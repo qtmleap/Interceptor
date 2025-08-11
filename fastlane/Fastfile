@@ -26,11 +26,11 @@ platform :ios do
   lane :build do
   gym(
     scheme: "Interceptor",
-    export_method: "ad-hoc", # ここは ad-hoc でも app-store でもOK、署名しないから意味ない
+    export_method: "ad-hoc",
     export_options: {
       signingStyle: "manual",
-      provisioningProfiles: {}, # プロビジョニング使わない
-      signingCertificate: "",   # 証明書なし
+      provisioningProfiles: {},
+      signingCertificate: "",
       compileBitcode: false
     },
     export_xcargs: "-allowProvisioningUpdates CODE_SIGN_IDENTITY=\"\" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO",
