@@ -24,7 +24,18 @@ end
 platform :ios do
   desc "Build the iOS app"
   lane :build do
-    build_app(scheme: "Interceptor")
+  gym(
+    scheme: "Interceptor",
+    export_method: "ad-hoc", # ここは ad-hoc でも app-store でもOK、署名しないから意味ない
+    export_options: {
+      signingStyle: "manual",
+      provisioningProfiles: {}, # プロビジョニング使わない
+      signingCertificate: "",   # 証明書なし
+      compileBitcode: false
+    },
+    export_xcargs: "-allowProvisioningUpdates CODE_SIGN_IDENTITY=\"\" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO",
+    clean: true
+  )
   end
 end
 
