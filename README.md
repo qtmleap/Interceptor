@@ -19,10 +19,10 @@ TrollStore向けとApp Store/TestFlight向けのプロファイルを用意し�
 
 `fastlane beta`
 
-## Contributions
+## Contributors
 
 - [zhxie](https://github.com/zhxie)
-    - [Mudmouth](https://github.com/zhxie/Mudmouth/)
+- [ultemica](https://github.com/ultemica)
 
 ## License
 
