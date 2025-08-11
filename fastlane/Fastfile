@@ -22,12 +22,19 @@ before_all do |lane, options|
 end
 
 platform :ios do
+  desc "Build the iOS app"
+  lane :build do
+    build_app(scheme: "Interceptor")
+  end
+end
+
+platform :ios do
   desc "Push a new beta build to TestFlight"
   lane :beta do
     # scan
     fetch_testflight_profile
-    increment_build_number(xcodeproj: "KaraokeTool.xcodeproj")
-    build_app(scheme: "KaraokeTool")
+    increment_build_number(xcodeproj: "Interceptor.xcodeproj")
+    build_app(scheme: "Interceptor")
     upload_to_testflight(
       skip_waiting_for_build_processing: true,
       demo_account_required: false,
