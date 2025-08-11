@@ -18,3 +18,12 @@ TrollStore向けとApp Store/TestFlight向けのプロファイルを用意し�
 #### For App Store/TestFlight
 
 `fastlane beta`
+
+## Contributions
+
+- [zhxie](https://github.com/zhxie)
+    - [Mudmouth](https://github.com/zhxie/Mudmouth/)
+
+## License
+
+Interceptor is licensed under the MIT License.
