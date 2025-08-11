@@ -12,12 +12,15 @@ import QuantumLeap
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
     /// どういうときに呼ばれるの、これ
+    /// NOTE: startVPNTunnelが実行されたときのオプションがここで渡される
     /// - Parameter options: <#options description#>
     override func startTunnel(options: [String: NSObject]? = nil) async throws {
         NSLog("Starting tunnel with options: \(String(describing: options))")
         Logger.debug("Starting tunnel with options: \(String(describing: options))")
-//        try await setTunnelNetworkSettings(settings)
-//        try await startMITMServer(options: options)
+        try await setTunnelNetworkSettings(settings)
+        /// FIXME: 一時的にクラッシュの原因となるヤバめのコードを書く
+        let option: String = options![NEVPNConnectionStartOptionPassword]! as! String
+        //        try await startMITMServer(options: options)
     }
 
     /// スプラトゥーン3のトークンを取得するためだけの設定
@@ -29,6 +32,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         let proxySettings: NEProxySettings = .init()
         proxySettings.httpsServer = NEProxyServer(address: "127.0.0.1", port: 6_836)
         proxySettings.httpsEnabled = true
+        // ここのドメインでしかプロクシを実行しないようにする(ということはURL自体はあまり関係ない)
         // swiftlint:disable:next force_unwrapping
         proxySettings.matchDomains = [url.host!]
         let ipv4Settings = NEIPv4Settings(addresses: ["198.18.0.1"], subnetMasks: ["255.255.255.0"])
