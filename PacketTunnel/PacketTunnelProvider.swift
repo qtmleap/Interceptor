@@ -8,7 +8,7 @@
 
 import Mudmouth
 import NetworkExtension
-import QuantumLeap
+import SwiftyLogger
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
     /// どういうときに呼ばれるの、これ
@@ -16,10 +16,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     /// - Parameter options: <#options description#>
     override func startTunnel(options: [String: NSObject]? = nil) async throws {
         NSLog("Starting tunnel with options: \(String(describing: options))")
-        Logger.debug("Starting tunnel with options: \(String(describing: options))")
+        SwiftyLogger.debug("Starting tunnel with options: \(String(describing: options))")
         try await setTunnelNetworkSettings(settings)
-        /// FIXME: 一時的にクラッシュの原因となるヤバめのコードを書く
-        let option: String = options![NEVPNConnectionStartOptionPassword]! as! String
+        // FIXME: 一時的にクラッシュの原因となるヤバめのコードを書く
+        let option: Data = options![NEVPNConnectionStartOptionPassword]! as! Data
+
         //        try await startMITMServer(options: options)
     }
 

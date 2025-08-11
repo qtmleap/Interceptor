@@ -7,11 +7,10 @@
 //
 
 import Mudmouth
-import QuantumLeap
 import SwiftUI
+import SwiftyLogger
 
 struct ContentView: View {
-    @Environment(\.isFirstLaunch) private var isFirstLaunch
     var body: some View {
         TabView(content: {})
             .fullScreenCover(isPresented: .constant(true), content: {

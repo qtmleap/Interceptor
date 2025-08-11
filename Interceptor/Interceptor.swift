@@ -7,13 +7,13 @@
 //
 
 import Firebase
-import QuantumLeap
 import SwiftUI
+import SwiftyLogger
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         FirebaseApp.configure()
-        Logger.configure()
+        SwiftyLogger.configure()
         print(UIApplication.shared.canOpenURL(URL(string: "com.nintendo.znca://")!))
         return true
     }
@@ -26,7 +26,6 @@ struct Interceptor: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentIsFirstLaunch()
         }
     }
 }
