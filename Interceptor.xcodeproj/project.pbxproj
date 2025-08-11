@@ -1,0 +1,873 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 104F3BAE2E49131900A2D6F1 /* Mudmouth */; };
+		104F3BB22E49135800A2D6F1 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 104F3BB12E49135800A2D6F1 /* Mudmouth */; };
+		10F701BC2E491546006ECDD2 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 10F701BB2E491546006ECDD2 /* NetworkExtension.framework */; };
+		10F701C42E491546006ECDD2 /* PacketTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 10F701B92E491546006ECDD2 /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		10F701CB2E491567006ECDD2 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 10F701CA2E491567006ECDD2 /* Mudmouth */; };
+		10F702712E49829B006ECDD2 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 10F702702E49829B006ECDD2 /* FirebaseAnalytics */; };
+		10F702732E49829B006ECDD2 /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = 10F702722E49829B006ECDD2 /* FirebaseAnalyticsCore */; };
+		10F702752E49829B006ECDD2 /* FirebaseAnalyticsIdentitySupport in Frameworks */ = {isa = PBXBuildFile; productRef = 10F702742E49829B006ECDD2 /* FirebaseAnalyticsIdentitySupport */; };
+		10F702772E49829B006ECDD2 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 10F702762E49829B006ECDD2 /* FirebaseAppCheck */; };
+		10F702792E49829B006ECDD2 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 10F702782E49829B006ECDD2 /* FirebaseCore */; };
+		10F7027B2E49829B006ECDD2 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 10F7027A2E49829B006ECDD2 /* FirebaseCrashlytics */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		104F3B8F2E49099300A2D6F1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 104F3B792E49099100A2D6F1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 104F3B802E49099200A2D6F1;
+			remoteInfo = Interceptor;
+		};
+		104F3B992E49099300A2D6F1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 104F3B792E49099100A2D6F1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 104F3B802E49099200A2D6F1;
+			remoteInfo = Interceptor;
+		};
+		10F701C22E491546006ECDD2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 104F3B792E49099100A2D6F1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 10F701B82E491546006ECDD2;
+			remoteInfo = "packet-tunnel";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		10F701C92E491546006ECDD2 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				10F701C42E491546006ECDD2 /* PacketTunnel.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		104F3B812E49099200A2D6F1 /* Interceptor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Interceptor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		104F3B8E2E49099300A2D6F1 /* InterceptorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InterceptorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		104F3B982E49099300A2D6F1 /* InterceptorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InterceptorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		10F701B92E491546006ECDD2 /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		10F701BB2E491546006ECDD2 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1017BFC42E4A2080005E8F65 /* Exceptions for "Interceptor" folder in "Interceptor" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 104F3B802E49099200A2D6F1 /* Interceptor */;
+		};
+		10F701C52E491546006ECDD2 /* Exceptions for "PacketTunnel" folder in "PacketTunnel" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 10F701B82E491546006ECDD2 /* PacketTunnel */;
+		};
+		10F7026C2E497A96006ECDD2 /* Exceptions for "Interceptor" folder in "PacketTunnel" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Localizable.xcstrings,
+			);
+			target = 10F701B82E491546006ECDD2 /* PacketTunnel */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		104F3B832E49099200A2D6F1 /* Interceptor */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				1017BFC42E4A2080005E8F65 /* Exceptions for "Interceptor" folder in "Interceptor" target */,
+				10F7026C2E497A96006ECDD2 /* Exceptions for "Interceptor" folder in "PacketTunnel" target */,
+			);
+			path = Interceptor;
+			sourceTree = "<group>";
+		};
+		104F3B912E49099300A2D6F1 /* InterceptorTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = InterceptorTests;
+			sourceTree = "<group>";
+		};
+		104F3B9B2E49099300A2D6F1 /* InterceptorUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = InterceptorUITests;
+			sourceTree = "<group>";
+		};
+		10F701BD2E491546006ECDD2 /* PacketTunnel */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				10F701C52E491546006ECDD2 /* Exceptions for "PacketTunnel" folder in "PacketTunnel" target */,
+			);
+			path = PacketTunnel;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		104F3B7E2E49099200A2D6F1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */,
+				10F702752E49829B006ECDD2 /* FirebaseAnalyticsIdentitySupport in Frameworks */,
+				104F3BB22E49135800A2D6F1 /* Mudmouth in Frameworks */,
+				10F702712E49829B006ECDD2 /* FirebaseAnalytics in Frameworks */,
+				10F702792E49829B006ECDD2 /* FirebaseCore in Frameworks */,
+				10F7027B2E49829B006ECDD2 /* FirebaseCrashlytics in Frameworks */,
+				10F702772E49829B006ECDD2 /* FirebaseAppCheck in Frameworks */,
+				10F702732E49829B006ECDD2 /* FirebaseAnalyticsCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		104F3B8B2E49099300A2D6F1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		104F3B952E49099300A2D6F1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		10F701B62E491546006ECDD2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				10F701BC2E491546006ECDD2 /* NetworkExtension.framework in Frameworks */,
+				10F701CB2E491567006ECDD2 /* Mudmouth in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		104F3B782E49099100A2D6F1 = {
+			isa = PBXGroup;
+			children = (
+				104F3B832E49099200A2D6F1 /* Interceptor */,
+				104F3B912E49099300A2D6F1 /* InterceptorTests */,
+				104F3B9B2E49099300A2D6F1 /* InterceptorUITests */,
+				10F701BD2E491546006ECDD2 /* PacketTunnel */,
+				10F701BA2E491546006ECDD2 /* Frameworks */,
+				104F3B822E49099200A2D6F1 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		104F3B822E49099200A2D6F1 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				104F3B812E49099200A2D6F1 /* Interceptor.app */,
+				104F3B8E2E49099300A2D6F1 /* InterceptorTests.xctest */,
+				104F3B982E49099300A2D6F1 /* InterceptorUITests.xctest */,
+				10F701B92E491546006ECDD2 /* PacketTunnel.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		10F701BA2E491546006ECDD2 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				10F701BB2E491546006ECDD2 /* NetworkExtension.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		104F3B802E49099200A2D6F1 /* Interceptor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 104F3BA22E49099300A2D6F1 /* Build configuration list for PBXNativeTarget "Interceptor" */;
+			buildPhases = (
+				104F3B7D2E49099200A2D6F1 /* Sources */,
+				104F3B7E2E49099200A2D6F1 /* Frameworks */,
+				104F3B7F2E49099200A2D6F1 /* Resources */,
+				10F701C92E491546006ECDD2 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				10F701C32E491546006ECDD2 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				104F3B832E49099200A2D6F1 /* Interceptor */,
+			);
+			name = Interceptor;
+			packageProductDependencies = (
+				104F3BAE2E49131900A2D6F1 /* Mudmouth */,
+				104F3BB12E49135800A2D6F1 /* Mudmouth */,
+				10F702702E49829B006ECDD2 /* FirebaseAnalytics */,
+				10F702722E49829B006ECDD2 /* FirebaseAnalyticsCore */,
+				10F702742E49829B006ECDD2 /* FirebaseAnalyticsIdentitySupport */,
+				10F702762E49829B006ECDD2 /* FirebaseAppCheck */,
+				10F702782E49829B006ECDD2 /* FirebaseCore */,
+				10F7027A2E49829B006ECDD2 /* FirebaseCrashlytics */,
+			);
+			productName = Interceptor;
+			productReference = 104F3B812E49099200A2D6F1 /* Interceptor.app */;
+			productType = "com.apple.product-type.application";
+		};
+		104F3B8D2E49099300A2D6F1 /* InterceptorTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 104F3BA52E49099300A2D6F1 /* Build configuration list for PBXNativeTarget "InterceptorTests" */;
+			buildPhases = (
+				104F3B8A2E49099300A2D6F1 /* Sources */,
+				104F3B8B2E49099300A2D6F1 /* Frameworks */,
+				104F3B8C2E49099300A2D6F1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				104F3B902E49099300A2D6F1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				104F3B912E49099300A2D6F1 /* InterceptorTests */,
+			);
+			name = InterceptorTests;
+			packageProductDependencies = (
+			);
+			productName = InterceptorTests;
+			productReference = 104F3B8E2E49099300A2D6F1 /* InterceptorTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		104F3B972E49099300A2D6F1 /* InterceptorUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 104F3BA82E49099300A2D6F1 /* Build configuration list for PBXNativeTarget "InterceptorUITests" */;
+			buildPhases = (
+				104F3B942E49099300A2D6F1 /* Sources */,
+				104F3B952E49099300A2D6F1 /* Frameworks */,
+				104F3B962E49099300A2D6F1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				104F3B9A2E49099300A2D6F1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				104F3B9B2E49099300A2D6F1 /* InterceptorUITests */,
+			);
+			name = InterceptorUITests;
+			packageProductDependencies = (
+			);
+			productName = InterceptorUITests;
+			productReference = 104F3B982E49099300A2D6F1 /* InterceptorUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		10F701B82E491546006ECDD2 /* PacketTunnel */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 10F701C62E491546006ECDD2 /* Build configuration list for PBXNativeTarget "PacketTunnel" */;
+			buildPhases = (
+				10F701B52E491546006ECDD2 /* Sources */,
+				10F701B62E491546006ECDD2 /* Frameworks */,
+				10F701B72E491546006ECDD2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				10F701BD2E491546006ECDD2 /* PacketTunnel */,
+			);
+			name = PacketTunnel;
+			packageProductDependencies = (
+				10F701CA2E491567006ECDD2 /* Mudmouth */,
+			);
+			productName = "packet-tunnel";
+			productReference = 10F701B92E491546006ECDD2 /* PacketTunnel.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		104F3B792E49099100A2D6F1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				ORGANIZATIONNAME = QuantumLeap;
+				TargetAttributes = {
+					104F3B802E49099200A2D6F1 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					104F3B8D2E49099300A2D6F1 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 104F3B802E49099200A2D6F1;
+					};
+					104F3B972E49099300A2D6F1 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 104F3B802E49099200A2D6F1;
+					};
+					10F701B82E491546006ECDD2 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+				};
+			};
+			buildConfigurationList = 104F3B7C2E49099100A2D6F1 /* Build configuration list for PBXProject "Interceptor" */;
+			developmentRegion = ja;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				ja,
+			);
+			mainGroup = 104F3B782E49099100A2D6F1;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				104F3BB02E49135800A2D6F1 /* XCLocalSwiftPackageReference "../Mudmouth" */,
+				10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 104F3B822E49099200A2D6F1 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				104F3B802E49099200A2D6F1 /* Interceptor */,
+				104F3B8D2E49099300A2D6F1 /* InterceptorTests */,
+				104F3B972E49099300A2D6F1 /* InterceptorUITests */,
+				10F701B82E491546006ECDD2 /* PacketTunnel */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		104F3B7F2E49099200A2D6F1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		104F3B8C2E49099300A2D6F1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		104F3B962E49099300A2D6F1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		10F701B72E491546006ECDD2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		104F3B7D2E49099200A2D6F1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		104F3B8A2E49099300A2D6F1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		104F3B942E49099300A2D6F1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		10F701B52E491546006ECDD2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		104F3B902E49099300A2D6F1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 104F3B802E49099200A2D6F1 /* Interceptor */;
+			targetProxy = 104F3B8F2E49099300A2D6F1 /* PBXContainerItemProxy */;
+		};
+		104F3B9A2E49099300A2D6F1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 104F3B802E49099200A2D6F1 /* Interceptor */;
+			targetProxy = 104F3B992E49099300A2D6F1 /* PBXContainerItemProxy */;
+		};
+		10F701C32E491546006ECDD2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 10F701B82E491546006ECDD2 /* PacketTunnel */;
+			targetProxy = 10F701C22E491546006ECDD2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		104F3BA02E49099300A2D6F1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 5Q94QJ7G98;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		104F3BA12E49099300A2D6F1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 5Q94QJ7G98;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		104F3BA32E49099300A2D6F1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Interceptor/Interceptor.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5Q94QJ7G98;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Interceptor/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Interceptor;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jp.qleap.intrcptr;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		104F3BA42E49099300A2D6F1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Interceptor/Interceptor.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5Q94QJ7G98;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Interceptor/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Interceptor;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jp.qleap.intrcptr;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		104F3BA62E49099300A2D6F1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5Q94QJ7G98;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "jp.qleap.intrcptr-test";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Interceptor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Interceptor";
+			};
+			name = Debug;
+		};
+		104F3BA72E49099300A2D6F1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5Q94QJ7G98;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "jp.qleap.intrcptr-test";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Interceptor.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Interceptor";
+			};
+			name = Release;
+		};
+		104F3BA92E49099300A2D6F1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5Q94QJ7G98;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "jp.qleap.intrcptr-ui-test";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Interceptor;
+			};
+			name = Debug;
+		};
+		104F3BAA2E49099300A2D6F1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5Q94QJ7G98;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "jp.qleap.intrcptr-ui-test";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Interceptor;
+			};
+			name = Release;
+		};
+		10F701C72E491546006ECDD2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5Q94QJ7G98;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PacketTunnel/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PacketTunnel;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "jp.qleap.intrcptr.packet-tunnel";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		10F701C82E491546006ECDD2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5Q94QJ7G98;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PacketTunnel/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PacketTunnel;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "jp.qleap.intrcptr.packet-tunnel";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		104F3B7C2E49099100A2D6F1 /* Build configuration list for PBXProject "Interceptor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				104F3BA02E49099300A2D6F1 /* Debug */,
+				104F3BA12E49099300A2D6F1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		104F3BA22E49099300A2D6F1 /* Build configuration list for PBXNativeTarget "Interceptor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				104F3BA32E49099300A2D6F1 /* Debug */,
+				104F3BA42E49099300A2D6F1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		104F3BA52E49099300A2D6F1 /* Build configuration list for PBXNativeTarget "InterceptorTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				104F3BA62E49099300A2D6F1 /* Debug */,
+				104F3BA72E49099300A2D6F1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		104F3BA82E49099300A2D6F1 /* Build configuration list for PBXNativeTarget "InterceptorUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				104F3BA92E49099300A2D6F1 /* Debug */,
+				104F3BAA2E49099300A2D6F1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		10F701C62E491546006ECDD2 /* Build configuration list for PBXNativeTarget "PacketTunnel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				10F701C72E491546006ECDD2 /* Debug */,
+				10F701C82E491546006ECDD2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		104F3BB02E49135800A2D6F1 /* XCLocalSwiftPackageReference "../Mudmouth" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Mudmouth;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		104F3BAE2E49131900A2D6F1 /* Mudmouth */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Mudmouth;
+		};
+		104F3BB12E49135800A2D6F1 /* Mudmouth */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Mudmouth;
+		};
+		10F701CA2E491567006ECDD2 /* Mudmouth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 104F3BB02E49135800A2D6F1 /* XCLocalSwiftPackageReference "../Mudmouth" */;
+			productName = Mudmouth;
+		};
+		10F702702E49829B006ECDD2 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		10F702722E49829B006ECDD2 /* FirebaseAnalyticsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsCore;
+		};
+		10F702742E49829B006ECDD2 /* FirebaseAnalyticsIdentitySupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsIdentitySupport;
+		};
+		10F702762E49829B006ECDD2 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
+		};
+		10F702782E49829B006ECDD2 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		10F7027A2E49829B006ECDD2 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 104F3B792E49099100A2D6F1 /* Project object */;
+}

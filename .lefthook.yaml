@@ -1,0 +1,6 @@
+pre-commit:
+  commands:
+    swiftlint:
+      run: swiftlint lint --fix
+    swiftformat:
+      run: swiftformat .
