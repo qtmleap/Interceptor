@@ -15,4 +15,4 @@ This is an iOS application that uses a self-signed certificate to obtain an acce
 
 ## License
 
-Interceptor is licensed under the MIT License.
+Interceptor is licensed under [the MIT License](/LICENSE).
