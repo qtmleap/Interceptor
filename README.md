@@ -4,6 +4,7 @@ This is an iOS application that uses a self-signed certificate to obtain an acce
 
 ### Requirements
 
+- iOS 16.x
 - Xcode 16.x
 - fastlane
 
