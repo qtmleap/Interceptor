@@ -20,8 +20,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         try await setTunnelNetworkSettings(settings)
         // FIXME: 一時的にクラッシュの原因となるヤバめのコードを書く
         let option: Data = options![NEVPNConnectionStartOptionPassword]! as! Data
-
-        //        try await startMITMServer(options: options)
+      
+      
     }
 
     /// スプラトゥーン3のトークンを取得するためだけの設定
