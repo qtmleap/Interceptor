@@ -42,6 +42,10 @@ platform :ios do
     match(
       api_key: api_key,
       type: "appstore",
+      app_identifier: [
+        "jp.qleap.intrcptr",
+        "jp.qleap.intrcptr.packet-tunnel",
+      ],
       readonly: ENV["MATCH_FETCH_READ_ONLY_MODE"]
     )
   end
