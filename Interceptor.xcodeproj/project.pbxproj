@@ -200,7 +200,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 104F3BA22E49099300A2D6F1 /* Build configuration list for PBXNativeTarget "Interceptor" */;
 			buildPhases = (
-				10CC42F42E4AD335002C5857 /* ShellScript */,
 				104F3B7D2E49099200A2D6F1 /* Sources */,
 				104F3B7E2E49099200A2D6F1 /* Frameworks */,
 				104F3B7F2E49099200A2D6F1 /* Resources */,
@@ -382,26 +381,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		10CC42F42E4AD335002C5857 /* ShellScript */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nswiftformat /Users/devonly/Developer/Interceptor --config /Users/devonly/Developer/Interceptor/.swiftformat\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		104F3B7D2E49099200A2D6F1 /* Sources */ = {
