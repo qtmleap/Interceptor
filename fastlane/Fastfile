@@ -22,24 +22,6 @@ before_all do |lane, options|
 end
 
 platform :ios do
-  desc "Build the iOS app"
-  lane :build do
-  gym(
-    scheme: "Interceptor",
-    export_method: "ad-hoc",
-    export_options: {
-      signingStyle: "manual",
-      provisioningProfiles: {},
-      signingCertificate: "",
-      compileBitcode: false
-    },
-    export_xcargs: "-allowProvisioningUpdates CODE_SIGN_IDENTITY=\"\" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO",
-    clean: true
-  )
-  end
-end
-
-platform :ios do
   desc "Push a new beta build to TestFlight"
   lane :beta do
     # scan
