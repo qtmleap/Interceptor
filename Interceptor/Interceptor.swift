@@ -14,7 +14,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         FirebaseApp.configure()
         SwiftyLogger.configure()
-        print(UIApplication.shared.canOpenURL(URL(string: "com.nintendo.znca://")!))
         return true
     }
 }
