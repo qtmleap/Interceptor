@@ -7,6 +7,7 @@
 //
 
 import Firebase
+import Mudmouth
 import SwiftUI
 import SwiftyLogger
 
@@ -14,7 +15,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         FirebaseApp.configure()
         SwiftyLogger.configure()
+        UNUserNotificationCenter.current().delegate = self
         return true
+    }
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        SwiftyLogger.debug("Received notification response: \(response.notification.request.content.userInfo)")
     }
 }
 
@@ -25,6 +33,7 @@ struct Interceptor: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(Mudmouth())
         }
     }
 }

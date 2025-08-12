@@ -14,7 +14,9 @@ struct ContentView: View {
     var body: some View {
         TabView(content: {})
             .fullScreenCover(isPresented: .constant(true), content: {
-                ConfigurationView()
+                NavigationView(content: {
+                    ConfigurationView()
+                })
             })
     }
 }
