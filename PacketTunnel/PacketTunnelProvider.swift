@@ -18,10 +18,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     NSLog("Starting tunnel with options: \(String(describing: options))")
     SwiftyLogger.debug("Starting tunnel with options: \(String(describing: options))")
     try await setTunnelNetworkSettings(settings)
-    // FIXME: 一時的にクラッシュの原因となるヤバめのコードを書く
-    let option: Data = options![NEVPNConnectionStartOptionPassword]! as! Data
-    
-    
+    try await MITM.startTunnel(options: options)
   }
   
   /// スプラトゥーン3のトークンを取得するためだけの設定
