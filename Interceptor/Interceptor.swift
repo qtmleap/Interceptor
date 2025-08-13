@@ -49,7 +49,14 @@ class AppDelegate: NSObject, UIApplicationDelegate, UIWindowSceneDelegate {
 
 extension AppDelegate: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        SwiftyLogger.debug("Received notification response: \(response.notification.request.content.userInfo)")
+        let userInfo = response.notification.request.content.userInfo
+        if let headers = (userInfo["headers"] as? String).map(\.base64DecodedString),
+           let body = userInfo["body"] as? String
+        {
+            print(headers)
+            SwiftyLogger.debug(headers)
+            SwiftyLogger.debug(body)
+        }
     }
 }
 
