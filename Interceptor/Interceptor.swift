@@ -53,7 +53,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         if let headers = (userInfo["headers"] as? String).map(\.base64DecodedString),
            let body = userInfo["body"] as? String
         {
-            print(headers)
             SwiftyLogger.debug(headers)
             SwiftyLogger.debug(body)
         }
