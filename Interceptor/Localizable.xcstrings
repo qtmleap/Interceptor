@@ -1,7 +1,26 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
-
+    "LABEL_DEVELOPER_SETTINGS" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開発者向け設定"
+          }
+        }
+      }
+    },
+    "TITLE_SETTINGS" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }

@@ -18,7 +18,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, UIWindowSceneDelegate {
     ) -> Bool { true }
 
     func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // Firebaseの設定
         FirebaseApp.configure()
+        // ログ収集を開始
         SwiftyLogger.configure()
         UNUserNotificationCenter.current().delegate = self
         return true
@@ -67,6 +69,7 @@ struct Interceptor: App {
         WindowGroup {
             ContentView()
                 .environment(Mudmouth())
+                .environmentIsFirstLaunch()
         }
     }
 }

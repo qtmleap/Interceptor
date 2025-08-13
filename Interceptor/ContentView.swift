@@ -11,14 +11,34 @@ import SwiftUI
 import SwiftyLogger
 
 struct ContentView: View {
+    @Environment(\.isFirstLaunch) private var isFirstLaunch: Binding<Bool>
+    @State private var isPresented: Bool = false
+
     var body: some View {
-        TabView(content: {})
-            .fullScreenCover(isPresented: .constant(true), content: {
-                FirstLaunchView()
-            })
+        NavigationView(content: {
+            TabView(content: {})
+                .toolbar(content: {
+                    ToolbarItem(placement: .navigation, content: {
+                        Button(action: {
+                            isPresented.toggle()
+                        }, label: {
+                            Image(systemName: "gearshape.fill")
+                        })
+                    })
+                })
+                .navigationBarTitleDisplayMode(.inline)
+        })
+        .fullScreenCover(isPresented: isFirstLaunch, content: {
+            FirstLaunchView()
+        })
+        .fullScreenCover(isPresented: $isPresented, content: {
+            SettingsView()
+        })
     }
 }
 
 #Preview {
     ContentView()
+        .environmentIsFirstLaunch()
+        .environment(Mudmouth())
 }

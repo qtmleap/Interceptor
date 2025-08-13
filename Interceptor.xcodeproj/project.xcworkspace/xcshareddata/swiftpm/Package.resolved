@@ -1,5 +1,5 @@
 {
-  "originHash" : "63b13cfc3475f46824bf597fa4ca073dc9c5af639c398a9398086e7fd3527177",
+  "originHash" : "bd021d5c0e7e680b883b7cf2828604d23700fdf290aef4cf435d88bfe17e1ddf",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -146,6 +146,15 @@
       }
     },
     {
+      "identity" : "licenselist",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/cybozu/LicenseList.git",
+      "state" : {
+        "revision" : "a0a1784aa60dcdafbc30cb2ffbac90544b46100a",
+        "version" : "2.1.0"
+      }
+    },
+    {
       "identity" : "nanopb",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/firebase/nanopb.git",
@@ -161,6 +170,15 @@
       "state" : {
         "revision" : "540318ecedd63d883069ae7f1ed811a2df00b6ac",
         "version" : "2.4.0"
+      }
+    },
+    {
+      "identity" : "quantumleap",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/qtmleap/QuantumLeap.git",
+      "state" : {
+        "revision" : "b06e8c9f301dadf2cde490bf01f311d62d5057b9",
+        "version" : "0.0.4"
       }
     },
     {
