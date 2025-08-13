@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 104F3BAE2E49131900A2D6F1 /* Mudmouth */; };
 		104F3BB22E49135800A2D6F1 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 104F3BB12E49135800A2D6F1 /* Mudmouth */; };
+		10925F5D2E4CFA25003611AA /* QuantumLeap in Frameworks */ = {isa = PBXBuildFile; productRef = 10925F5C2E4CFA25003611AA /* QuantumLeap */; };
 		10F701BC2E491546006ECDD2 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 10F701BB2E491546006ECDD2 /* NetworkExtension.framework */; };
 		10F701C42E491546006ECDD2 /* PacketTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 10F701B92E491546006ECDD2 /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		10F701CB2E491567006ECDD2 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 10F701CA2E491567006ECDD2 /* Mudmouth */; };
@@ -125,6 +126,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				10925F5D2E4CFA25003611AA /* QuantumLeap in Frameworks */,
 				104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */,
 				10F702752E49829B006ECDD2 /* FirebaseAnalyticsIdentitySupport in Frameworks */,
 				104F3BB22E49135800A2D6F1 /* Mudmouth in Frameworks */,
@@ -223,6 +225,7 @@
 				10F702762E49829B006ECDD2 /* FirebaseAppCheck */,
 				10F702782E49829B006ECDD2 /* FirebaseCore */,
 				10F7027A2E49829B006ECDD2 /* FirebaseCrashlytics */,
+				10925F5C2E4CFA25003611AA /* QuantumLeap */,
 			);
 			productName = Interceptor;
 			productReference = 104F3B812E49099200A2D6F1 /* Interceptor.app */;
@@ -337,6 +340,7 @@
 			packageReferences = (
 				104F3BB02E49135800A2D6F1 /* XCLocalSwiftPackageReference "../Mudmouth" */,
 				10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 104F3B822E49099200A2D6F1 /* Products */;
@@ -817,6 +821,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/qtmleap/QuantumLeap.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.4;
+			};
+		};
 		10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
@@ -835,6 +847,11 @@
 		104F3BB12E49135800A2D6F1 /* Mudmouth */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Mudmouth;
+		};
+		10925F5C2E4CFA25003611AA /* QuantumLeap */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */;
+			productName = QuantumLeap;
 		};
 		10F701CA2E491567006ECDD2 /* Mudmouth */ = {
 			isa = XCSwiftPackageProductDependency;
