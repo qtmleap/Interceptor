@@ -13,7 +13,7 @@ import SwiftyLogger
 
 class AppDelegate: NSObject, UIApplicationDelegate, UIWindowSceneDelegate {
     weak var tokenStore: WebTokenStore?
-    
+
     func application(
         _ application: UIApplication,
         willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil,
@@ -62,9 +62,9 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
 @main
 struct Interceptor: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    
+
     private let tokenStore: WebTokenStore = .default
-    
+
     init() {
         appDelegate.tokenStore = .default
     }
