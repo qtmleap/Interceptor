@@ -34,6 +34,7 @@ struct SettingsView: View {
                         })
                     })
                 })
+                Services()
                 QuantumLeap.Policy()
                 QuantumLeap.Version()
             })

@@ -12,6 +12,8 @@ import SwiftUI
 import SwiftyLogger
 
 class AppDelegate: NSObject, UIApplicationDelegate, UIWindowSceneDelegate {
+    weak var tokenStore: WebTokenStore?
+    
     func application(
         _ application: UIApplication,
         willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil,
@@ -51,23 +53,26 @@ class AppDelegate: NSObject, UIApplicationDelegate, UIWindowSceneDelegate {
 
 extension AppDelegate: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        let userInfo = response.notification.request.content.userInfo
-        if let headers = (userInfo["headers"] as? String).map(\.base64DecodedString),
-           let body = userInfo["body"] as? String
-        {
-            SwiftyLogger.debug(headers)
-            SwiftyLogger.debug(body)
-        }
+        await MainActor.run(body: {
+            try? tokenStore?.setToken(response)
+        })
     }
 }
 
 @main
 struct Interceptor: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
+    private let tokenStore: WebTokenStore = .default
+    
+    init() {
+        appDelegate.tokenStore = .default
+    }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(tokenStore)
                 .environment(Mudmouth())
                 .environmentIsFirstLaunch()
         }
