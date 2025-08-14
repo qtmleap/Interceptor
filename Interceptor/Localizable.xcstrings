@@ -1,6 +1,51 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "BUTTON_API_KEY" : {
+
+    },
+    "BUTTON_REFRESH_TOKEN" : {
+
+    },
+    "FIELD_API_KEY" : {
+
+    },
+    "FOOTER_LINK_SERVICES" : {
+
+    },
+    "FOOTER_NOOK_LINK" : {
+
+    },
+    "FOOTER_SMASH_BROS_SPECIAL" : {
+
+    },
+    "FOOTER_SPLATOON_2" : {
+
+    },
+    "FOOTER_SPLATOON_3" : {
+
+    },
+    "FOOTER_ZELDA_NOTES" : {
+
+    },
+    "HEADER_LINK_SERVICES" : {
+
+    },
+    "HEADER_NOOK_LINK" : {
+
+    },
+    "HEADER_SMASH_BROS_SPECIAL" : {
+
+    },
+    "HEADER_SPLATOON_2" : {
+
+    },
+    "HEADER_SPLATOON_3" : {
+
+    },
+    "HEADER_ZELDA_NOTES" : {
+
+    },
     "LABEL_DEVELOPER_SETTINGS" : {
       "localizations" : {
         "ja" : {
@@ -11,6 +56,18 @@
         }
       }
     },
+    "LABEL_EXPIRES_IN" : {
+
+    },
+    "NINTENDO_TOKEN_LIST" : {
+
+    },
+    "stat.ink" : {
+
+    },
+    "TITLE_SERVICE_STATINK" : {
+
+    },
     "TITLE_SETTINGS" : {
       "localizations" : {
         "ja" : {
@@ -20,6 +77,9 @@
           }
         }
       }
+    },
+    "TOKEN_BULLET_TOKENS" : {
+
     }
   },
   "version" : "1.0"
