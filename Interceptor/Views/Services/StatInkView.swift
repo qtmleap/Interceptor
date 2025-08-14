@@ -10,7 +10,7 @@ import SwiftUI
 
 struct StatInkView: View {
     @State private var apiKey: String = ""
-    
+
     var body: some View {
         Form(content: {
             Button(action: {

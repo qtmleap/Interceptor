@@ -7,16 +7,16 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "C6D629B1-8C5D-4ACD-8C8C-2FECFC135E82"
+            uuid = "869DF501-58C3-4538-9BE4-83C597F48C42"
             shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "Interceptor/Interceptor.swift"
+            filePath = "../Mudmouth/Sources/Mudmouth/Classes/Mudmouth.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "57"
-            endingLineNumber = "57"
-            landmarkName = "userNotificationCenter(_:didReceive:)"
+            startingLineNumber = "138"
+            endingLineNumber = "138"
+            landmarkName = "installVPN()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

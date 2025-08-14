@@ -8,6 +8,7 @@
 
 import Mudmouth
 import SwiftUI
+import SwiftUIIntrospect
 import SwiftyLogger
 
 struct ContentView: View {
@@ -33,6 +34,11 @@ struct ContentView: View {
         })
         .fullScreenCover(isPresented: $isPresented, content: {
             SettingsView()
+        })
+        .introspect(.navigationSplitView, on: .iOS(.v17, .v18), customize: { controller in
+            controller.preferredDisplayMode = .oneBesideSecondary
+            controller.preferredSplitBehavior = .tile
+            controller.presentsWithGesture = true
         })
     }
 }
