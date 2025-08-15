@@ -17,17 +17,18 @@ final class WebTokenStore {
     // iCloud Keychainを利用する
     // ライブラリ側と共通なので見ようと思ったらプライベートキーも参照できる？
     private let keychain: Keychain = .init(service: Bundle.main.bundleIdentifier!).synchronizable(true)
-
+    // 登録しているホスト一覧
+    private let hosts: [String] = [
+        "app.splatoon2.nintendo.net",
+        "api.lp1.av5ja.srv.nintendo.net",
+        "web.sd.lp1.acbaa.srv.nintendo.net",
+        "app.smashbros.nintendo.net",
+        "api.lp1.87abc152.srv.nintendo.net",
+    ]
     private(set) var tokens: [AccessToken] = []
 
     init() {
-        tokens = [
-            "app.splatoon2.nintendo.net",
-            "api.lp1.av5ja.srv.nintendo.net",
-            "web.sd.lp1.acbaa.srv.nintendo.net",
-            "app.smashbros.nintendo.net",
-            "api.lp1.87abc152.srv.nintendo.net",
-        ].compactMap { try? keychain.getToken(forKey: $0) }
+        tokens = hosts.compactMap { try? keychain.getToken(forKey: $0) }
         print(tokens)
     }
 
@@ -51,14 +52,14 @@ final class WebTokenStore {
                        let gtoken: String = headers.gtoken
                     {
                         print(token, gtoken)
-                        try keychain.setToken(.init(contentId: .SP2, gtoken: gtoken, accessToken: token), forKey: "app.splatoon2.nintendo.net")
+                        try keychain.setToken(.init(contentId: .SP2, host: host, gtoken: gtoken, accessToken: token), forKey: "app.splatoon2.nintendo.net")
                     }
                 case "api.lp1.av5ja.srv.nintendo.net": // Splatoon 3
                     if let token: String = body.value(forKey: "bulletToken"),
                        let gtoken: String = headers.gtoken
                     {
                         print(token, gtoken)
-                        try keychain.setToken(.init(contentId: .SP3, gtoken: gtoken, accessToken: token), forKey: "api.lp1.av5ja.srv.nintendo.net")
+                        try keychain.setToken(.init(contentId: .SP3, host: host, gtoken: gtoken, accessToken: token), forKey: "api.lp1.av5ja.srv.nintendo.net")
                     }
                 case "web.sd.lp1.acbaa.srv.nintendo.net": // NookLink
                     break
@@ -67,13 +68,15 @@ final class WebTokenStore {
                        let gtoken: String = headers.gtoken
                     {
                         print(token, gtoken)
-                        try keychain.setToken(.init(contentId: .SMSP, gtoken: gtoken, accessToken: token), forKey: "app.smashbros.nintendo.net")
+                        try keychain.setToken(.init(contentId: .SMSP, host: host, gtoken: gtoken, accessToken: token), forKey: "app.smashbros.nintendo.net")
                     }
                 case "api.lp1.87abc152.srv.nintendo.net": // Zelda Notes
                     break
                 default:
                     break
             }
+            // トークン一覧を更新
+            tokens = hosts.compactMap { try? keychain.getToken(forKey: $0) }
         }
     }
 }

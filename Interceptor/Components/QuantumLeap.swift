@@ -13,25 +13,96 @@ struct TokenListView: View {
     @Environment(WebTokenStore.self) private var store: WebTokenStore
 
     var body: some View {
-        ForEach(store.tokens, content: { token in
-            Section(content: {
-                Text(token.accessToken)
-                    .lineLimit(1)
-                Button(action: {
-                    UIApplication.shared.open(URL(string: "com.nintendo.znca://znca/game/\(token.contentId.rawValue)")!)
+        Section(content: {
+            ForEach(store.tokens, content: { token in
+                NavigationLink(destination: {
+                    TokenConfigView(token: token)
                 }, label: {
-                    Text("BUTTON_REFRESH_TOKEN")
+                    Text(NSLocalizedString(token.host, bundle: .main, comment: ""))
                 })
-            }, header: {
-                Text("HEADER_SPLATOON_2")
-            }, footer: {
-                Text("FOOTER_SPLATOON_2")
             })
+        }, header: {
+            Text("TITLE_GAME_WEB_TOKEN")
         })
         .multilineTextAlignment(.trailing)
         .textSelection(.enabled)
         .textContentType(.password)
-        .navigationTitle(Text("NINTENDO_TOKEN_LIST"))
+    }
+}
+
+struct TokenConfigView: View {
+//    @Binding var token: AccessToken
+    @State private var destinationURL: String = ""
+    @State private var isEditable: Bool = false
+    let token: AccessToken
+
+    var body: some View {
+        Form(content: {
+            Section(content: {
+                Toggle(isOn: .constant(false), label: {
+                    Text("LABEL_REGENERATE_FROM_GAME_WEB_TOKEN")
+                })
+                .disabled(true)
+                Toggle(isOn: .constant(false), label: {
+                    Text("LABEL_OPEN_APP_WHEN_TOKEN_EXPIRED")
+                })
+                .disabled(true)
+            }, header: {
+                Text("HEADER_GAME_WEB_TOKEN_EXPIRED_ACTION")
+            }, footer: {
+                Text("LABEL_GAME_WEB_TOKEN_EXPIRED_ACTION_FOOTER")
+            })
+            Section(content: {
+                TextField("LABEL_DESTINATION_URL", text: $destinationURL)
+                    .keyboardType(.URL)
+                    .disabled(!isEditable)
+            }, header: {
+                Text("HEADER_SERVICE_SETTING")
+            }, footer: {
+                Text("FOOTER_SERVICE_SETTING")
+            })
+            Section(content: {
+                LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_MEMBERSHIP", bundle: .main, comment: ""), content: {
+                    Text(token.gtoken.payload.membership.active ? "ENABLED" : "DISABLED")
+                })
+                LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_IS_CHILD_RESTRICTED", bundle: .main, comment: ""), content: {
+                    Text(token.gtoken.payload.isChildRestricted ? "ENABLED" : "DISABLED")
+                })
+                LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_AUD", comment: ""), content: {
+                    Text(token.gtoken.payload.aud)
+                        .lineLimit(1)
+                })
+                LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_EXP", comment: ""), content: {
+                    Text(Date(timeIntervalSince1970: TimeInterval(token.gtoken.payload.exp)).formatted())
+                        .lineLimit(1)
+                })
+                LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_IAT", comment: ""), content: {
+                    Text(Date(timeIntervalSince1970: TimeInterval(token.gtoken.payload.iat)).formatted())
+                        .lineLimit(1)
+                })
+                LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_ISS", comment: ""), content: {
+                    Text(token.gtoken.payload.iss)
+                        .lineLimit(1)
+                })
+                LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_JTI", comment: ""), content: {
+                    Text(token.gtoken.payload.jti.uuidString)
+                        .lineLimit(1)
+                })
+                LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_SUB", comment: ""), content: {
+                    Text(token.gtoken.payload.sub, format: .number)
+                        .lineLimit(1)
+                })
+            }, header: {
+                Text("HEADER_GAME_WEB_TOKEN")
+            })
+            Button(action: {
+                UIApplication.shared.open(token.url)
+            }, label: {
+                Text("LABEL_OPEN_APP")
+            })
+        })
+        .monospacedDigit()
+        .navigationTitle(Text(token.host))
         .navigationBarTitleDisplayMode(.inline)
     }
 }

@@ -1,11 +1,72 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "api.lp1.87abc152.srv.nintendo.net" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ZELDA NOTES"
+          }
+        }
+      }
+    },
+    "api.lp1.av5ja.srv.nintendo.net" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イカリング3"
+          }
+        }
+      }
+    },
+    "app.smashbros.nintendo.net" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スマプラス"
+          }
+        }
+      }
+    },
+    "app.splatoon2.nintendo.net" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イカリング2"
+          }
+        }
+      }
+    },
     "BUTTON_API_KEY" : {
 
     },
-    "BUTTON_REFRESH_TOKEN" : {
-
+    "DISABLED" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無効"
+          }
+        }
+      }
+    },
+    "ENABLED" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効"
+          }
+        }
+      }
     },
     "FIELD_API_KEY" : {
 
@@ -13,14 +74,58 @@
     "FOOTER_LINK_SERVICES" : {
 
     },
-    "FOOTER_SPLATOON_2" : {
-
+    "FOOTER_SERVICE_SETTING" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取得したゲームのリザルトなどを送信するサービスのURLを設定できます。"
+          }
+        }
+      }
+    },
+    "HEADER_GAME_WEB_TOKEN" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Web Token"
+          }
+        }
+      }
+    },
+    "HEADER_GAME_WEB_TOKEN_EXPIRED_ACTION" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効期限切れ処理"
+          }
+        }
+      }
     },
     "HEADER_LINK_SERVICES" : {
 
     },
-    "HEADER_SPLATOON_2" : {
-
+    "HEADER_SERVICE_SETTING" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連携サービス"
+          }
+        }
+      }
+    },
+    "LABEL_DESTINATION_URL" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連携先ウェブAPI"
+          }
+        }
+      }
     },
     "LABEL_DEVELOPER_SETTINGS" : {
       "localizations" : {
@@ -32,10 +137,130 @@
         }
       }
     },
-    "NINTENDO_TOKEN_LIST" : {
-
+    "LABEL_GAME_WEB_TOKEN_EXPIRED_ACTION_FOOTER" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生成を有効化すると取得頻度は下がりますが、アカウント停止措置の可能性が高まります。特別な理由がない限り、無効にすることを推奨します。"
+          }
+        }
+      }
+    },
+    "LABEL_OPEN_APP" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを開く"
+          }
+        }
+      }
+    },
+    "LABEL_OPEN_APP_WHEN_TOKEN_EXPIRED" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生成する"
+          }
+        }
+      }
+    },
+    "LABEL_REGENERATE_FROM_GAME_WEB_TOKEN" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを開く"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_PAYLOAD_AUD" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対象者"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_PAYLOAD_EXP" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効期限"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_PAYLOAD_IAT" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発行時刻"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_PAYLOAD_IS_CHILD_RESTRICTED" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保護者による使用制限"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_PAYLOAD_ISS" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発行者"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_PAYLOAD_JTI" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "識別子"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_PAYLOAD_MEMBERSHIP" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メンバーシップ"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_PAYLOAD_SUB" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対象ユーザー"
+          }
+        }
+      }
     },
     "stat.ink" : {
+
+    },
+    "TITLE_GAME_WEB_TOKEN" : {
 
     },
     "TITLE_SERVICE_STATINK" : {
@@ -47,6 +272,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定"
+          }
+        }
+      }
+    },
+    "web.sd.lp1.acbaa.srv.nintendo.net" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タヌポータル"
           }
         }
       }

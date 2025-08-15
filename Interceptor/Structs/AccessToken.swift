@@ -18,17 +18,24 @@ struct AccessToken: Codable, Identifiable, @unchecked Sendable {
     let accessToken: String
     /// 取得時間+有効期限
     let expiresIn: Date
+    /// ホスト
+    let host: String
 
     var id: String {
         gtoken.payload.aud
+    }
+
+    var url: URL {
+        .init(string: "com.nintendo.znca://znca/game/\(contentId.rawValue)")!
     }
 
     var isRefreshNeeded: Bool {
         gtoken.isRefreshNeeded
     }
 
-    init(contentId: ContentId, gtoken: String, accessToken: String, timeInterval timeIntervalSinceNow: TimeInterval = 60 * 60 * 2) {
+    init(contentId: ContentId, host: String, gtoken: String, accessToken: String, timeInterval timeIntervalSinceNow: TimeInterval = 60 * 60 * 2) {
         self.contentId = contentId
+        self.host = host
         self.gtoken = try! .init(gtoken)
         self.accessToken = accessToken
         expiresIn = .init(timeIntervalSinceNow: timeIntervalSinceNow)
