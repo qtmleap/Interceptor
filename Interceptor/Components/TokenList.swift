@@ -1,5 +1,5 @@
 //
-//  QuantumLeap.swift
+//  TokenList.swift
 //  Interceptor
 //
 //  Created by devonly on 2025/08/14.
@@ -110,6 +110,10 @@ struct TokenConfigView: View {
 extension QuantumLeap {
     static func TokenList() -> some View {
         TokenListView()
+    }
+
+    static func VPNSettingList() -> some View {
+        VPNSetting()
     }
 }
 

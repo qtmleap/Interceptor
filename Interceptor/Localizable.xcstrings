@@ -117,6 +117,25 @@
         }
       }
     },
+    "LABEL_ACTIVATE_ON_FOREGROUND" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動的に有効化する"
+          }
+        }
+      }
+    },
+    "LABEL_CLEAR" : {
+
+    },
+    "LABEL_CLEAR_REQUESTS" : {
+
+    },
+    "LABEL_CLEAR_REQUESTS_DESC" : {
+
+    },
     "LABEL_DESTINATION_URL" : {
       "localizations" : {
         "ja" : {
@@ -147,6 +166,16 @@
         }
       }
     },
+    "LABEL_HOME" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホーム"
+          }
+        }
+      }
+    },
     "LABEL_OPEN_APP" : {
       "localizations" : {
         "ja" : {
@@ -173,6 +202,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを開く"
+          }
+        }
+      }
+    },
+    "LABEL_SETTINGS" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定"
           }
         }
       }
@@ -257,10 +296,30 @@
         }
       }
     },
+    "LABEL_VPN_IS_CONNECTED" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VPN接続状態"
+          }
+        }
+      }
+    },
     "stat.ink" : {
 
     },
     "TITLE_GAME_WEB_TOKEN" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "トークン一覧"
+          }
+        }
+      }
+    },
+    "TITLE_HOME" : {
 
     },
     "TITLE_SERVICE_STATINK" : {
@@ -272,6 +331,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定"
+          }
+        }
+      }
+    },
+    "TITLE_VPN_SETTINGS" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VPN設定"
           }
         }
       }

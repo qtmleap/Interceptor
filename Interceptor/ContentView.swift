@@ -16,31 +16,54 @@ struct ContentView: View {
     @State private var isPresented: Bool = false
 
     var body: some View {
-        NavigationView(content: {
-            TabView(content: {})
-                .toolbar(content: {
-                    ToolbarItem(placement: .navigation, content: {
-                        Button(action: {
-                            isPresented.toggle()
-                        }, label: {
-                            Image(systemName: "gearshape.fill")
-                        })
-                    })
+        TabView(content: {
+            NavigationView(content: {
+                HomeView()
+            })
+            .navigationBarTitleDisplayMode(.inline)
+            .introspect(.navigationSplitView, on: .iOS(.v17, .v18), customize: { controller in
+                controller.preferredDisplayMode = .oneBesideSecondary
+                controller.preferredSplitBehavior = .displace
+                controller.presentsWithGesture = false
+            })
+            .tabItem {
+                Label("LABEL_HOME", systemImage: "paperplane.fill")
+            }
+            .tag(0)
+            NavigationView(content: {
+                SettingsView()
+            })
+            .navigationBarTitleDisplayMode(.inline)
+            .introspect(.navigationSplitView, on: .iOS(.v17, .v18), customize: { controller in
+                controller.preferredDisplayMode = .oneBesideSecondary
+                controller.preferredSplitBehavior = .displace
+                controller.presentsWithGesture = false
+            })
+            .tabItem {
+                Label("LABEL_SETTINGS", systemImage: "gearshape.fill")
+            }
+            .tag(1)
+        })
+        .introspect(.tabView, on: .iOS(.v18), customize: { tabView in
+            tabView.traitOverrides.horizontalSizeClass = .unspecified
+            tabView.tabBar.backgroundColor = .systemBackground
+            tabView.tabBar.isTranslucent = true
+        })
+        .toolbar(content: {
+            ToolbarItem(placement: .navigation, content: {
+                Button(action: {
+                    isPresented.toggle()
+                }, label: {
+                    Image(systemName: "gearshape.fill")
                 })
-                .navigationBarTitleDisplayMode(.inline)
+            })
         })
-        .fullScreenCover(isPresented: isFirstLaunch, content: {
-            FirstLaunchView()
-        })
-        .fullScreenCover(isPresented: $isPresented, content: {
-            SettingsView()
-        })
-//        .navigationViewStyle(.split)
-        .introspect(.navigationSplitView, on: .iOS(.v17, .v18), customize: { controller in
-            controller.preferredDisplayMode = .oneBesideSecondary
-            controller.preferredSplitBehavior = .displace
-            controller.presentsWithGesture = false
-        })
+//        .fullScreenCover(isPresented: isFirstLaunch, content: {
+//            FirstLaunchView()
+//        })
+//        .fullScreenCover(isPresented: $isPresented, content: {
+//            SettingsView()
+//        })
     }
 }
 
@@ -48,4 +71,5 @@ struct ContentView: View {
     ContentView()
         .environmentIsFirstLaunch()
         .environment(Mudmouth())
+        .environment(WebTokenStore.default)
 }

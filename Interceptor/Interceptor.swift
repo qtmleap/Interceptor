@@ -75,6 +75,9 @@ struct Interceptor: App {
                 .environment(tokenStore)
                 .environment(Mudmouth())
                 .environmentIsFirstLaunch()
+                .onReceive(NotificationCenter.default.publisher(for: .MudmouthDidReceiveRequestHead), perform: { notification in
+                    SwiftyLogger.debug(notification)
+                })
         }
     }
 }
