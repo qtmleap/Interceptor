@@ -35,10 +35,11 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $isPresented, content: {
             SettingsView()
         })
+//        .navigationViewStyle(.split)
         .introspect(.navigationSplitView, on: .iOS(.v17, .v18), customize: { controller in
             controller.preferredDisplayMode = .oneBesideSecondary
-            controller.preferredSplitBehavior = .tile
-            controller.presentsWithGesture = true
+            controller.preferredSplitBehavior = .displace
+            controller.presentsWithGesture = false
         })
     }
 }
