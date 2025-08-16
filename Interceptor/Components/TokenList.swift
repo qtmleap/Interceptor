@@ -45,7 +45,7 @@ struct TokenConfigView: View {
                         Text("LABEL_REGENERATE_FROM_GAME_WEB_TOKEN")
                     })
                 }, label: {
-                    Image(systemName: "arrow.trianglehead.2.clockwise")
+                    Image(systemName: "wifi.exclamationmark")
                 })
                 LabeledContent(content: {
                     Toggle(isOn: .constant(false), label: {
