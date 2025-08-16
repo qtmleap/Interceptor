@@ -25,6 +25,7 @@ struct HomeView: View {
                 }, label: {
                     LabeledContent(content: {
                         Text(group.records.count, format: .number)
+                            .lineLimit(1)
                     }, label: {
                         Label(title: {
                             Text(group.host)
@@ -32,10 +33,15 @@ struct HomeView: View {
                         }, icon: {
                             Image(systemName: "folder.fill")
                         })
+                        .lineLimit(1)
                     })
+                    .lineLimit(1)
                 })
                 .isDetailLink(false)
             })
+        })
+        .onAppear(perform: {
+            print(groups.count)
         })
         .listStyle(.plain)
         .navigationTitle(Text("TITLE_HOME"))
@@ -52,7 +58,7 @@ struct HomeView: View {
                         // 全削除
                         Task(priority: .background, operation: {
                             withAnimation(.spring) {
-                                try? modelContext.delete(model: Record.self)
+                                try? modelContext.delete(model: RecordGroup.self)
                             }
                         })
                     }, label: {

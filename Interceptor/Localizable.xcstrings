@@ -210,12 +210,42 @@
         }
       }
     },
+    "LABEL_RECORD_BODY" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Body"
+          }
+        }
+      }
+    },
     "LABEL_RECORD_HEADER" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Header"
+          }
+        }
+      }
+    },
+    "LABEL_RECORD_REQUEST" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエスト"
+          }
+        }
+      }
+    },
+    "LABEL_RECORD_RESPONSE" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レスポンス"
           }
         }
       }

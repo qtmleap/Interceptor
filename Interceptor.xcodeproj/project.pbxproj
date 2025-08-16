@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		102C73A72E5033940016704B /* CodeViewer in Frameworks */ = {isa = PBXBuildFile; productRef = 102C73A62E5033940016704B /* CodeViewer */; };
 		104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 104F3BAE2E49131900A2D6F1 /* Mudmouth */; };
 		104F3BB22E49135800A2D6F1 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 104F3BB12E49135800A2D6F1 /* Mudmouth */; };
 		10925F5D2E4CFA25003611AA /* QuantumLeap in Frameworks */ = {isa = PBXBuildFile; productRef = 10925F5C2E4CFA25003611AA /* QuantumLeap */; };
@@ -135,6 +136,7 @@
 				10F7027B2E49829B006ECDD2 /* FirebaseCrashlytics in Frameworks */,
 				10F702772E49829B006ECDD2 /* FirebaseAppCheck in Frameworks */,
 				10F702732E49829B006ECDD2 /* FirebaseAnalyticsCore in Frameworks */,
+				102C73A72E5033940016704B /* CodeViewer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -226,6 +228,7 @@
 				10F702782E49829B006ECDD2 /* FirebaseCore */,
 				10F7027A2E49829B006ECDD2 /* FirebaseCrashlytics */,
 				10925F5C2E4CFA25003611AA /* QuantumLeap */,
+				102C73A62E5033940016704B /* CodeViewer */,
 			);
 			productName = Interceptor;
 			productReference = 104F3B812E49099200A2D6F1 /* Interceptor.app */;
@@ -341,6 +344,7 @@
 				104F3BB02E49135800A2D6F1 /* XCLocalSwiftPackageReference "../Mudmouth" */,
 				10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */,
+				102C73A52E5033940016704B /* XCRemoteSwiftPackageReference "CodeViewer" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 104F3B822E49099200A2D6F1 /* Products */;
@@ -731,6 +735,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -762,6 +767,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -825,6 +831,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		102C73A52E5033940016704B /* XCRemoteSwiftPackageReference "CodeViewer" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/dwarvesf/CodeViewer";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.4;
+			};
+		};
 		10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/qtmleap/QuantumLeap.git";
@@ -844,6 +858,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		102C73A62E5033940016704B /* CodeViewer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 102C73A52E5033940016704B /* XCRemoteSwiftPackageReference "CodeViewer" */;
+			productName = CodeViewer;
+		};
 		104F3BAE2E49131900A2D6F1 /* Mudmouth */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Mudmouth;

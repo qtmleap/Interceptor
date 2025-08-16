@@ -1,5 +1,5 @@
 {
-  "originHash" : "bd021d5c0e7e680b883b7cf2828604d23700fdf290aef4cf435d88bfe17e1ddf",
+  "originHash" : "d84480512f7927f1a0573631886adcdd6181f5dca567e08ab8b78c455d35cbfe",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -26,6 +26,15 @@
       "state" : {
         "revision" : "884533749e55949b2566030948c6fdbe2873ed0c",
         "version" : "2.4.2"
+      }
+    },
+    {
+      "identity" : "codeviewer",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/dwarvesf/CodeViewer",
+      "state" : {
+        "revision" : "44bd04af81046ce65a4e38dc97a9dd3d387f069e",
+        "version" : "1.2.4"
       }
     },
     {
