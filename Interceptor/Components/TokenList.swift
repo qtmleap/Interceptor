@@ -6,6 +6,7 @@
 //  Copyright © 2025 QuantumLeap. All rights reserved.
 //
 
+import Mudmouth
 import QuantumLeap
 import SwiftUI
 
@@ -39,19 +40,26 @@ struct TokenConfigView: View {
     var body: some View {
         Form(content: {
             Section(content: {
-                Toggle(isOn: .constant(false), label: {
-                    Text("LABEL_REGENERATE_FROM_GAME_WEB_TOKEN")
+                LabeledContent(content: {
+                    Toggle(isOn: .constant(false), label: {
+                        Text("LABEL_REGENERATE_FROM_GAME_WEB_TOKEN")
+                    })
+                }, label: {
+                    Image(systemName: "arrow.trianglehead.2.clockwise")
                 })
-                .disabled(true)
-                Toggle(isOn: .constant(false), label: {
-                    Text("LABEL_OPEN_APP_WHEN_TOKEN_EXPIRED")
+                LabeledContent(content: {
+                    Toggle(isOn: .constant(false), label: {
+                        Text("LABEL_OPEN_APP_WHEN_TOKEN_EXPIRED")
+                    })
+                }, label: {
+                    Image(systemName: "arrow.trianglehead.2.clockwise")
                 })
-                .disabled(true)
             }, header: {
                 Text("HEADER_GAME_WEB_TOKEN_EXPIRED_ACTION")
             }, footer: {
                 Text("LABEL_GAME_WEB_TOKEN_EXPIRED_ACTION_FOOTER")
             })
+            .disabled(true)
             Section(content: {
                 TextField("LABEL_DESTINATION_URL", text: $destinationURL)
                     .keyboardType(.URL)
@@ -120,8 +128,9 @@ extension QuantumLeap {
 #Preview {
     NavigationView(content: {
         Form(content: {
-            QuantumLeap.TokenList()
+            QuantumLeap.VPNSettingList()
         })
     })
     .environment(WebTokenStore.default)
+    .environment(Mudmouth())
 }
