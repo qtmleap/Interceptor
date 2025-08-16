@@ -4,6 +4,12 @@
     "api.lp1.87abc152.srv.nintendo.net" : {
       "extractionState" : "manual",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ZELDA NOTES"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15,6 +21,12 @@
     "api.lp1.av5ja.srv.nintendo.net" : {
       "extractionState" : "manual",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SplatNet 3"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -37,6 +49,12 @@
     "app.splatoon2.nintendo.net" : {
       "extractionState" : "manual",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SplatNet 2"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -50,6 +68,12 @@
     },
     "DISABLED" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disabled"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -60,6 +84,12 @@
     },
     "ENABLED" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enabled"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -76,6 +106,12 @@
     },
     "FOOTER_SERVICE_SETTING" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can configure the URL of the service to which acquired game results will be sent."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -86,6 +122,12 @@
     },
     "HEADER_GAME_WEB_TOKEN" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Web Token"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -96,6 +138,12 @@
     },
     "HEADER_GAME_WEB_TOKEN_EXPIRED_ACTION" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expiration Handling"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -109,6 +157,12 @@
     },
     "HEADER_SERVICE_SETTING" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linked Services"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -119,6 +173,12 @@
     },
     "LABEL_ACTIVATE_ON_FOREGROUND" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto Connect"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -129,6 +189,12 @@
     },
     "LABEL_CLEAR" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -142,6 +208,12 @@
     },
     "LABEL_CLEAR_REQUESTS_DESC" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete all history. This action cannot be undone."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -152,6 +224,12 @@
     },
     "LABEL_DESTINATION_URL" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destination Web API"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -162,6 +240,12 @@
     },
     "LABEL_DEVELOPER_SETTINGS" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Developer Settings"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -172,6 +256,12 @@
     },
     "LABEL_GAME_WEB_TOKEN_EXPIRED_ACTION_FOOTER" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enabling regeneration reduces retrieval frequency but increases the risk of account suspension. Unless you have a specific reason, it is recommended to keep this disabled."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -182,6 +272,12 @@
     },
     "LABEL_HOME" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Home"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -192,6 +288,12 @@
     },
     "LABEL_OPEN_APP" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open App"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -202,6 +304,12 @@
     },
     "LABEL_OPEN_APP_WHEN_TOKEN_EXPIRED" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regenerate"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -212,6 +320,12 @@
     },
     "LABEL_RECORD_BODY" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Body"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -222,6 +336,12 @@
     },
     "LABEL_RECORD_HEADER" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Header"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -232,6 +352,12 @@
     },
     "LABEL_RECORD_REQUEST" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -242,6 +368,12 @@
     },
     "LABEL_RECORD_RESPONSE" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -252,6 +384,12 @@
     },
     "LABEL_REGENERATE_FROM_GAME_WEB_TOKEN" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open App"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -262,6 +400,12 @@
     },
     "LABEL_SETTINGS" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -272,6 +416,12 @@
     },
     "LABEL_TOKEN_PAYLOAD_AUD" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audience"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -282,6 +432,12 @@
     },
     "LABEL_TOKEN_PAYLOAD_EXP" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expiration"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -292,6 +448,12 @@
     },
     "LABEL_TOKEN_PAYLOAD_IAT" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Issued At"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -302,6 +464,12 @@
     },
     "LABEL_TOKEN_PAYLOAD_IS_CHILD_RESTRICTED" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parental Restriction"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -312,6 +480,12 @@
     },
     "LABEL_TOKEN_PAYLOAD_ISS" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Issuer"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -322,6 +496,12 @@
     },
     "LABEL_TOKEN_PAYLOAD_JTI" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JWT ID"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -332,6 +512,12 @@
     },
     "LABEL_TOKEN_PAYLOAD_MEMBERSHIP" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membership"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -342,6 +528,12 @@
     },
     "LABEL_TOKEN_PAYLOAD_SUB" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subject (User)"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -352,6 +544,12 @@
     },
     "LABEL_VPN_IS_CONNECTED" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection Status"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -365,6 +563,12 @@
     },
     "TITLE_GAME_WEB_TOKEN" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token List"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -375,6 +579,12 @@
     },
     "TITLE_HOME" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Home"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -388,6 +598,12 @@
     },
     "TITLE_SETTINGS" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -398,6 +614,12 @@
     },
     "TITLE_VPN_SETTINGS" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VPN Settings"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -409,6 +631,12 @@
     "web.sd.lp1.acbaa.srv.nintendo.net" : {
       "extractionState" : "manual",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NookLink"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
