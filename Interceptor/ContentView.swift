@@ -8,7 +8,7 @@
 
 import Mudmouth
 import SwiftUI
-import SwiftUIIntrospect
+@_spi(Advanced) import SwiftUIIntrospect
 import SwiftyLogger
 
 struct ContentView: View {
