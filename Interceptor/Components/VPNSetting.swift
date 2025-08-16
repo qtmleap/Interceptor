@@ -17,11 +17,19 @@ struct VPNSetting: View {
 
     var body: some View {
         Section(content: {
-            Toggle(isOn: $isConnected, label: {
-                Text("LABEL_VPN_IS_CONNECTED")
+            LabeledContent(content: {
+                Toggle(isOn: $isConnected, label: {
+                    Text("LABEL_VPN_IS_CONNECTED")
+                })
+            }, label: {
+                Image(systemName: "wifi")
             })
-            Toggle(isOn: manager.$activateOnForeground, label: {
-                Text("LABEL_ACTIVATE_ON_FOREGROUND")
+            LabeledContent(content: {
+                Toggle(isOn: manager.$activateOnForeground, label: {
+                    Text("LABEL_ACTIVATE_ON_FOREGROUND")
+                })
+            }, label: {
+                Image(systemName: "autostartstop")
             })
         }, header: {
             Text("TITLE_VPN_SETTINGS")
@@ -36,4 +44,13 @@ struct VPNSetting: View {
             })
         })
     }
+}
+
+#Preview {
+    NavigationView(content: {
+        Form(content: {
+            VPNSetting()
+        })
+    })
+    .environment(Mudmouth())
 }

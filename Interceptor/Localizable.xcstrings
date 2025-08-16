@@ -122,19 +122,33 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自動的に有効化する"
+            "value" : "自動接続"
           }
         }
       }
     },
     "LABEL_CLEAR" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消去する"
+          }
+        }
+      }
     },
     "LABEL_CLEAR_REQUESTS" : {
 
     },
     "LABEL_CLEAR_REQUESTS_DESC" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての履歴を消去します。この操作は取り消せません。"
+          }
+        }
+      }
     },
     "LABEL_DESTINATION_URL" : {
       "localizations" : {
@@ -192,6 +206,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "再生成する"
+          }
+        }
+      }
+    },
+    "LABEL_RECORD_HEADER" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Header"
           }
         }
       }
@@ -320,7 +344,14 @@
       }
     },
     "TITLE_HOME" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホーム"
+          }
+        }
+      }
     },
     "TITLE_SERVICE_STATINK" : {
 

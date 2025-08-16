@@ -8,6 +8,7 @@
 
 import Firebase
 import Mudmouth
+import SwiftData
 import SwiftUI
 import SwiftyLogger
 
@@ -75,9 +76,7 @@ struct Interceptor: App {
                 .environment(tokenStore)
                 .environment(Mudmouth())
                 .environmentIsFirstLaunch()
-                .onReceive(NotificationCenter.default.publisher(for: .MudmouthDidReceiveRequestHead), perform: { notification in
-                    SwiftyLogger.debug(notification)
-                })
+                .modelContainer(ModelContainer.default)
         }
     }
 }

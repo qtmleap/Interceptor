@@ -8,32 +8,61 @@
 
 import CoreData
 import Mudmouth
+import SwiftData
 import SwiftUI
 import SwiftyLogger
 
 struct HomeView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \RecordGroup.host, order: .forward) private var groups: [RecordGroup]
     @State private var isPresented: Bool = false
 
     var body: some View {
-        List(content: {})
-            .navigationTitle(Text("TITLE_HOME"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(content: {
-                ToolbarItem(placement: .topBarLeading, content: {
-                    Button(action: {
-                        isPresented.toggle()
+        List(content: {
+            ForEach(groups, content: { group in
+                NavigationLink(destination: {
+                    RecordsView(group: group)
+                }, label: {
+                    LabeledContent(content: {
+                        Text(group.records.count, format: .number)
                     }, label: {
-                        Image(systemName: "trash.fill")
-                    })
-                    .confirmationDialog(NSLocalizedString("LABEL_CLEAR_REQUESTS", comment: ""), isPresented: $isPresented, actions: {
-                        Button(role: .destructive, action: {}, label: {
-                            Text("LABEL_CLEAR")
+                        Label(title: {
+                            Text(group.host)
+                                .lineLimit(1)
+                        }, icon: {
+                            Image(systemName: "folder.fill")
                         })
-                    }, message: {
-                        Text("LABEL_CLEAR_REQUESTS_DESC")
                     })
                 })
+                .isDetailLink(false)
             })
+        })
+        .listStyle(.plain)
+        .navigationTitle(Text("TITLE_HOME"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(content: {
+            ToolbarItem(placement: .topBarLeading, content: {
+                Button(action: {
+                    isPresented.toggle()
+                }, label: {
+                    Image(systemName: "trash.fill")
+                })
+                .confirmationDialog(NSLocalizedString("LABEL_CLEAR_REQUESTS", comment: ""), isPresented: $isPresented, actions: {
+                    Button(role: .destructive, action: {
+                        // 全削除
+                        Task(priority: .background, operation: {
+                            withAnimation(.spring) {
+                                try? modelContext.delete(model: Record.self)
+                            }
+                        })
+                    }, label: {
+                        Text("LABEL_CLEAR")
+                    })
+                }, message: {
+                    Text("LABEL_CLEAR_REQUESTS_DESC")
+                })
+            })
+        })
     }
 }
 
