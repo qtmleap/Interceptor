@@ -49,27 +49,15 @@ struct ContentView: View {
             tabView.tabBar.backgroundColor = .systemBackground
             tabView.tabBar.isTranslucent = true
         })
-        .toolbar(content: {
-            ToolbarItem(placement: .navigation, content: {
-                Button(action: {
-                    isPresented.toggle()
-                }, label: {
-                    Image(systemName: "gearshape.fill")
-                })
-            })
+        .fullScreenCover(isPresented: isFirstLaunch, content: {
+            FirstLaunchView()
         })
-//        .fullScreenCover(isPresented: isFirstLaunch, content: {
-//            FirstLaunchView()
-//        })
-//        .fullScreenCover(isPresented: $isPresented, content: {
-//            SettingsView()
-//        })
     }
 }
 
 #Preview {
     ContentView()
-//        .environmentIsFirstLaunch()
-//        .environment(Mudmouth())
-//        .environment(WebTokenStore.default)
+        .environmentIsFirstLaunch()
+        .environment(Mudmouth())
+        .environment(WebTokenStore.default)
 }
