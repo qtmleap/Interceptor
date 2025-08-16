@@ -21,7 +21,7 @@ struct ContentView: View {
                 HomeView()
             })
             .navigationBarTitleDisplayMode(.inline)
-            .introspect(.navigationSplitView, on: .iOS(.v17, .v18), customize: { controller in
+            .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
                 controller.preferredDisplayMode = .oneBesideSecondary
                 controller.preferredSplitBehavior = .displace
                 controller.presentsWithGesture = false
@@ -34,7 +34,7 @@ struct ContentView: View {
                 SettingsView()
             })
             .navigationBarTitleDisplayMode(.inline)
-            .introspect(.navigationSplitView, on: .iOS(.v17, .v18), customize: { controller in
+            .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
                 controller.preferredDisplayMode = .oneBesideSecondary
                 controller.preferredSplitBehavior = .displace
                 controller.presentsWithGesture = false
