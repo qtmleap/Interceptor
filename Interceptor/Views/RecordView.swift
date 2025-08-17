@@ -6,9 +6,9 @@
 //  Copyright © 2025 QuantumLeap. All rights reserved.
 //
 
-import CodeViewer
 import Mudmouth
 import SwiftUI
+@_spi(Advanced) import SwiftUIIntrospect
 
 struct RecordView: View {
     let record: Record
@@ -37,7 +37,7 @@ struct RecordView: View {
             .listRowSeparator(.hidden)
             if let body = record.request.body {
                 NavigationLink(destination: {
-                    CodeViewer(content: .constant(body), mode: .json, isReadOnly: true)
+                    CodeView(text: body)
                 }, label: {
                     Text("LABEL_RECORD_BODY")
                         .font(.title2)
@@ -71,7 +71,7 @@ struct RecordView: View {
             .listRowSeparator(.hidden)
             if let body = record.response.body {
                 NavigationLink(destination: {
-                    CodeViewer(content: .constant(body), mode: .json, isReadOnly: true)
+                    CodeView(text: body)
                 }, label: {
                     Text("LABEL_RECORD_BODY")
                         .font(.title2)
@@ -84,39 +84,41 @@ struct RecordView: View {
     }
 
     var body: some View {
-        VStack(content: {
-            HStack(content: {
-                Button(action: {
-                    withAnimation(.spring) {
-                        selection = 0
-                    }
+        TabView(selection: $selection, content: {
+            RequestView
+            ResponseView
+        })
+        .toolbar(content: {
+            ToolbarItem(placement: .navigation, content: {
+                Picker(selection: $selection, content: {
+                    Text("LABEL_RECORD_REQUEST")
+                        .tag(0)
+                    Text("LABEL_RECORD_RESPONSE")
+                        .tag(1)
                 }, label: {
                     Text("LABEL_RECORD_REQUEST")
                 })
-                .foregroundStyle(selection == 0 ? .blue : .secondary)
-                .fontWeight(.semibold)
-                Button(action: {
-                    withAnimation(.spring) {
-                        selection = 1
-                    }
-                }, label: {
-                    Text("LABEL_RECORD_RESPONSE")
+                .pickerStyle(.segmented)
+                // NOTE: これを書くと表示がバグるので一旦何もしない
+                .introspect(.picker(style: .segmented), on: .iOS(.v17...), customize: { control in
+                    control.selectedSegmentTintColor = .systemBlue
                 })
-                .foregroundStyle(selection == 1 ? .blue : .secondary)
-                .fontWeight(.semibold)
             })
-            TabView(selection: $selection, content: {
-                RequestView
-                ResponseView
-            })
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .listStyle(.plain)
         })
-        .navigationTitle(record.path)
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .listStyle(.plain)
+//        .navigationTitle(record.path)
         .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 #Preview {
-    HomeView()
+    NavigationView(content: {
+        RecordsView(group: .init())
+    })
+    .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
+        controller.preferredDisplayMode = .oneBesideSecondary
+        controller.preferredSplitBehavior = .displace
+        controller.presentsWithGesture = false
+    })
 }

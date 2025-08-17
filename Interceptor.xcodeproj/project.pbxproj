@@ -7,9 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		102C73A72E5033940016704B /* CodeViewer in Frameworks */ = {isa = PBXBuildFile; productRef = 102C73A62E5033940016704B /* CodeViewer */; };
 		104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 104F3BAE2E49131900A2D6F1 /* Mudmouth */; };
 		104F3BB22E49135800A2D6F1 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 104F3BB12E49135800A2D6F1 /* Mudmouth */; };
+		1089BCFA2E5239CA0088488B /* TreeSitterJSON in Frameworks */ = {isa = PBXBuildFile; productRef = 1089BCF92E5239CA0088488B /* TreeSitterJSON */; };
+		1089BCFC2E5239CA0088488B /* TreeSitterJSONQueries in Frameworks */ = {isa = PBXBuildFile; productRef = 1089BCFB2E5239CA0088488B /* TreeSitterJSONQueries */; };
+		1089BCFE2E5239CA0088488B /* TreeSitterJSONRunestone in Frameworks */ = {isa = PBXBuildFile; productRef = 1089BCFD2E5239CA0088488B /* TreeSitterJSONRunestone */; };
+		1089BD002E5239CA0088488B /* TreeSitterLanguagesCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1089BCFF2E5239CA0088488B /* TreeSitterLanguagesCommon */; };
 		10925F5D2E4CFA25003611AA /* QuantumLeap in Frameworks */ = {isa = PBXBuildFile; productRef = 10925F5C2E4CFA25003611AA /* QuantumLeap */; };
 		10F701BC2E491546006ECDD2 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 10F701BB2E491546006ECDD2 /* NetworkExtension.framework */; };
 		10F701C42E491546006ECDD2 /* PacketTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 10F701B92E491546006ECDD2 /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -20,6 +23,7 @@
 		10F702772E49829B006ECDD2 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 10F702762E49829B006ECDD2 /* FirebaseAppCheck */; };
 		10F702792E49829B006ECDD2 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 10F702782E49829B006ECDD2 /* FirebaseCore */; };
 		10F7027B2E49829B006ECDD2 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 10F7027A2E49829B006ECDD2 /* FirebaseCrashlytics */; };
+		10FBBF2D2E522C5E00CC57B0 /* Runestone in Frameworks */ = {isa = PBXBuildFile; productRef = 10FBBF2C2E522C5E00CC57B0 /* Runestone */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -133,10 +137,14 @@
 				104F3BB22E49135800A2D6F1 /* Mudmouth in Frameworks */,
 				10F702712E49829B006ECDD2 /* FirebaseAnalytics in Frameworks */,
 				10F702792E49829B006ECDD2 /* FirebaseCore in Frameworks */,
+				10FBBF2D2E522C5E00CC57B0 /* Runestone in Frameworks */,
+				1089BCFA2E5239CA0088488B /* TreeSitterJSON in Frameworks */,
+				1089BCFC2E5239CA0088488B /* TreeSitterJSONQueries in Frameworks */,
 				10F7027B2E49829B006ECDD2 /* FirebaseCrashlytics in Frameworks */,
 				10F702772E49829B006ECDD2 /* FirebaseAppCheck in Frameworks */,
+				1089BCFE2E5239CA0088488B /* TreeSitterJSONRunestone in Frameworks */,
+				1089BD002E5239CA0088488B /* TreeSitterLanguagesCommon in Frameworks */,
 				10F702732E49829B006ECDD2 /* FirebaseAnalyticsCore in Frameworks */,
-				102C73A72E5033940016704B /* CodeViewer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -228,7 +236,11 @@
 				10F702782E49829B006ECDD2 /* FirebaseCore */,
 				10F7027A2E49829B006ECDD2 /* FirebaseCrashlytics */,
 				10925F5C2E4CFA25003611AA /* QuantumLeap */,
-				102C73A62E5033940016704B /* CodeViewer */,
+				10FBBF2C2E522C5E00CC57B0 /* Runestone */,
+				1089BCF92E5239CA0088488B /* TreeSitterJSON */,
+				1089BCFB2E5239CA0088488B /* TreeSitterJSONQueries */,
+				1089BCFD2E5239CA0088488B /* TreeSitterJSONRunestone */,
+				1089BCFF2E5239CA0088488B /* TreeSitterLanguagesCommon */,
 			);
 			productName = Interceptor;
 			productReference = 104F3B812E49099200A2D6F1 /* Interceptor.app */;
@@ -344,7 +356,8 @@
 				104F3BB02E49135800A2D6F1 /* XCLocalSwiftPackageReference "../Mudmouth" */,
 				10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */,
-				102C73A52E5033940016704B /* XCRemoteSwiftPackageReference "CodeViewer" */,
+				10FBBF2B2E522C5E00CC57B0 /* XCRemoteSwiftPackageReference "Runestone" */,
+				1089BCF82E5239CA0088488B /* XCRemoteSwiftPackageReference "treesitterlanguages" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 104F3B822E49099200A2D6F1 /* Products */;
@@ -831,12 +844,12 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		102C73A52E5033940016704B /* XCRemoteSwiftPackageReference "CodeViewer" */ = {
+		1089BCF82E5239CA0088488B /* XCRemoteSwiftPackageReference "treesitterlanguages" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/dwarvesf/CodeViewer";
+			repositoryURL = "https://github.com/simonbs/treesitterlanguages";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.2.4;
+				minimumVersion = 0.1.10;
 			};
 		};
 		10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */ = {
@@ -855,14 +868,17 @@
 				minimumVersion = 12.1.0;
 			};
 		};
+		10FBBF2B2E522C5E00CC57B0 /* XCRemoteSwiftPackageReference "Runestone" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/simonbs/Runestone.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.5.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		102C73A62E5033940016704B /* CodeViewer */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 102C73A52E5033940016704B /* XCRemoteSwiftPackageReference "CodeViewer" */;
-			productName = CodeViewer;
-		};
 		104F3BAE2E49131900A2D6F1 /* Mudmouth */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Mudmouth;
@@ -870,6 +886,26 @@
 		104F3BB12E49135800A2D6F1 /* Mudmouth */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Mudmouth;
+		};
+		1089BCF92E5239CA0088488B /* TreeSitterJSON */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1089BCF82E5239CA0088488B /* XCRemoteSwiftPackageReference "treesitterlanguages" */;
+			productName = TreeSitterJSON;
+		};
+		1089BCFB2E5239CA0088488B /* TreeSitterJSONQueries */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1089BCF82E5239CA0088488B /* XCRemoteSwiftPackageReference "treesitterlanguages" */;
+			productName = TreeSitterJSONQueries;
+		};
+		1089BCFD2E5239CA0088488B /* TreeSitterJSONRunestone */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1089BCF82E5239CA0088488B /* XCRemoteSwiftPackageReference "treesitterlanguages" */;
+			productName = TreeSitterJSONRunestone;
+		};
+		1089BCFF2E5239CA0088488B /* TreeSitterLanguagesCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1089BCF82E5239CA0088488B /* XCRemoteSwiftPackageReference "treesitterlanguages" */;
+			productName = TreeSitterLanguagesCommon;
 		};
 		10925F5C2E4CFA25003611AA /* QuantumLeap */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -910,6 +946,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 10F7026F2E49829B006ECDD2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCrashlytics;
+		};
+		10FBBF2C2E522C5E00CC57B0 /* Runestone */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 10FBBF2B2E522C5E00CC57B0 /* XCRemoteSwiftPackageReference "Runestone" */;
+			productName = Runestone;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
