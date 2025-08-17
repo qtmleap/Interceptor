@@ -23,19 +23,19 @@ struct HomeView: View {
                 NavigationLink(destination: {
                     RecordsView(group: group)
                 }, label: {
-                    LabeledContent(content: {
-                        Text(group.records.count, format: .number)
-                            .lineLimit(1)
-                    }, label: {
+                    HStack(content: {
                         Label(title: {
-                            Text(group.host)
-                                .lineLimit(1)
+                            HStack(content: {
+                                Text(group.host)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Text(group.records.count, format: .number)
+                                    .foregroundStyle(.secondary)
+                            })
                         }, icon: {
                             Image(systemName: "folder.fill")
                         })
-                        .lineLimit(1)
                     })
-                    .lineLimit(1)
                 })
                 .isDetailLink(false)
             })

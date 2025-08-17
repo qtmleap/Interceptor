@@ -1,5 +1,5 @@
 {
-  "originHash" : "d84480512f7927f1a0573631886adcdd6181f5dca567e08ab8b78c455d35cbfe",
+  "originHash" : "aaa6085c096db72590a6bebadcdf293e0a23f1b4238edb1da67e8d5cf5ec4940",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -26,15 +26,6 @@
       "state" : {
         "revision" : "884533749e55949b2566030948c6fdbe2873ed0c",
         "version" : "2.4.2"
-      }
-    },
-    {
-      "identity" : "codeviewer",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/dwarvesf/CodeViewer",
-      "state" : {
-        "revision" : "44bd04af81046ce65a4e38dc97a9dd3d387f069e",
-        "version" : "1.2.4"
       }
     },
     {
@@ -188,6 +179,15 @@
       "state" : {
         "revision" : "b06e8c9f301dadf2cde490bf01f311d62d5057b9",
         "version" : "0.0.4"
+      }
+    },
+    {
+      "identity" : "runestone",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/simonbs/Runestone.git",
+      "state" : {
+        "revision" : "1fad339aab99cf2136ce6bf8c32da3265b2e85e5",
+        "version" : "0.5.1"
       }
     },
     {
@@ -350,6 +350,24 @@
       "state" : {
         "revision" : "a853604c9e9a83ad9954c7e3d2a565273982471f",
         "version" : "7.0.2"
+      }
+    },
+    {
+      "identity" : "tree-sitter",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tree-sitter/tree-sitter",
+      "state" : {
+        "revision" : "98be227227af10cc7a269cb3ffb23686c0610b17",
+        "version" : "0.20.9"
+      }
+    },
+    {
+      "identity" : "treesitterlanguages",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/simonbs/treesitterlanguages",
+      "state" : {
+        "revision" : "15cf3a9ec3ab95e0d058b7df9f35619123c9e02d",
+        "version" : "0.1.10"
       }
     },
     {

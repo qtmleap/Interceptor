@@ -7,7 +7,9 @@
 //
 
 import Mudmouth
+import NIOHTTP1
 import SwiftUI
+@_spi(Advanced) import SwiftUIIntrospect
 
 struct RecordsView: View {
     let group: RecordGroup
@@ -18,13 +20,20 @@ struct RecordsView: View {
                 NavigationLink(destination: {
                     RecordView(record: record)
                 }, label: {
-                    VStack(alignment: .leading, content: {
-                        Text(record.method)
-                            .font(.caption)
-                            .fontWeight(.bold)
+                    VStack(alignment: .leading, spacing: 0, content: {
+                        HStack(spacing: 4, content: {
+                            Circle()
+                                .fill(record.foregroundColor)
+                                .frame(width: 12, height: 12)
+                            Text(record.method)
+                                .font(.system(size: 14))
+                                .fontWeight(.bold)
+                                .foregroundStyle(record.foregroundColor)
+                        })
                         Text(record.path)
                             .lineLimit(1)
                     })
+                    .padding(1)
                 })
             })
         })
@@ -34,6 +43,32 @@ struct RecordsView: View {
     }
 }
 
+extension Record {
+    var foregroundColor: Color {
+        switch method {
+            case HTTPMethod.GET.rawValue:
+                .blue
+            case HTTPMethod.POST.rawValue:
+                .green
+            case HTTPMethod.PATCH.rawValue:
+                .orange
+            case HTTPMethod.PUT.rawValue:
+                .pink
+            case HTTPMethod.DELETE.rawValue:
+                .red
+            default:
+                .primary
+        }
+    }
+}
+
 #Preview {
-    HomeView()
+    NavigationView(content: {
+        RecordsView(group: .init())
+    })
+    .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
+        controller.preferredDisplayMode = .oneBesideSecondary
+        controller.preferredSplitBehavior = .displace
+        controller.presentsWithGesture = false
+    })
 }
