@@ -99,10 +99,6 @@ struct RecordView: View {
                     Text("LABEL_RECORD_REQUEST")
                 })
                 .pickerStyle(.segmented)
-                // NOTE: これを書くと表示がバグるので一旦何もしない
-                .introspect(.picker(style: .segmented), on: .iOS(.v17...), customize: { control in
-                    control.selectedSegmentTintColor = .systemBlue
-                })
             })
         })
         .tabViewStyle(.page(indexDisplayMode: .never))
