@@ -177,8 +177,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/qtmleap/QuantumLeap.git",
       "state" : {
-        "revision" : "e2e21de4c2fc6e5e00789b9859d96f898a47a9ab",
-        "version" : "0.0.6"
+        "revision" : "d7e8cf36ade39306a8e1f3943c380352285db9ee",
+        "version" : "0.0.7"
       }
     },
     {
