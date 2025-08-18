@@ -18,13 +18,21 @@ public final class Tuberose: ObservableObject {
 
     /// VPN設定
     /// NOTE: とりあえず最初はスプラ2とスプラ3のみに対応
-    private var options: [ProxyOption] = [
+    /// NOTE: キャプチャ自体は対応しておく
+    private let options: [ProxyOption] = [
+        .init(host: "api.accounts.nintendo.com", paths: []),
+        .init(host: "api-lp1.znc.srv.nintendo.net", paths: []),
+        .init(host: "api.lp1.usagi.srv.nintendo.net", paths: []),
         .init(host: "api.lp1.av5ja.srv.nintendo.net", paths: [
             .init(path: "/api/bullet_tokens"),
         ]),
+        .init(host: "api.lp1.87abc152.srv.nintendo.net", paths: []),
+        .init(host: "accounts.nintendo.com", paths: []),
         .init(host: "app.splatoon2.nintendo.net", paths: [
             .init(path: "/"),
         ]),
+        .init(host: "app.smashbros.nintendo.net", paths: []),
+        .init(host: "web.sd.lp1.acbaa.srv.nintendo.net", paths: []),
     ]
 
     /// アクセストークン一覧
@@ -33,7 +41,7 @@ public final class Tuberose: ObservableObject {
 
     private let decoder: JSONDecoder = .init()
     private let encoder: JSONEncoder = .init()
-    private let keychain: Keychain = .init(accessGroup: Bundle.main.bundleIdentifier!)
+    private let keychain: Keychain = .init(service: Bundle.main.bundleIdentifier!).synchronizable(true)
 
     let mudmouth: Mudmouth = .default
 
@@ -42,14 +50,13 @@ public final class Tuberose: ObservableObject {
     }
 
     init() {
+        tokens = options.map(\.host).compactMap { host in
+            try? keychain.getToken(forKey: host)
+        }
         NotificationCenter.default.addObserver(self, selector: #selector(didBecomeActiveNotification), name: UIApplication.didBecomeActiveNotification, object: nil)
     }
 
     func startVPNTunnel() async throws {
-        SwiftyLogger.debug("Starting VPN tunnel with options: \(options)")
-        for option in options {
-            print(option)
-        }
         try await mudmouth.startVPNTunnel(options: options)
     }
 
@@ -85,6 +92,10 @@ public final class Tuberose: ObservableObject {
                     break
             }
         }
+        tokens = options.map(\.host).compactMap { host in
+            try? keychain.getToken(forKey: host)
+        }
+        print(tokens)
     }
 
     @objc

@@ -1,71 +1,6 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
-    "api.lp1.87abc152.srv.nintendo.net" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ZELDA NOTES"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ZELDA NOTES"
-          }
-        }
-      }
-    },
-    "api.lp1.av5ja.srv.nintendo.net" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SplatNet 3"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "イカリング3"
-          }
-        }
-      }
-    },
-    "app.smashbros.nintendo.net" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スマプラス"
-          }
-        }
-      }
-    },
-    "app.splatoon2.nintendo.net" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SplatNet 2"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "イカリング2"
-          }
-        }
-      }
-    },
-    "BUTTON_API_KEY" : {
-
-    },
     "DISABLED" : {
       "localizations" : {
         "en" : {
@@ -98,30 +33,22 @@
         }
       }
     },
-    "FIELD_API_KEY" : {
-
-    },
-    "FOOTER_LINK_SERVICES" : {
-
-    },
-    "FOOTER_SERVER_LIST" : {
-      "extractionState" : "stale",
+    "FOOTER_ACCESS_TOKEN" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リクエストをキャプチャするサーバーのドメイン一覧です。"
+            "value" : "アクセストークンはゲームデータを取得するために利用されます。"
           }
         }
       }
     },
-    "FOOTER_SERVER_NOTIFICATION" : {
-      "extractionState" : "stale",
+    "FOOTER_GAME_WEB_TOKEN" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "有効になっているパスに対するリクエストのキャプチャが成功したときに、通知を送ります。"
+            "value" : "ゲームトークンはアクセストークンを発行するために利用されます。"
           }
         }
       }
@@ -142,18 +69,28 @@
         }
       }
     },
+    "HEADER_ACCESS_TOKEN" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクセストークン"
+          }
+        }
+      }
+    },
     "HEADER_GAME_WEB_TOKEN" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Game Web Token"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Game Web Token"
+            "value" : "ゲームトークン"
           }
         }
       }
@@ -174,42 +111,6 @@
         }
       }
     },
-    "HEADER_LINK_SERVICES" : {
-
-    },
-    "HEADER_SERVER_LIST" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "サーバー一覧"
-          }
-        }
-      }
-    },
-    "HEADER_SERVER_NOTIFICATION" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通知設定"
-          }
-        }
-      }
-    },
-    "HEADER_SERVER_SCRIPT" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スクリプト設定"
-          }
-        }
-      }
-    },
     "HEADER_SERVICE_SETTING" : {
       "localizations" : {
         "en" : {
@@ -226,12 +127,32 @@
         }
       }
     },
+    "HEADER_SERVICE_TOKENS" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "トークン一覧"
+          }
+        }
+      }
+    },
     "HEADER_TOOLS" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "ツール"
+          }
+        }
+      }
+    },
+    "LABEL_ACCESS_TOKEN" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクセストークン"
           }
         }
       }
@@ -478,46 +399,12 @@
         }
       }
     },
-    "LABEL_SERVER_LIST_ENABLE" : {
-      "extractionState" : "stale",
+    "LABEL_SERVICE_TOKENS" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "キャプチャ"
-          }
-        }
-      }
-    },
-    "LABEL_SERVER_LIST_NOTIFICATION_ENABLE" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通知"
-          }
-        }
-      }
-    },
-    "LABEL_SERVER_SCRIPT" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スクリプト"
-          }
-        }
-      }
-    },
-    "LABEL_SERVER_SCRIPT_ENABLE" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スクリプトの実行"
+            "value" : "トークン一覧"
           }
         }
       }
@@ -682,31 +569,12 @@
         }
       }
     },
-    "stat.ink" : {
-
-    },
     "TITLE_CERTIFICATE" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "証明書"
-          }
-        }
-      }
-    },
-    "TITLE_GAME_WEB_TOKEN" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Token List"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "トークン一覧"
           }
         }
       }
@@ -727,30 +595,15 @@
         }
       }
     },
-    "TITLE_SERVER" : {
-      "extractionState" : "stale",
+    "TITLE_SERVICE_TOKENS" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "サーバー設定"
+            "value" : "トークン一覧"
           }
         }
       }
-    },
-    "TITLE_SERVER_LIST" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "サーバー一覧"
-          }
-        }
-      }
-    },
-    "TITLE_SERVICE_STATINK" : {
-
     },
     "TITLE_SETTINGS" : {
       "localizations" : {
@@ -780,23 +633,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "VPN設定"
-          }
-        }
-      }
-    },
-    "web.sd.lp1.acbaa.srv.nintendo.net" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NookLink"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "タヌポータル"
           }
         }
       }

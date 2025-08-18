@@ -15,7 +15,7 @@ import SwiftUI
 extension QuantumLeap {
     @ViewBuilder
     static func ServiceList() -> some View {
-        ServiceTokenList()
+        ServiceTokenLink()
     }
 
     @ViewBuilder
@@ -49,6 +49,7 @@ extension QuantumLeap {
     static func Tools() -> some View {
         Section(content: {
             QuantumLeap.Certificate()
+            QuantumLeap.ServiceList()
         }, header: {
             Text("HEADER_TOOLS")
         })
@@ -64,6 +65,7 @@ extension QuantumLeap {
         })
     })
     .environmentObject(Tuberose.default)
+    .environment(Tuberose.default.mudmouth)
     .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
         controller.preferredDisplayMode = .oneBesideSecondary
         controller.preferredSplitBehavior = .displace
