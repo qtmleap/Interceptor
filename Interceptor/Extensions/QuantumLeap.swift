@@ -64,7 +64,7 @@ extension QuantumLeap {
             QuantumLeap.ServerList()
         })
     })
-    .environment(Tuberose.default)
+    .environmentObject(Tuberose.default)
     .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
         controller.preferredDisplayMode = .oneBesideSecondary
         controller.preferredSplitBehavior = .displace

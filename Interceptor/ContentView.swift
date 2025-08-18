@@ -58,5 +58,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environmentIsFirstLaunch()
-        .environment(Tuberose.default)
+        .environmentObject(Tuberose.default)
 }

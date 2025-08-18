@@ -73,8 +73,7 @@ struct ServerView: View {
 }
 
 struct ServerListView: View {
-//    @Environment(Tuberose.self) private var client: Tuberose
-    @Bindable var client: Tuberose = .default
+    @EnvironmentObject var client: Tuberose
     @State var editMode: EditMode = .active
 
     func onDelete(offsets: IndexSet) {
@@ -128,7 +127,7 @@ struct ServerListView: View {
             QuantumLeap.ServerList()
         })
     })
-    .environment(Tuberose.default)
+    .environmentObject(Tuberose.default)
     .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
         controller.preferredDisplayMode = .oneBesideSecondary
         controller.preferredSplitBehavior = .displace

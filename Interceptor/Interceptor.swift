@@ -71,7 +71,7 @@ struct Interceptor: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(tuberose)
+                .environmentObject(tuberose)
                 .environment(tuberose.mudmouth)
                 .environmentIsFirstLaunch()
                 .modelContainer(ModelContainer.default)
