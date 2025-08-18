@@ -16,6 +16,7 @@ public final class Tuberose: ObservableObject {
     @AppStorage("ACTIVATE_ON_FOREGROUND")
     var activateOnForeground: Bool = true
 
+    @Published
     var options: [ProxyOption]
 
     private let decoder: JSONDecoder = .init()
