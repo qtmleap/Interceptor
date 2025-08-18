@@ -29,5 +29,5 @@ struct SettingsView: View {
 #Preview {
     ContentView()
         .environmentIsFirstLaunch()
-        .environment(Tuberose.default)
+        .environmentObject(Tuberose.default)
 }

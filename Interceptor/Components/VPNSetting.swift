@@ -12,7 +12,7 @@ import SwiftUI
 @_spi(Advanced) import SwiftUIIntrospect
 
 struct VPNSetting: View {
-    @Environment(Tuberose.self) private var client: Tuberose
+    @EnvironmentObject private var client: Tuberose
     @Environment(\.scenePhase) private var scenePhase
     /// VPNの接続状態
     /// 直接Mudmouthの状態を弄れないので一時的に変数に逃がす
@@ -61,9 +61,9 @@ struct VPNSetting: View {
 //            QuantumLeap.ServerList()
         })
     })
-    .environment(Tuberose.default)
     .environment(Tuberose.default.mudmouth)
     .environment(\.colorScheme, .dark)
+    .environmentObject(Tuberose.default)
     .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
         controller.preferredDisplayMode = .oneBesideSecondary
         controller.preferredSplitBehavior = .displace

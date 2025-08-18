@@ -12,17 +12,11 @@ import SwiftUI
 import SwiftyLogger
 
 @MainActor
-@Observable
-public final class Tuberose {
-    @ObservationIgnored
-    @CodableStorage("ACTIVATE_ON_FOREGROUND")
+public final class Tuberose: ObservableObject {
+    @AppStorage("ACTIVATE_ON_FOREGROUND")
     var activateOnForeground: Bool = true
 
-    var options: [ProxyOption] {
-        willSet {
-            SwiftyLogger.debug("Updating proxy options: \(newValue)")
-        }
-    }
+    var options: [ProxyOption]
 
     private let decoder: JSONDecoder = .init()
     private let encoder: JSONEncoder = .init()

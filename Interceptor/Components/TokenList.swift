@@ -122,5 +122,5 @@ struct TokenConfigView: View {
             QuantumLeap.VPNSettingList()
         })
     })
-    .environment(Tuberose.default)
+    .environmentObject(Tuberose.default)
 }
