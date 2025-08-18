@@ -10,18 +10,18 @@ import Mudmouth
 import QuantumLeap
 import SwiftUI
 
-struct TokenListView: View {
-    @Environment(WebTokenStore.self) private var store: WebTokenStore
+struct ServiceTokenList: View {
+//    @Environment(WebTokenStore.self) private var store: WebTokenStore
 
     var body: some View {
         Section(content: {
-            ForEach(store.tokens, content: { token in
-                NavigationLink(destination: {
-                    TokenConfigView(token: token)
-                }, label: {
-                    Text(NSLocalizedString(token.host, bundle: .main, comment: ""))
-                })
-            })
+//            ForEach(store.tokens, content: { token in
+//                NavigationLink(destination: {
+//                    TokenConfigView(token: token)
+//                }, label: {
+//                    Text(NSLocalizedString(token.host, bundle: .main, comment: ""))
+//                })
+//            })
         }, header: {
             Text("TITLE_GAME_WEB_TOKEN")
         })
@@ -118,10 +118,9 @@ struct TokenConfigView: View {
 #Preview {
     NavigationView(content: {
         Form(content: {
-            QuantumLeap.TokenList()
+            QuantumLeap.ServiceList()
             QuantumLeap.VPNSettingList()
         })
     })
-    .environment(WebTokenStore.default)
-    .environment(Mudmouth.default)
+    .environment(Tuberose.default)
 }

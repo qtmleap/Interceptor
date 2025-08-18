@@ -17,29 +17,26 @@ final class WebTokenStore {
     // iCloud Keychainを利用する
     // ライブラリ側と共通なので見ようと思ったらプライベートキーも参照できる？
     private let keychain: Keychain = .init(service: Bundle.main.bundleIdentifier!).synchronizable(true)
-    // 登録しているホスト一覧
-    private let hosts: [String] = [
-        "app.splatoon2.nintendo.net",
-        "api.lp1.av5ja.srv.nintendo.net",
-        "web.sd.lp1.acbaa.srv.nintendo.net",
-        "app.smashbros.nintendo.net",
-        "api.lp1.87abc152.srv.nintendo.net",
-    ]
-    private(set) var tokens: [AccessToken] = []
 
-    init() {
-        tokens = hosts.compactMap { try? keychain.getToken(forKey: $0) }
-        print(tokens)
-    }
+    var options: [ProxyOption] = [
+        .init(host: "api.lp1.av5ja.srv.nintendo.net", paths: [
+            .init(path: "/api/bullet_tokens"),
+        ]),
+        .init(host: "app.splatoon2.nintendo.net", paths: [
+            .init(path: "/"),
+        ]),
+    ].sorted(by: { $0.host < $1.host })
 
-    private func getToken(forKey: String) throws -> AccessToken {
-        try keychain.getToken(forKey: forKey)
-    }
+    init() {}
+
+//    private func getToken(forKey: String) throws -> AccessToken {
+//        try keychain.getToken(forKey: forKey)
+//    }
 
     /// 通知で受け取ったデータをKeychainに保存する
     /// 過去のデータとかはとりあえず気にしなくていいと思う
     /// - Parameter value: <#value description#>
-    func setToken(_ value: UNNotificationResponse) throws {
+//    func setToken(_ value: UNNotificationResponse) throws {
 //        let userInfo = value.notification.request.content.userInfo
 //        if let headers: HTTP.Parameters = userInfo.data(forKey: "headers"),
 //           let body: HTTP.Parameters = userInfo.data(forKey: "body"),
@@ -78,24 +75,24 @@ final class WebTokenStore {
 //            // トークン一覧を更新
 //            tokens = hosts.compactMap { try? keychain.getToken(forKey: $0) }
 //        }
-    }
+//    }
 }
 
 extension Keychain {
-    func setToken(_ value: AccessToken, forKey: String) throws {
-        let encoder: JSONEncoder = .init()
-        let data: Data = try encoder.encode(value)
-        try set(data, key: forKey)
-    }
-
-    func getToken(forKey: String) throws -> AccessToken {
-        guard let data: Data = try getData(forKey)
-        else {
-            throw DecodingError.valueNotFound(AccessToken.self, .init(codingPath: [], debugDescription: ""))
-        }
-        let decoder: JSONDecoder = .init()
-        return try decoder.decode(AccessToken.self, from: data)
-    }
+//    func setToken(_ value: AccessToken, forKey: String) throws {
+//        let encoder: JSONEncoder = .init()
+//        let data: Data = try encoder.encode(value)
+//        try set(data, key: forKey)
+//    }
+//
+//    func getToken(forKey: String) throws -> AccessToken {
+//        guard let data: Data = try getData(forKey)
+//        else {
+//            throw DecodingError.valueNotFound(AccessToken.self, .init(codingPath: [], debugDescription: ""))
+//        }
+//        let decoder: JSONDecoder = .init()
+//        return try decoder.decode(AccessToken.self, from: data)
+//    }
 }
 
 // extension HTTP.Headers {
@@ -123,7 +120,7 @@ extension Keychain {
 //    }
 // }
 
-extension [AnyHashable: Any] {
+// extension [AnyHashable: Any] {
 //    func data(forKey key: String) -> HTTP.Parameters? {
 //        guard let value = (self[key] as? String).map(\.base64DecodedString),
 //              let data: Data = value?.data(using: .utf8)
@@ -133,8 +130,8 @@ extension [AnyHashable: Any] {
 //        let decoder: JSONDecoder = .init()
 //        return try? decoder.decode(HTTP.Parameters.self, from: data)
 //    }
-}
+// }
 
-extension WebTokenStore {
-    static let `default`: WebTokenStore = .init()
-}
+// extension WebTokenStore {
+//    static let `default`: WebTokenStore = .init()
+// }
