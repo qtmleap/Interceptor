@@ -9,29 +9,38 @@
 import Mudmouth
 import QuantumLeap
 import SwiftUI
+@_spi(Advanced) import SwiftUIIntrospect
 
-struct ServiceTokenList: View {
+struct ServiceTokenLink: View {
     @EnvironmentObject private var client: Tuberose
 
     var body: some View {
-        Section(content: {
-//            ForEach(store.tokens, content: { token in
-//                NavigationLink(destination: {
-//                    TokenConfigView(token: token)
-//                }, label: {
-//                    Text(NSLocalizedString(token.host, bundle: .main, comment: ""))
-//                })
-//            })
-        }, header: {
-            Text("TITLE_GAME_WEB_TOKEN")
+        NavigationLink(destination: {
+            Form(content: {
+                Section(content: {
+                    ForEach(client.tokens, content: { token in
+                        NavigationLink(destination: {
+                            ServiceTokenView(token: token)
+                        }, label: {
+                            Text(token.host)
+                                .lineLimit(1)
+                        })
+                    })
+                }, header: {
+                    Text("HEADER_SERVICE_TOKENS")
+                })
+            })
+            .navigationTitle(Text("TITLE_SERVICE_TOKENS"))
+            .navigationBarTitleDisplayMode(.inline)
+        }, label: {
+            Label(systemName: "lock.shield.fill", color: .teal, title: {
+                Text("LABEL_SERVICE_TOKENS")
+            })
         })
-        .multilineTextAlignment(.trailing)
-        .textSelection(.enabled)
-        .textContentType(.password)
     }
 }
 
-struct TokenConfigView: View {
+struct ServiceTokenView: View {
 //    @Binding var token: AccessToken
     @State private var destinationURL: String = ""
     @State private var isEditable: Bool = false
@@ -70,6 +79,17 @@ struct TokenConfigView: View {
                 Text("FOOTER_SERVICE_SETTING")
             })
             Section(content: {
+                LabeledContent(NSLocalizedString("LABEL_ACCESS_TOKEN", bundle: .main, comment: ""), content: {
+                    Text(token.accessToken)
+                        .lineLimit(1)
+                        .textSelection(.enabled)
+                })
+            }, header: {
+                Text("HEADER_ACCESS_TOKEN")
+            }, footer: {
+                Text("FOOTER_ACCESS_TOKEN")
+            })
+            Section(content: {
                 LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_MEMBERSHIP", bundle: .main, comment: ""), content: {
                     Text(token.gtoken.payload.membership.active ? "ENABLED" : "DISABLED")
                 })
@@ -102,6 +122,8 @@ struct TokenConfigView: View {
                 })
             }, header: {
                 Text("HEADER_GAME_WEB_TOKEN")
+            }, footer: {
+                Text("FOOTER_GAME_WEB_TOKEN")
             })
             Button(action: {
                 UIApplication.shared.open(token.url)
@@ -118,9 +140,16 @@ struct TokenConfigView: View {
 #Preview {
     NavigationView(content: {
         Form(content: {
-            QuantumLeap.ServiceList()
             QuantumLeap.VPNSettingList()
+            QuantumLeap.Certificate()
+            QuantumLeap.ServiceList()
         })
     })
     .environmentObject(Tuberose.default)
+    .environment(Tuberose.default.mudmouth)
+    .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
+        controller.preferredDisplayMode = .oneBesideSecondary
+        controller.preferredSplitBehavior = .displace
+        controller.presentsWithGesture = false
+    })
 }
