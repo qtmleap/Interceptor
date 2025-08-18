@@ -14,41 +14,38 @@ import SwiftUI
 struct VPNSetting: View {
     @EnvironmentObject private var client: Tuberose
     @Environment(\.scenePhase) private var scenePhase
-    /// VPNの接続状態
-    /// 直接Mudmouthの状態を弄れないので一時的に変数に逃がす
     @State private var isConnected: Bool = false
-    @AppStorage("ACTIVATE_ON_FOREGROUND") private var activateOnForeground: Bool = false
 
     var body: some View {
         Section(content: {
             Label(systemName: "wifi", color: .blue, title: {
-                Toggle(isOn: $isConnected, label: {
+                Toggle(isOn: $client.isConnected, label: {
                     Text("LABEL_VPN_IS_CONNECTED")
                 })
             })
             Label(systemName: "autostartstop", color: .blue, title: {
-                Toggle(isOn: $activateOnForeground, label: {
+                Toggle(isOn: client.$activateOnForeground, label: {
                     Text("LABEL_ACTIVATE_ON_FOREGROUND")
                 })
             })
         }, header: {
             Text("TITLE_VPN_SETTINGS")
         })
-        .onAppear(perform: {
-            isConnected = client.isConnected
-        })
-        .onChange(of: scenePhase) {
-            isConnected = client.isConnected
-        }
-        .onChange(of: client.isConnected) {
-            isConnected = client.isConnected
-        }
-        .onChange(of: isConnected) {
-            // 値が変わったときにVPN設定を切り替える
-            Task(priority: .background, operation: {
-                isConnected ? try await client.startVPNTunnel() : client.stopVPNTunnel()
-            })
-        }
+//        .onAppear(perform: {
+//            isConnected = client.isConnected
+//        })
+//        .onChange(of: scenePhase) {
+//            isConnected = client.isConnected
+//        }
+//        .onChange(of: client.isConnected) {
+//            isConnected = client.isConnected
+//        }
+//        .onChange(of: isConnected) {
+//            // 値が変わったときにVPN設定を切り替える
+//            Task(priority: .background, operation: {
+//                isConnected ? try await client.startVPNTunnel() : client.stopVPNTunnel()
+//            })
+//        }
     }
 }
 
