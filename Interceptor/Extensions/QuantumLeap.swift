@@ -14,8 +14,8 @@ import SwiftUI
 @MainActor
 extension QuantumLeap {
     @ViewBuilder
-    static func TokenList() -> some View {
-        TokenListView()
+    static func ServiceList() -> some View {
+        ServiceTokenList()
     }
 
     @ViewBuilder
@@ -64,8 +64,7 @@ extension QuantumLeap {
             QuantumLeap.ServerList()
         })
     })
-    .environment(WebTokenStore.default)
-    .environment(Mudmouth.default)
+    .environment(Tuberose.default)
     .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
         controller.preferredDisplayMode = .oneBesideSecondary
         controller.preferredSplitBehavior = .displace

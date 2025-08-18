@@ -13,6 +13,7 @@ import SwiftUI
 import TreeSitterJavaScriptRunestone
 
 struct ServerView: View {
+    @Bindable var option: ProxyOption
     let paths: [String] = [
         "/",
         "/tokens",
@@ -33,24 +34,26 @@ struct ServerView: View {
     var body: some View {
         Form(content: {
             Section(content: {
-                Toggle(isOn: .constant(true), label: {
+                Toggle(isOn: $option.capture, label: {
                     Text("LABEL_SERVER_LIST_ENABLE")
                 })
-                Toggle(isOn: .constant(true), label: {
+                Toggle(isOn: $option.notify, label: {
                     Text("LABEL_SERVER_LIST_NOTIFICATION_ENABLE")
                 })
             })
-            Section(content: {
-                ForEach(paths, id: \.self, content: { path in
-                    Toggle(isOn: .constant(true), label: {
-                        Text(path)
+            if !option.paths.isEmpty {
+                Section(content: {
+                    ForEach($option.paths, content: { $path in
+                        Toggle(isOn: $path.notify, label: {
+                            Text(path.path)
+                        })
                     })
+                }, header: {
+                    Text("HEADER_SERVER_NOTIFICATION")
+                }, footer: {
+                    Text("FOOTER_SERVER_NOTIFICATION")
                 })
-            }, header: {
-                Text("HEADER_SERVER_NOTIFICATION")
-            }, footer: {
-                Text("FOOTER_SERVER_NOTIFICATION")
-            })
+            }
             Section(content: {
                 Toggle(isOn: .constant(true), label: {
                     Text("LABEL_SERVER_SCRIPT_ENABLE")
@@ -70,36 +73,27 @@ struct ServerView: View {
 }
 
 struct ServerListView: View {
-    @State var editMode: EditMode = .inactive
-    @State private var servers: [URL] = [
-        URL(string: "https://api.accounts.nintendo.com/")!, // Nintendo
-        URL(string: "https://api-lp1.znc.srv.nintendo.net/")!, // Nintendo (暗号化されているので現在は取得不可)
-        URL(string: "https://api.lp1.usagi.srv.nintendo.net/")!, // Splatoon 3
-        URL(string: "https://api.lp1.av5ja.srv.nintendo.net/")!, // Splatoon 3
-        URL(string: "https://api.lp1.87abc152.srv.nintendo.net/")!, // Zelda Notes
-        URL(string: "https://accounts.nintendo.com/")!, // Nintendo
-        URL(string: "https://app.splatoon2.nintendo.net/")!, // Splatoon 2
-        URL(string: "https://app.smashbros.nintendo.net/")!, // Smash World
-        URL(string: "https://web.sd.lp1.acbaa.srv.nintendo.net/")!, // NookLink
-    ].sorted(by: { $0.host! < $1.host! })
+//    @Environment(Tuberose.self) private var client: Tuberose
+    @Bindable var client: Tuberose = .default
+    @State var editMode: EditMode = .active
 
     func onDelete(offsets: IndexSet) {
-        // Handle deletion logic here
+        client.options.remove(atOffsets: offsets)
     }
 
     func onMove(offsets: IndexSet, to destination: Int) {
-        // Handle move logic here
+        client.options.move(fromOffsets: offsets, toOffset: destination)
     }
 
     var body: some View {
         Form(content: {
             Section(content: {
-                ForEach(servers, id: \.self, content: { server in
+                ForEach(client.options, content: { option in
                     NavigationLink(destination: {
-                        ServerView()
+                        ServerView(option: option)
                     }, label: {
                         Label(title: {
-                            Text(server.host!)
+                            Text(option.host)
                         }, icon: {
                             Image(systemName: "checkmark")
                                 .fontWeight(.bold)
@@ -134,8 +128,7 @@ struct ServerListView: View {
             QuantumLeap.ServerList()
         })
     })
-    .environment(WebTokenStore.default)
-    .environment(Mudmouth.default)
+    .environment(Tuberose.default)
     .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
         controller.preferredDisplayMode = .oneBesideSecondary
         controller.preferredSplitBehavior = .displace

@@ -12,10 +12,12 @@ import SwiftUI
 @_spi(Advanced) import SwiftUIIntrospect
 
 struct VPNSetting: View {
-    @Environment(Mudmouth.self) private var manager: Mudmouth
+    @Environment(Tuberose.self) private var client: Tuberose
+    @Environment(\.scenePhase) private var scenePhase
     /// VPNの接続状態
     /// 直接Mudmouthの状態を弄れないので一時的に変数に逃がす
     @State private var isConnected: Bool = false
+    @AppStorage("ACTIVATE_ON_FOREGROUND") private var activateOnForeground: Bool = false
 
     var body: some View {
         Section(content: {
@@ -25,7 +27,7 @@ struct VPNSetting: View {
                 })
             })
             Label(systemName: "autostartstop", color: .blue, title: {
-                Toggle(isOn: manager.$activateOnForeground, label: {
+                Toggle(isOn: $activateOnForeground, label: {
                     Text("LABEL_ACTIVATE_ON_FOREGROUND")
                 })
             })
@@ -33,14 +35,20 @@ struct VPNSetting: View {
             Text("TITLE_VPN_SETTINGS")
         })
         .onAppear(perform: {
-            isConnected = manager.isConnected
+            isConnected = client.isConnected
         })
-        .onChange(of: isConnected, perform: { newValue in
+        .onChange(of: scenePhase) {
+            isConnected = client.isConnected
+        }
+        .onChange(of: client.isConnected) {
+            isConnected = client.isConnected
+        }
+        .onChange(of: isConnected) {
             // 値が変わったときにVPN設定を切り替える
             Task(priority: .background, operation: {
-                newValue ? try await manager.startVPNTunnel() : manager.stopVPNTunnel()
+                isConnected ? try await client.startVPNTunnel() : client.stopVPNTunnel()
             })
-        })
+        }
     }
 }
 
@@ -50,10 +58,12 @@ struct VPNSetting: View {
             QuantumLeap.VPNSettingList()
             QuantumLeap.Certificate()
             QuantumLeap.ServerList()
+//            QuantumLeap.ServerList()
         })
     })
-    .environment(WebTokenStore.default)
-    .environment(Mudmouth.default)
+    .environment(Tuberose.default)
+    .environment(Tuberose.default.mudmouth)
+    .environment(\.colorScheme, .dark)
     .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
         controller.preferredDisplayMode = .oneBesideSecondary
         controller.preferredSplitBehavior = .displace

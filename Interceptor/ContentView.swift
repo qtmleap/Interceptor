@@ -58,6 +58,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environmentIsFirstLaunch()
-        .environment(Mudmouth.default)
-        .environment(WebTokenStore.default)
+        .environment(Tuberose.default)
 }

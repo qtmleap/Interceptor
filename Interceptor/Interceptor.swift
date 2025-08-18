@@ -13,7 +13,7 @@ import SwiftUI
 import SwiftyLogger
 
 class AppDelegate: NSObject, UIApplicationDelegate, UIWindowSceneDelegate {
-    weak var tokenStore: WebTokenStore?
+    weak var tuberose: Tuberose?
 
     func application(
         _ application: UIApplication,
@@ -45,9 +45,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UIWindowSceneDelegate {
         _ scene: UIScene,
         willConnectTo session: UISceneSession,
         options connectionOptions: UIScene.ConnectionOptions,
-    ) {
-        if let url = connectionOptions.urlContexts.first?.url {}
-    }
+    ) {}
 
     func sceneDidBecomeActive(_ scene: UIScene) {}
 }
@@ -55,7 +53,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UIWindowSceneDelegate {
 extension AppDelegate: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         await MainActor.run(body: {
-            try? tokenStore?.setToken(response)
+            try? tuberose?.setToken(response)
         })
     }
 }
@@ -64,18 +62,17 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
 struct Interceptor: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    private let tokenStore: WebTokenStore = .default
-    private let manager: Mudmouth = .default
+    private let tuberose: Tuberose = .default
 
     init() {
-        appDelegate.tokenStore = .default
+        appDelegate.tuberose = tuberose
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(tokenStore)
-                .environment(manager)
+                .environment(tuberose)
+                .environment(tuberose.mudmouth)
                 .environmentIsFirstLaunch()
                 .modelContainer(ModelContainer.default)
         }
