@@ -16,7 +16,7 @@ struct RecordsView: View {
 
     var body: some View {
         List(content: {
-            ForEach(group.records, content: { record in
+            ForEach(group.records.reversed(), content: { record in
                 NavigationLink(destination: {
                     RecordView(record: record)
                 }, label: {
@@ -29,6 +29,12 @@ struct RecordsView: View {
                                 .font(.system(size: 14))
                                 .fontWeight(.bold)
                                 .foregroundStyle(record.foregroundColor)
+                            Text(record.code, format: .number)
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                            Text(record.phrase)
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
                         })
                         Text(record.path)
                             .lineLimit(1)

@@ -23,16 +23,6 @@ struct SettingsView: View {
         })
         .navigationTitle(Text("TITLE_SETTINGS"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(content: {
-            ToolbarItem(placement: .topBarTrailing, content: {
-                Button(action: {
-                    dismiss()
-                }, label: {
-                    Image(systemName: "xmark")
-                        .fontWeight(.bold)
-                })
-            })
-        })
     }
 }
 
