@@ -31,7 +31,9 @@ public final class Tuberose: ObservableObject {
         .init(host: "app.splatoon2.nintendo.net", paths: [
             .init(path: "/"),
         ]),
-        .init(host: "app.smashbros.nintendo.net", paths: []),
+        .init(host: "app.smashbros.nintendo.net", paths: [
+            .init(path: "/"),
+        ]),
         .init(host: "web.sd.lp1.acbaa.srv.nintendo.net", paths: []),
     ]
 
@@ -72,6 +74,13 @@ public final class Tuberose: ObservableObject {
            let host: String = headers.host
         {
             switch host {
+                case "app.smashbros.nintendo.net":
+                    if let token: String = cookies.value(forKey: "super_smash_session"),
+                       let gtoken: String = headers.value(forKey: "X-GameWebToken")
+                    {
+                        SwiftyLogger.debug("Captured token: \(token) \(gtoken)")
+                        try? keychain.setToken(.init(contentId: .SMSP, host: host, gtoken: gtoken, accessToken: token), forKey: host)
+                    }
                 case "app.splatoon2.nintendo.net":
                     if let token: String = cookies.value(forKey: "iksm_session"),
                        let gtoken: String = headers.value(forKey: "X-GameWebToken")
@@ -95,7 +104,6 @@ public final class Tuberose: ObservableObject {
         tokens = options.map(\.host).compactMap { host in
             try? keychain.getToken(forKey: host)
         }
-        print(tokens)
     }
 
     @objc

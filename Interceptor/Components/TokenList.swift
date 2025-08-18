@@ -42,26 +42,29 @@ struct ServiceTokenLink: View {
 
 struct ServiceTokenView: View {
 //    @Binding var token: AccessToken
-    @State private var destinationURL: String = ""
+    @State private var apiURL: String = ""
+    @State private var urlScheme: String = ""
     @State private var isEditable: Bool = false
     let token: AccessToken
 
     var body: some View {
         Form(content: {
             Section(content: {
-                LabeledContent(content: {
+                Label(title: {
                     Toggle(isOn: .constant(false), label: {
                         Text("LABEL_REGENERATE_FROM_GAME_WEB_TOKEN")
                     })
-                }, label: {
-                    Image(systemName: "wifi.exclamationmark")
+                    .disabled(true)
+                }, icon: {
+                    Image(systemName: "lock")
                 })
-                LabeledContent(content: {
+                Label(title: {
                     Toggle(isOn: .constant(false), label: {
                         Text("LABEL_OPEN_APP_WHEN_TOKEN_EXPIRED")
                     })
-                }, label: {
-                    Image(systemName: "arrow.trianglehead.2.clockwise")
+                    .disabled(true)
+                }, icon: {
+                    Image(systemName: "lock")
                 })
             }, header: {
                 Text("HEADER_GAME_WEB_TOKEN_EXPIRED_ACTION")
@@ -70,14 +73,36 @@ struct ServiceTokenView: View {
             })
             .disabled(true)
             Section(content: {
-                TextField("LABEL_DESTINATION_URL", text: $destinationURL)
-                    .keyboardType(.URL)
-                    .disabled(!isEditable)
+                Label(title: {
+                    TextField("LABEL_DESTINATION_URL", text: $apiURL)
+                        .keyboardType(.URL)
+                        .disabled(true)
+                }, icon: {
+                    Image(systemName: "lock")
+                })
+                Label(title: {
+                    TextField("LABEL_URL_SCHEME", text: $urlScheme)
+                        .keyboardType(.URL)
+                        .disabled(true)
+                }, icon: {
+                    Image(systemName: "lock")
+                })
+                Label(title: {
+                    NavigationLink(destination: {
+                        EmptyView()
+                    }, label: {
+                        Text("LABEL_JAVASCRIPT_CODE")
+                    })
+                    .disabled(true)
+                }, icon: {
+                    Image(systemName: "lock")
+                })
             }, header: {
                 Text("HEADER_SERVICE_SETTING")
             }, footer: {
                 Text("FOOTER_SERVICE_SETTING")
             })
+            .disabled(true)
             Section(content: {
                 LabeledContent(NSLocalizedString("LABEL_ACCESS_TOKEN", bundle: .main, comment: ""), content: {
                     Text(token.accessToken)
