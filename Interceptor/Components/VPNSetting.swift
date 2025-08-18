@@ -19,7 +19,7 @@ struct VPNSetting: View {
     var body: some View {
         Section(content: {
             Label(systemName: "wifi", color: .blue, title: {
-                Toggle(isOn: $client.isConnected, label: {
+                Toggle(isOn: $isConnected, label: {
                     Text("LABEL_VPN_IS_CONNECTED")
                 })
             })
@@ -31,21 +31,21 @@ struct VPNSetting: View {
         }, header: {
             Text("TITLE_VPN_SETTINGS")
         })
-//        .onAppear(perform: {
-//            isConnected = client.isConnected
-//        })
-//        .onChange(of: scenePhase) {
-//            isConnected = client.isConnected
-//        }
-//        .onChange(of: client.isConnected) {
-//            isConnected = client.isConnected
-//        }
-//        .onChange(of: isConnected) {
-//            // 値が変わったときにVPN設定を切り替える
-//            Task(priority: .background, operation: {
-//                isConnected ? try await client.startVPNTunnel() : client.stopVPNTunnel()
-//            })
-//        }
+        .onAppear(perform: {
+            isConnected = client.isConnected
+        })
+        .onChange(of: scenePhase) {
+            isConnected = client.isConnected
+        }
+        .onChange(of: client.isConnected) {
+            isConnected = client.isConnected
+        }
+        .onChange(of: isConnected) {
+            // 値が変わったときにVPN設定を切り替える
+            Task(priority: .background, operation: {
+                isConnected ? try await client.startVPNTunnel() : client.stopVPNTunnel()
+            })
+        }
     }
 }
 
