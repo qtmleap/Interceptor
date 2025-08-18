@@ -78,23 +78,6 @@ final class WebTokenStore {
 //    }
 }
 
-extension Keychain {
-//    func setToken(_ value: AccessToken, forKey: String) throws {
-//        let encoder: JSONEncoder = .init()
-//        let data: Data = try encoder.encode(value)
-//        try set(data, key: forKey)
-//    }
-//
-//    func getToken(forKey: String) throws -> AccessToken {
-//        guard let data: Data = try getData(forKey)
-//        else {
-//            throw DecodingError.valueNotFound(AccessToken.self, .init(codingPath: [], debugDescription: ""))
-//        }
-//        let decoder: JSONDecoder = .init()
-//        return try decoder.decode(AccessToken.self, from: data)
-//    }
-}
-
 // extension HTTP.Headers {
 //    var host: String? {
 //        value(forKey: "Host")

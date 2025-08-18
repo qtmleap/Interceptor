@@ -34,22 +34,21 @@ extension QuantumLeap {
         })
     }
 
-    @ViewBuilder
-    static func ServerList() -> some View {
-        NavigationLink(destination: {
-            ServerListView()
-        }, label: {
-            Label(systemName: "list.dash", color: .green, title: {
-                Text("TITLE_SERVER_LIST")
-            })
-        })
-    }
+//    @ViewBuilder
+//    static func ServerList() -> some View {
+//        NavigationLink(destination: {
+//            ServerListView()
+//        }, label: {
+//            Label(systemName: "list.dash", color: .green, title: {
+//                Text("TITLE_SERVER_LIST")
+//            })
+//        })
+//    }
 
     @ViewBuilder
     static func Tools() -> some View {
         Section(content: {
             QuantumLeap.Certificate()
-            QuantumLeap.ServerList()
         }, header: {
             Text("HEADER_TOOLS")
         })
@@ -61,7 +60,7 @@ extension QuantumLeap {
         Form(content: {
             QuantumLeap.VPNSettingList()
             QuantumLeap.Certificate()
-            QuantumLeap.ServerList()
+            QuantumLeap.ServiceList()
         })
     })
     .environmentObject(Tuberose.default)

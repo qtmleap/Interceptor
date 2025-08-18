@@ -54,7 +54,8 @@ struct VPNSetting: View {
         Form(content: {
             QuantumLeap.VPNSettingList()
             QuantumLeap.Certificate()
-            QuantumLeap.ServerList()
+            QuantumLeap.ServiceList()
+//            QuantumLeap.ServerList()
 //            QuantumLeap.ServerList()
         })
     })
