@@ -298,23 +298,6 @@
         }
       }
     },
-    "LABEL_DEVELOPER_SETTINGS" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Developer Settings"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "開発者向け設定"
-          }
-        }
-      }
-    },
     "LABEL_GAME_WEB_TOKEN_EXPIRED_ACTION_FOOTER" : {
       "localizations" : {
         "en" : {
@@ -709,7 +692,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "サーバー"
+            "value" : "サーバー設定"
           }
         }
       }
