@@ -105,6 +105,7 @@
 
     },
     "FOOTER_SERVER_LIST" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -115,6 +116,7 @@
       }
     },
     "FOOTER_SERVER_NOTIFICATION" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -176,6 +178,7 @@
 
     },
     "HEADER_SERVER_LIST" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -186,6 +189,7 @@
       }
     },
     "HEADER_SERVER_NOTIFICATION" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -196,6 +200,7 @@
       }
     },
     "HEADER_SERVER_SCRIPT" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -363,6 +368,7 @@
       }
     },
     "LABEL_RECORD_BODY" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -473,6 +479,7 @@
       }
     },
     "LABEL_SERVER_LIST_ENABLE" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -483,6 +490,7 @@
       }
     },
     "LABEL_SERVER_LIST_NOTIFICATION_ENABLE" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -493,6 +501,7 @@
       }
     },
     "LABEL_SERVER_SCRIPT" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -503,6 +512,7 @@
       }
     },
     "LABEL_SERVER_SCRIPT_ENABLE" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -718,6 +728,7 @@
       }
     },
     "TITLE_SERVER" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -728,6 +739,7 @@
       }
     },
     "TITLE_SERVER_LIST" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

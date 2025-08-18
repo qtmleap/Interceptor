@@ -11,14 +11,14 @@ import SwiftUI
 @_spi(Advanced) import SwiftUIIntrospect
 import TreeSitterJSONRunestone
 
-private struct DisclosureIndicator<T: HTTP.KeyValuePair>: View {
+private struct DisclosureIndicator: View {
     @State private var isExpanded: Bool = true
     let label: () -> Text
-    let items: [T]
+    let items: [HTTP.Parameter]
 
-    init(label: @escaping () -> Text, items: [T]) {
+    init(label: @escaping () -> Text, items: HTTP.Parameters) {
         self.label = label
-        self.items = items
+        self.items = items.values
     }
 
     var body: some View {
@@ -70,16 +70,16 @@ struct RecordView: View {
                 }, items: record.cookies)
                     .listRowSeparator(.hidden)
             }
-            if let body = record.request.body {
-                NavigationLink(destination: {
-                    CodeView(text: body, language: .json)
-                }, label: {
-                    Text("LABEL_RECORD_BODY")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                })
-                .listRowSeparator(.hidden)
-            }
+//            if let body = record.request.body {
+//                NavigationLink(destination: {
+//                    CodeView(text: body, language: .json)
+//                }, label: {
+//                    Text("LABEL_RECORD_BODY")
+//                        .font(.title2)
+//                        .fontWeight(.bold)
+//                })
+//                .listRowSeparator(.hidden)
+//            }
         })
         .tag(0)
     }
@@ -101,16 +101,16 @@ struct RecordView: View {
                 }, items: record.response.cookies)
                     .listRowSeparator(.hidden)
             }
-            if let body = record.response.body {
-                NavigationLink(destination: {
-                    CodeView(text: body, language: .json)
-                }, label: {
-                    Text("LABEL_RECORD_BODY")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                })
-                .listRowSeparator(.hidden)
-            }
+//            if let body = record.response.body {
+//                NavigationLink(destination: {
+//                    CodeView(text: body, language: .json)
+//                }, label: {
+//                    Text("LABEL_RECORD_BODY")
+//                        .font(.title2)
+//                        .fontWeight(.bold)
+//                })
+//                .listRowSeparator(.hidden)
+//            }
         })
         .tag(1)
     }

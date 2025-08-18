@@ -11,7 +11,7 @@ import QuantumLeap
 import SwiftUI
 
 struct ServiceTokenList: View {
-//    @Environment(WebTokenStore.self) private var store: WebTokenStore
+    @EnvironmentObject private var client: Tuberose
 
     var body: some View {
         Section(content: {
