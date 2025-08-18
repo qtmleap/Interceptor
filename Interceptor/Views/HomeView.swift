@@ -29,8 +29,10 @@ struct HomeView: View {
                                 Text(group.host)
                                     .lineLimit(1)
                                     .truncationMode(.tail)
+                                Spacer()
                                 Text(group.records.count, format: .number)
                                     .foregroundStyle(.secondary)
+                                    .monospacedDigit()
                             })
                         }, icon: {
                             Image(systemName: "folder.fill")
@@ -39,9 +41,6 @@ struct HomeView: View {
                 })
                 .isDetailLink(false)
             })
-        })
-        .onAppear(perform: {
-            print(groups.count)
         })
         .listStyle(.plain)
         .navigationTitle(Text("TITLE_HOME"))
@@ -53,7 +52,7 @@ struct HomeView: View {
                 }, label: {
                     Image(systemName: "trash.fill")
                 })
-                .confirmationDialog(NSLocalizedString("LABEL_CLEAR_REQUESTS", comment: ""), isPresented: $isPresented, actions: {
+                .confirmationDialog(NSLocalizedString("LABEL_CLEAR_REQUESTS", comment: ""), isPresented: $isPresented, titleVisibility: .visible, actions: {
                     Button(role: .destructive, action: {
                         // 全削除
                         Task(priority: .background, operation: {

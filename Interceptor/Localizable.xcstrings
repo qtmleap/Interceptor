@@ -35,6 +35,12 @@
     },
     "FOOTER_ACCESS_TOKEN" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The access token is used to retrieve game data."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45,6 +51,12 @@
     },
     "FOOTER_GAME_WEB_TOKEN" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The game web token is used to issue an access token."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -64,13 +76,19 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "取得したゲームのリザルトなどを送信するサービスのURLを設定できます。"
+            "value" : "アクセストークン取得後のアプリの処理を設定することができます。"
           }
         }
       }
     },
     "HEADER_ACCESS_TOKEN" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access Token"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -83,7 +101,7 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Game Web Token"
           }
         },
@@ -129,6 +147,12 @@
     },
     "HEADER_SERVICE_TOKENS" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token List"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -139,6 +163,12 @@
     },
     "HEADER_TOOLS" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tools"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -149,6 +179,12 @@
     },
     "LABEL_ACCESS_TOKEN" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access Token"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -190,7 +226,20 @@
       }
     },
     "LABEL_CLEAR_REQUESTS" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear History"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "履歴削除"
+          }
+        }
+      }
     },
     "LABEL_CLEAR_REQUESTS_DESC" : {
       "localizations" : {
@@ -256,6 +305,22 @@
         }
       }
     },
+    "LABEL_JAVASCRIPT_CODE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JavaScript Code"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JavaScriptコード"
+          }
+        }
+      }
+    },
     "LABEL_OPEN_APP" : {
       "localizations" : {
         "en" : {
@@ -306,6 +371,12 @@
     },
     "LABEL_RECORD_COOKIE" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -332,6 +403,12 @@
     },
     "LABEL_RECORD_QUERY" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Query"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -374,6 +451,12 @@
     },
     "LABEL_RECORD_SET_COOKIE" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set-Cookie"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -400,6 +483,12 @@
     },
     "LABEL_SERVICE_TOKENS" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token List"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -552,6 +641,22 @@
         }
       }
     },
+    "LABEL_URL_SCHEME" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL Scheme"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URLスキーマ"
+          }
+        }
+      }
+    },
     "LABEL_VPN_IS_CONNECTED" : {
       "localizations" : {
         "en" : {
@@ -570,6 +675,12 @@
     },
     "TITLE_CERTIFICATE" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -596,6 +707,12 @@
     },
     "TITLE_SERVICE_TOKENS" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token List"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
