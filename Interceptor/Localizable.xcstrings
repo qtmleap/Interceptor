@@ -378,6 +378,16 @@
         }
       }
     },
+    "LABEL_RECORD_COOKIE" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie"
+          }
+        }
+      }
+    },
     "LABEL_RECORD_HEADER" : {
       "localizations" : {
         "en" : {
@@ -390,6 +400,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Header"
+          }
+        }
+      }
+    },
+    "LABEL_RECORD_QUERY" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Query"
           }
         }
       }
@@ -422,6 +442,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "レスポンス"
+          }
+        }
+      }
+    },
+    "LABEL_RECORD_SET_COOKIE" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set-Cookie"
           }
         }
       }

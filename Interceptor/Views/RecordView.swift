@@ -11,6 +11,35 @@ import SwiftUI
 @_spi(Advanced) import SwiftUIIntrospect
 import TreeSitterJSONRunestone
 
+private struct DisclosureIndicator<T: HTTP.KeyValuePair>: View {
+    @State private var isExpanded: Bool = true
+    let label: () -> Text
+    let items: [T]
+
+    init(label: @escaping () -> Text, items: [T]) {
+        self.label = label
+        self.items = items
+    }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded, content: {
+            ForEach(items, id: \.self, content: { item in
+                VStack(alignment: .leading, content: {
+                    Text(item.key)
+                    Text(item.value)
+                        .textSelection(.enabled)
+                        .foregroundStyle(.secondary)
+                        .font(.footnote)
+                })
+                .padding(0)
+            })
+            .listRowSeparator(.visible)
+        }, label: {
+            label()
+        })
+    }
+}
+
 struct RecordView: View {
     let record: Record
     @State private var isExpanded: Bool = true
@@ -19,23 +48,28 @@ struct RecordView: View {
     @ViewBuilder
     var RequestView: some View {
         List(content: {
-            DisclosureGroup(isExpanded: $isExpanded, content: {
-                ForEach(record.request.headers, id: \.self, content: { header in
-                    VStack(alignment: .leading, content: {
-                        Text(header.key)
-                        Text(header.value)
-                            .foregroundStyle(.secondary)
-                            .font(.footnote)
-                    })
-                    .padding(0)
-                })
-                .listRowSeparator(.visible)
-            }, label: {
+            DisclosureIndicator(label: {
                 Text("LABEL_RECORD_HEADER")
                     .font(.title2)
                     .fontWeight(.bold)
-            })
-            .listRowSeparator(.hidden)
+            }, items: record.request.headers)
+                .listRowSeparator(.hidden)
+            if !record.queries.isEmpty {
+                DisclosureIndicator(label: {
+                    Text("LABEL_RECORD_QUERY")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                }, items: record.queries)
+                    .listRowSeparator(.hidden)
+            }
+            if !record.cookies.isEmpty {
+                DisclosureIndicator(label: {
+                    Text("LABEL_RECORD_COOKIE")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                }, items: record.cookies)
+                    .listRowSeparator(.hidden)
+            }
             if let body = record.request.body {
                 NavigationLink(destination: {
                     CodeView(text: body, language: .json)
@@ -53,23 +87,20 @@ struct RecordView: View {
     @ViewBuilder
     var ResponseView: some View {
         List(content: {
-            DisclosureGroup(isExpanded: $isExpanded, content: {
-                ForEach(record.response.headers, id: \.self, content: { header in
-                    VStack(alignment: .leading, content: {
-                        Text(header.key)
-                        Text(header.value)
-                            .foregroundStyle(.secondary)
-                            .font(.footnote)
-                    })
-                    .padding(0)
-                })
-                .listRowSeparator(.visible)
-            }, label: {
+            DisclosureIndicator(label: {
                 Text("LABEL_RECORD_HEADER")
                     .font(.title2)
                     .fontWeight(.bold)
-            })
-            .listRowSeparator(.hidden)
+            }, items: record.response.headers)
+                .listRowSeparator(.hidden)
+            if !record.response.cookies.isEmpty {
+                DisclosureIndicator(label: {
+                    Text("LABEL_RECORD_SET_COOKIE")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                }, items: record.response.cookies)
+                    .listRowSeparator(.hidden)
+            }
             if let body = record.response.body {
                 NavigationLink(destination: {
                     CodeView(text: body, language: .json)
@@ -96,9 +127,9 @@ struct RecordView: View {
         })
         .pickerStyle(.segmented)
         // 有効化すると最初の表示が表示されないかつNavigationLinkで遷移できなくなる
-//        .introspect(.picker(style: .segmented), on: .iOS(.v17...), customize: { controller in
-//            controller.selectedSegmentTintColor = .systemBlue
-//        })
+        //        .introspect(.picker(style: .segmented), on: .iOS(.v17...), customize: { controller in
+        //            controller.selectedSegmentTintColor = .systemBlue
+        //        })
     }
 
     var body: some View {
@@ -113,7 +144,7 @@ struct RecordView: View {
         })
         .tabViewStyle(.page(indexDisplayMode: .never))
         .listStyle(.plain)
-//        .navigationTitle(record.path)
+        //        .navigationTitle(record.path)
         .navigationBarTitleDisplayMode(.inline)
     }
 }
