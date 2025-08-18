@@ -289,7 +289,6 @@
       }
     },
     "LABEL_RECORD_BODY" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

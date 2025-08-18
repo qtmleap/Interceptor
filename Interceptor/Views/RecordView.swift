@@ -70,16 +70,16 @@ struct RecordView: View {
                 }, items: record.cookies)
                     .listRowSeparator(.hidden)
             }
-//            if let body = record.request.body {
-//                NavigationLink(destination: {
-//                    CodeView(text: body, language: .json)
-//                }, label: {
-//                    Text("LABEL_RECORD_BODY")
-//                        .font(.title2)
-//                        .fontWeight(.bold)
-//                })
-//                .listRowSeparator(.hidden)
-//            }
+            if let json = record.request.json {
+                NavigationLink(destination: {
+                    CodeView(text: json, language: .json)
+                }, label: {
+                    Text("LABEL_RECORD_BODY")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                })
+                .listRowSeparator(.hidden)
+            }
         })
         .tag(0)
     }
@@ -101,16 +101,16 @@ struct RecordView: View {
                 }, items: record.response.cookies)
                     .listRowSeparator(.hidden)
             }
-//            if let body = record.response.body {
-//                NavigationLink(destination: {
-//                    CodeView(text: body, language: .json)
-//                }, label: {
-//                    Text("LABEL_RECORD_BODY")
-//                        .font(.title2)
-//                        .fontWeight(.bold)
-//                })
-//                .listRowSeparator(.hidden)
-//            }
+            if let json = record.response.json {
+                NavigationLink(destination: {
+                    CodeView(text: json, language: .json)
+                }, label: {
+                    Text("LABEL_RECORD_BODY")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                })
+                .listRowSeparator(.hidden)
+            }
         })
         .tag(1)
     }
