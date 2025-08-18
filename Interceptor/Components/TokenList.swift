@@ -115,22 +115,13 @@ struct TokenConfigView: View {
     }
 }
 
-extension QuantumLeap {
-    static func TokenList() -> some View {
-        TokenListView()
-    }
-
-    static func VPNSettingList() -> some View {
-        VPNSetting()
-    }
-}
-
 #Preview {
     NavigationView(content: {
         Form(content: {
+            QuantumLeap.TokenList()
             QuantumLeap.VPNSettingList()
         })
     })
     .environment(WebTokenStore.default)
-    .environment(Mudmouth())
+    .environment(Mudmouth.default)
 }

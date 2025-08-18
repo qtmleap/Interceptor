@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/cybozu/LicenseList.git",
       "state" : {
-        "revision" : "a0a1784aa60dcdafbc30cb2ffbac90544b46100a",
-        "version" : "2.1.0"
+        "revision" : "56f1b5724138e4d9f60453b555edc80e43805503",
+        "version" : "2.2.0"
       }
     },
     {
@@ -177,8 +177,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/qtmleap/QuantumLeap.git",
       "state" : {
-        "revision" : "b06e8c9f301dadf2cde490bf01f311d62d5057b9",
-        "version" : "0.0.4"
+        "revision" : "15a4ca2f01c599e41e1a1b4c523d3eced7e19fe5",
+        "version" : "0.0.5"
       }
     },
     {

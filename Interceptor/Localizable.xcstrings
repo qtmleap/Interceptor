@@ -104,6 +104,26 @@
     "FOOTER_LINK_SERVICES" : {
 
     },
+    "FOOTER_SERVER_LIST" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストをキャプチャするサーバーのドメイン一覧です。"
+          }
+        }
+      }
+    },
+    "FOOTER_SERVER_NOTIFICATION" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効になっているパスに対するリクエストのキャプチャが成功したときに、通知を送ります。"
+          }
+        }
+      }
+    },
     "FOOTER_SERVICE_SETTING" : {
       "localizations" : {
         "en" : {
@@ -155,6 +175,36 @@
     "HEADER_LINK_SERVICES" : {
 
     },
+    "HEADER_SERVER_LIST" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバー一覧"
+          }
+        }
+      }
+    },
+    "HEADER_SERVER_NOTIFICATION" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知設定"
+          }
+        }
+      }
+    },
+    "HEADER_SERVER_SCRIPT" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリプト設定"
+          }
+        }
+      }
+    },
     "HEADER_SERVICE_SETTING" : {
       "localizations" : {
         "en" : {
@@ -167,6 +217,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "連携サービス"
+          }
+        }
+      }
+    },
+    "HEADER_TOOLS" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ツール"
           }
         }
       }
@@ -239,6 +299,7 @@
       }
     },
     "LABEL_DEVELOPER_SETTINGS" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -394,6 +455,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを開く"
+          }
+        }
+      }
+    },
+    "LABEL_SERVER_LIST_ENABLE" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャプチャ"
+          }
+        }
+      }
+    },
+    "LABEL_SERVER_LIST_NOTIFICATION_ENABLE" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知"
+          }
+        }
+      }
+    },
+    "LABEL_SERVER_SCRIPT" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリプト"
+          }
+        }
+      }
+    },
+    "LABEL_SERVER_SCRIPT_ENABLE" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリプトの実行"
           }
         }
       }
@@ -561,6 +662,16 @@
     "stat.ink" : {
 
     },
+    "TITLE_CERTIFICATE" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "証明書"
+          }
+        }
+      }
+    },
     "TITLE_GAME_WEB_TOKEN" : {
       "localizations" : {
         "en" : {
@@ -589,6 +700,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ホーム"
+          }
+        }
+      }
+    },
+    "TITLE_SERVER" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバー"
+          }
+        }
+      }
+    },
+    "TITLE_SERVER_LIST" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバー一覧"
           }
         }
       }
