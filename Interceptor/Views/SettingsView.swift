@@ -15,26 +15,9 @@ struct SettingsView: View {
 
     var body: some View {
         Form(content: {
-            QuantumLeap.Support(label: {
-                NavigationLink(destination: {
-                    ConfigurationView()
-                }, label: {
-                    Label(title: {
-                        Text("LABEL_DEVELOPER_SETTINGS")
-                    }, icon: {
-                        RoundedRectangle(cornerRadius: 8)
-                            .overlay(content: {
-                                Image(systemName: "gear.badge.checkmark")
-                                    .imageScale(.medium)
-                                    .foregroundStyle(.white)
-                            })
-                            .foregroundStyle(.cyan)
-                            .frame(width: 28, height: 28)
-                    })
-                })
-            })
+            QuantumLeap.Support()
             QuantumLeap.VPNSettingList()
-            QuantumLeap.TokenList()
+            QuantumLeap.Tools()
             QuantumLeap.Policy()
             QuantumLeap.Version()
         })
@@ -56,5 +39,6 @@ struct SettingsView: View {
 #Preview {
     ContentView()
         .environmentIsFirstLaunch()
-        .environment(Mudmouth())
+        .environment(Mudmouth.default)
+        .environment(WebTokenStore.default)
 }

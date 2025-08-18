@@ -9,6 +9,7 @@
 import Mudmouth
 import SwiftUI
 @_spi(Advanced) import SwiftUIIntrospect
+import TreeSitterJSONRunestone
 
 struct RecordView: View {
     let record: Record
@@ -37,7 +38,7 @@ struct RecordView: View {
             .listRowSeparator(.hidden)
             if let body = record.request.body {
                 NavigationLink(destination: {
-                    CodeView(text: body)
+                    CodeView(text: body, language: .json)
                 }, label: {
                     Text("LABEL_RECORD_BODY")
                         .font(.title2)
@@ -71,7 +72,7 @@ struct RecordView: View {
             .listRowSeparator(.hidden)
             if let body = record.response.body {
                 NavigationLink(destination: {
-                    CodeView(text: body)
+                    CodeView(text: body, language: .json)
                 }, label: {
                     Text("LABEL_RECORD_BODY")
                         .font(.title2)
@@ -83,6 +84,23 @@ struct RecordView: View {
         .tag(1)
     }
 
+    @ViewBuilder
+    var SegmentControl: some View {
+        Picker(selection: $selection, content: {
+            Text("LABEL_RECORD_REQUEST")
+                .tag(0)
+            Text("LABEL_RECORD_RESPONSE")
+                .tag(1)
+        }, label: {
+            Text("LABEL_RECORD_REQUEST")
+        })
+        .pickerStyle(.segmented)
+        // 有効化すると最初の表示が表示されないかつNavigationLinkで遷移できなくなる
+//        .introspect(.picker(style: .segmented), on: .iOS(.v17...), customize: { controller in
+//            controller.selectedSegmentTintColor = .systemBlue
+//        })
+    }
+
     var body: some View {
         TabView(selection: $selection, content: {
             RequestView
@@ -90,15 +108,7 @@ struct RecordView: View {
         })
         .toolbar(content: {
             ToolbarItem(placement: .navigation, content: {
-                Picker(selection: $selection, content: {
-                    Text("LABEL_RECORD_REQUEST")
-                        .tag(0)
-                    Text("LABEL_RECORD_RESPONSE")
-                        .tag(1)
-                }, label: {
-                    Text("LABEL_RECORD_REQUEST")
-                })
-                .pickerStyle(.segmented)
+                SegmentControl
             })
         })
         .tabViewStyle(.page(indexDisplayMode: .never))

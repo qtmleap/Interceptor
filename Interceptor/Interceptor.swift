@@ -65,6 +65,7 @@ struct Interceptor: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     private let tokenStore: WebTokenStore = .default
+    private let manager: Mudmouth = .default
 
     init() {
         appDelegate.tokenStore = .default
@@ -74,7 +75,7 @@ struct Interceptor: App {
         WindowGroup {
             ContentView()
                 .environment(tokenStore)
-                .environment(Mudmouth())
+                .environment(manager)
                 .environmentIsFirstLaunch()
                 .modelContainer(ModelContainer.default)
         }

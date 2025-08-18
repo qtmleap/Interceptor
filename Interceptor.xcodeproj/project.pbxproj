@@ -14,6 +14,9 @@
 		1089BCFE2E5239CA0088488B /* TreeSitterJSONRunestone in Frameworks */ = {isa = PBXBuildFile; productRef = 1089BCFD2E5239CA0088488B /* TreeSitterJSONRunestone */; };
 		1089BD002E5239CA0088488B /* TreeSitterLanguagesCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1089BCFF2E5239CA0088488B /* TreeSitterLanguagesCommon */; };
 		10925F5D2E4CFA25003611AA /* QuantumLeap in Frameworks */ = {isa = PBXBuildFile; productRef = 10925F5C2E4CFA25003611AA /* QuantumLeap */; };
+		10B520E52E52A344006C2045 /* TreeSitterJavaScript in Frameworks */ = {isa = PBXBuildFile; productRef = 10B520E42E52A344006C2045 /* TreeSitterJavaScript */; };
+		10B520E72E52A344006C2045 /* TreeSitterJavaScriptQueries in Frameworks */ = {isa = PBXBuildFile; productRef = 10B520E62E52A344006C2045 /* TreeSitterJavaScriptQueries */; };
+		10B520E92E52A344006C2045 /* TreeSitterJavaScriptRunestone in Frameworks */ = {isa = PBXBuildFile; productRef = 10B520E82E52A344006C2045 /* TreeSitterJavaScriptRunestone */; };
 		10F701BC2E491546006ECDD2 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 10F701BB2E491546006ECDD2 /* NetworkExtension.framework */; };
 		10F701C42E491546006ECDD2 /* PacketTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 10F701B92E491546006ECDD2 /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		10F701CB2E491567006ECDD2 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 10F701CA2E491567006ECDD2 /* Mudmouth */; };
@@ -132,6 +135,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				10925F5D2E4CFA25003611AA /* QuantumLeap in Frameworks */,
+				10B520E52E52A344006C2045 /* TreeSitterJavaScript in Frameworks */,
 				104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */,
 				10F702752E49829B006ECDD2 /* FirebaseAnalyticsIdentitySupport in Frameworks */,
 				104F3BB22E49135800A2D6F1 /* Mudmouth in Frameworks */,
@@ -139,8 +143,10 @@
 				10F702792E49829B006ECDD2 /* FirebaseCore in Frameworks */,
 				10FBBF2D2E522C5E00CC57B0 /* Runestone in Frameworks */,
 				1089BCFA2E5239CA0088488B /* TreeSitterJSON in Frameworks */,
+				10B520E92E52A344006C2045 /* TreeSitterJavaScriptRunestone in Frameworks */,
 				1089BCFC2E5239CA0088488B /* TreeSitterJSONQueries in Frameworks */,
 				10F7027B2E49829B006ECDD2 /* FirebaseCrashlytics in Frameworks */,
+				10B520E72E52A344006C2045 /* TreeSitterJavaScriptQueries in Frameworks */,
 				10F702772E49829B006ECDD2 /* FirebaseAppCheck in Frameworks */,
 				1089BCFE2E5239CA0088488B /* TreeSitterJSONRunestone in Frameworks */,
 				1089BD002E5239CA0088488B /* TreeSitterLanguagesCommon in Frameworks */,
@@ -241,6 +247,9 @@
 				1089BCFB2E5239CA0088488B /* TreeSitterJSONQueries */,
 				1089BCFD2E5239CA0088488B /* TreeSitterJSONRunestone */,
 				1089BCFF2E5239CA0088488B /* TreeSitterLanguagesCommon */,
+				10B520E42E52A344006C2045 /* TreeSitterJavaScript */,
+				10B520E62E52A344006C2045 /* TreeSitterJavaScriptQueries */,
+				10B520E82E52A344006C2045 /* TreeSitterJavaScriptRunestone */,
 			);
 			productName = Interceptor;
 			productReference = 104F3B812E49099200A2D6F1 /* Interceptor.app */;
@@ -584,7 +593,7 @@
 				CODE_SIGN_ENTITLEMENTS = Interceptor/Interceptor.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = 5Q94QJ7G98;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -621,7 +630,7 @@
 				CODE_SIGN_ENTITLEMENTS = Interceptor/Interceptor.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = 5Q94QJ7G98;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -655,7 +664,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = 5Q94QJ7G98;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
@@ -674,7 +683,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = 5Q94QJ7G98;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
@@ -692,7 +701,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = 5Q94QJ7G98;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -709,7 +718,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = 5Q94QJ7G98;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -728,7 +737,7 @@
 				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = 5Q94QJ7G98;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PacketTunnel/Info.plist;
@@ -760,7 +769,7 @@
 				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = 5Q94QJ7G98;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PacketTunnel/Info.plist;
@@ -911,6 +920,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */;
 			productName = QuantumLeap;
+		};
+		10B520E42E52A344006C2045 /* TreeSitterJavaScript */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1089BCF82E5239CA0088488B /* XCRemoteSwiftPackageReference "treesitterlanguages" */;
+			productName = TreeSitterJavaScript;
+		};
+		10B520E62E52A344006C2045 /* TreeSitterJavaScriptQueries */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1089BCF82E5239CA0088488B /* XCRemoteSwiftPackageReference "treesitterlanguages" */;
+			productName = TreeSitterJavaScriptQueries;
+		};
+		10B520E82E52A344006C2045 /* TreeSitterJavaScriptRunestone */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1089BCF82E5239CA0088488B /* XCRemoteSwiftPackageReference "treesitterlanguages" */;
+			productName = TreeSitterJavaScriptRunestone;
 		};
 		10F701CA2E491567006ECDD2 /* Mudmouth */ = {
 			isa = XCSwiftPackageProductDependency;

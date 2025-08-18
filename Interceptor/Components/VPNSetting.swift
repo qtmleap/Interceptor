@@ -7,7 +7,9 @@
 //
 
 import Mudmouth
+import QuantumLeap
 import SwiftUI
+@_spi(Advanced) import SwiftUIIntrospect
 
 struct VPNSetting: View {
     @Environment(Mudmouth.self) private var manager: Mudmouth
@@ -17,19 +19,15 @@ struct VPNSetting: View {
 
     var body: some View {
         Section(content: {
-            LabeledContent(content: {
+            Label(systemName: "wifi", color: .blue, title: {
                 Toggle(isOn: $isConnected, label: {
                     Text("LABEL_VPN_IS_CONNECTED")
                 })
-            }, label: {
-                Image(systemName: "wifi")
             })
-            LabeledContent(content: {
+            Label(systemName: "autostartstop", color: .blue, title: {
                 Toggle(isOn: manager.$activateOnForeground, label: {
                     Text("LABEL_ACTIVATE_ON_FOREGROUND")
                 })
-            }, label: {
-                Image(systemName: "autostartstop")
             })
         }, header: {
             Text("TITLE_VPN_SETTINGS")
@@ -49,8 +47,16 @@ struct VPNSetting: View {
 #Preview {
     NavigationView(content: {
         Form(content: {
-            VPNSetting()
+            QuantumLeap.VPNSettingList()
+            QuantumLeap.Certificate()
+            QuantumLeap.ServerList()
         })
     })
-    .environment(Mudmouth())
+    .environment(WebTokenStore.default)
+    .environment(Mudmouth.default)
+    .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
+        controller.preferredDisplayMode = .oneBesideSecondary
+        controller.preferredSplitBehavior = .displace
+        controller.presentsWithGesture = false
+    })
 }

@@ -9,14 +9,17 @@
 import Runestone
 import SwiftUI
 import TreeSitter
+import TreeSitterJavaScript
+import TreeSitterJavaScriptQueries
 import TreeSitterJSON
 import TreeSitterJSONRunestone
 
 struct CodeView: UIViewControllerRepresentable {
     let text: String
+    let language: TreeSitterLanguage
 
     func makeUIViewController(context: Context) -> TextViewController {
-        let controller: TextViewController = .init(text: text)
+        let controller: TextViewController = .init(text: text, language: language)
         return controller
     }
 
@@ -25,9 +28,11 @@ struct CodeView: UIViewControllerRepresentable {
 
 class TextViewController: UIViewController {
     private let text: String
+    private var language: TreeSitterLanguage
 
-    init(text: String) {
+    init(text: String, language: TreeSitterLanguage) {
         self.text = text
+        self.language = language
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -51,7 +56,7 @@ class TextViewController: UIViewController {
         textView.lineHeightMultiplier = 1.3
         textView.backgroundColor = .systemBackground
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            let state = TextViewState(text: text, language: .json)
+            let state = TextViewState(text: text, language: language)
             DispatchQueue.main.async {
                 textView.setState(state)
             }
@@ -76,5 +81,6 @@ class TextViewController: UIViewController {
                 "key": "nestedValue",
             ],
         ], options: .prettyPrinted), encoding: .utf8)!,
+        language: .json,
     )
 }
