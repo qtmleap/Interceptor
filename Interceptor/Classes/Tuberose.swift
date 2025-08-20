@@ -19,7 +19,7 @@ public final class Tuberose: ObservableObject {
     /// VPN設定
     /// NOTE: とりあえず最初はスプラ2とスプラ3のみに対応
     /// NOTE: キャプチャ自体は対応しておく
-    private let options: [ProxyOption] = [
+    private(set) var options: [ProxyOption] = [
         .init(host: "api.accounts.nintendo.com", paths: []),
         .init(host: "api-lp1.znc.srv.nintendo.net", paths: []),
         .init(host: "api.lp1.usagi.srv.nintendo.net", paths: []),
