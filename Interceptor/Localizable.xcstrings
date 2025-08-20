@@ -705,6 +705,22 @@
         }
       }
     },
+    "TITLE_SERVER_LIST" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SSL Proxying List"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロキシ対象リスト"
+          }
+        }
+      }
+    },
     "TITLE_SERVICE_TOKENS" : {
       "localizations" : {
         "en" : {
