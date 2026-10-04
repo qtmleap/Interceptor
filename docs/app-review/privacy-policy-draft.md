@@ -15,7 +15,7 @@ Interceptor inspects selected Nintendo-related HTTPS traffic on your own device 
 
 ### Data accessed and purpose
 
-After you explicitly consent to capture, the app can process and save request and response hosts, paths and query parameters, headers, cookies, authentication tokens, account identifiers, and bodies for its configured hosts and paths. Some fields contain sensitive account or session information. The app uses these records to show you your traffic and to display supported service tokens. It also stores settings, consent state, and locally generated certificate/key material needed for inspection. Use the app only for devices, accounts, and traffic you are authorized to inspect.
+After you explicitly consent to capture, the app can process and save request and response hosts, paths and query parameters, headers, cookies, authentication tokens, account identifiers, and bodies for its configured hosts, including paths beyond the endpoints used for token notifications. Some fields contain sensitive account or session information. The app uses these records to show you your traffic and to display supported service tokens. It also stores settings, consent state, and locally generated certificate/key material needed for inspection. Use the app only for devices, accounts, and traffic you are authorized to inspect.
 
 ### Storage and transmission
 
@@ -45,7 +45,7 @@ Interceptorは、iOSのVPN設定と端末内のプロキシを使い、自分の
 
 ### 取得するデータと用途
 
-通信の取得に明示的に同意した後、対象のホストやパスについて、リクエストとレスポンスのホスト、パス、クエリ、ヘッダー、Cookie、認証トークン、アカウント識別子、本文を処理・保存することがあります。アカウントやセッションに関する機密情報が含まれる場合があります。これらは、通信内容と対応サービスのトークンを利用者に表示するために使用します。設定、同意の状態、解析に必要な端末内の証明書と鍵も保存します。解析する権限を持つ端末、アカウント、通信だけを対象にしてください。
+通信の取得に明示的に同意した後、設定したホストへの通信（トークン通知の対象エンドポイント以外のパスも含む）について、リクエストとレスポンスのホスト、パス、クエリ、ヘッダー、Cookie、認証トークン、アカウント識別子、本文を処理・保存することがあります。アカウントやセッションに関する機密情報が含まれる場合があります。これらは、通信内容と対応サービスのトークンを利用者に表示するために使用します。設定、同意の状態、解析に必要な端末内の証明書と鍵も保存します。解析する権限を持つ端末、アカウント、通信だけを対象にしてください。
 
 ### 保存先と送信
 
