@@ -68,6 +68,7 @@ final class InterceptorUITests: XCTestCase {
         #if targetEnvironment(simulator)
         throw XCTSkip("Nintendo capture requires a logged-in Nintendo Switch App on a physical device.")
         #else
+        XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
@@ -77,10 +78,10 @@ final class InterceptorUITests: XCTestCase {
         if app.buttons["Agree and Continue"].exists { app.buttons["Agree and Continue"].tap() }
         returnToSettings(app)
         let connection = app.switches["Connection Status"]
-        defer {
+        addTeardownBlock { @MainActor in
             app.activate()
             if app.alerts.buttons["OK"].exists { app.alerts.buttons["OK"].tap() }
-            tab(app, named: "Settings").tap()
+            self.tab(app, named: "Settings").tap()
             app.buttons["Data Use and Consent"].tap()
             if app.buttons["Withdraw Consent"].exists { app.buttons["Withdraw Consent"].tap() }
         }
@@ -117,6 +118,7 @@ final class InterceptorUITests: XCTestCase {
         #if targetEnvironment(simulator)
         throw XCTSkip("VPN tunnel validation requires a physical device with the certificate and VPN installed.")
         #else
+        XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
@@ -129,12 +131,17 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertTrue(connection.waitForExistence(timeout: 5))
         XCTAssertTrue(connection.isEnabled)
         let control = try switchControl(app, row: connection)
-        defer {
+        addTeardownBlock { @MainActor in
             app.activate()
-            tab(app, named: "Settings").tap()
             if app.alerts.buttons["OK"].exists { app.alerts.buttons["OK"].tap() }
+            self.tab(app, named: "Settings").tap()
             app.buttons["Data Use and Consent"].tap()
             if app.buttons["Withdraw Consent"].exists { app.buttons["Withdraw Consent"].tap() }
+        }
+        if connection.value as? String == "1" {
+            control.tap()
+            let initiallyStopped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0'"), object: connection)
+            XCTAssertEqual(XCTWaiter.wait(for: [initiallyStopped], timeout: 15), .completed)
         }
         control.tap()
         let connected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: connection)
@@ -179,12 +186,13 @@ final class InterceptorUITests: XCTestCase {
         attachScreenshot(app, named: "Physical VPN stopped after withdrawal")
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         settings.launch()
-        settings.buttons["com.apple.settings.general"].tap()
-        let vpnSettings = settings.cells["ManagedConfigurationList"]
-        if !vpnSettings.isHittable { settings.swipeUp() }
+        let vpnSettings = settings.buttons["com.apple.settings.vpn"]
         XCTAssertTrue(vpnSettings.waitForExistence(timeout: 5))
         vpnSettings.tap()
-        XCTAssertTrue(settings.staticTexts["Not Connected"].waitForExistence(timeout: 15), "iPadOS must report that the VPN stopped after consent withdrawal.")
+        let systemStatus = settings.switches.matching(NSPredicate(format: "label BEGINSWITH 'VPN Status'")).firstMatch
+        XCTAssertTrue(systemStatus.waitForExistence(timeout: 5))
+        let systemStopped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0'"), object: systemStatus)
+        XCTAssertEqual(XCTWaiter.wait(for: [systemStopped], timeout: 15), .completed, "iPadOS must report that the VPN stopped after consent withdrawal.")
         attachScreenshot(settings, named: "Physical system VPN disconnected")
         #endif
     }

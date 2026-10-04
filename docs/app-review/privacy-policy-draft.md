@@ -1,11 +1,11 @@
 # Interceptor Privacy Policy — draft / プライバシーポリシー案
 
-Draft prepared 2026-10-04. Not published or effective. This text describes the proposed revised release, not rejected build 28. Confirm the archive's behavior and the contact details below before publication.
+Source draft prepared 2026-10-04. An adapted bilingual policy was published on qleap.jp on 2026-10-04; use the public page as the authoritative published text. This source describes the revised release, not rejected build 28.
 
 Developer: Interceptor developer (qtmleap). The App Store legal developer entity has not been reconciled with the website business information.
 Privacy contact: https://qleap.jp/support (existing public support path).
-Planned public policy URL: https://qleap.jp/term/interceptor_privacy_policy (not yet published).
-Effective date: set when the verified policy is published.
+Published public policy URL: https://qleap.jp/term/interceptor_privacy_policy.
+Published effective date: 2026-10-04.
 
 ## English
 
