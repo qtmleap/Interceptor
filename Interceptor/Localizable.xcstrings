@@ -1,6 +1,182 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "Data Use" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data Use"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "データ利用"
+          }
+        }
+      }
+    },
+    "Consent Status" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consent Status"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意状態"
+          }
+        }
+      }
+    },
+    "Consented" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consented"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意済み"
+          }
+        }
+      }
+    },
+    "Not Consented" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Consented"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未同意"
+          }
+        }
+      }
+    },
+    "Consent Required" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consent Required"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再同意が必要"
+          }
+        }
+      }
+    },
+    "Read Details" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read Details"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "説明を読む"
+          }
+        }
+      }
+    },
+    "Review and Agree" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review and Agree"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認して同意"
+          }
+        }
+      }
+    },
+    "Close" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じる"
+          }
+        }
+      }
+    },
+    "Withdraw Consent?" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw Consent?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意を撤回しますか？"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンセル"
+          }
+        }
+      }
+    },
+    "CONSENT_WITHDRAW_CONFIRMATION" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This stops the VPN and automatic reconnection and removes capture notifications. Saved data is not deleted."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "VPNと自動再接続を停止し、キャプチャ通知を削除します。保存済みのデータは削除しません。"
+          }
+        }
+      }
+    },
     "DISABLED" : {
       "localizations" : {
         "en" : {
@@ -1030,13 +1206,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You can decline and browse existing data. Capture and certificate download require consent. Notifications are optional and contain only a generic message and a local record identifier. You can withdraw consent here to stop capture and clear notifications. Withdrawal does not delete existing records, tokens, or installed certificates. Clear on Home deletes history only; uninstalling the app does not guarantee removal of Keychain items or older iCloud copies."
+            "value" : "You can decline and browse existing data. Capture and certificate download require consent. Notifications are optional and contain only a generic message and a local record identifier. You can withdraw consent in Settings → Data Use to stop capture and clear notifications. Withdrawal does not delete existing records, tokens, or installed certificates. Clear on Home deletes history only; uninstalling the app does not guarantee removal of Keychain items or older iCloud copies."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同意しなくても既存データを閲覧できます。記録と証明書のダウンロードには同意が必要です。通知は任意で、一般的なメッセージと端末内の記録IDだけを含みます。この画面で同意を取り消すと記録を停止し、通知を消去します。既存の記録・トークン・インストール済み証明書は削除されません。ホームの「消去」は履歴のみを削除します。アプリの削除でもKeychainや旧iCloudコピーが必ず消えるとは限りません。"
+            "value" : "同意しなくても既存データを閲覧できます。記録と証明書のダウンロードには同意が必要です。通知は任意で、一般的なメッセージと端末内の記録IDだけを含みます。設定の「データ利用」から同意を撤回すると記録を停止し、通知を消去します。既存の記録・トークン・インストール済み証明書は削除されません。ホームの「消去」は履歴のみを削除します。アプリの削除でもKeychainや旧iCloudコピーが必ず消えるとは限りません。"
           }
         }
       }
