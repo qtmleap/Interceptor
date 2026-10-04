@@ -37,6 +37,17 @@ jobs:
           path: Mudmouth
           persist-credentials: false
 
+      - name: Authenticate read-only QuantumLeap dependency
+        env:
+          QUANTUMLEAP_READ_TOKEN: ${{ secrets.QUANTUMLEAP_READ_TOKEN }}
+        run: |
+          if [ -z "$QUANTUMLEAP_READ_TOKEN" ]; then
+            echo "::error::QUANTUMLEAP_READ_TOKEN is required to read the private QuantumLeap package"
+            exit 1
+          fi
+          umask 077
+          printf 'machine github.com\n  login x-access-token\n  password %s\n' "$QUANTUMLEAP_READ_TOKEN" > "$HOME/.netrc"
+
       - name: Select dedicated iPhone simulator
         run: |
           xcodebuild -version

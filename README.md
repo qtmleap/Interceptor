@@ -17,6 +17,9 @@ to use these compatible dependency versions.
 Dependencies are not bundled. Xcode downloads remote Swift packages, and the
 project expects a local Mudmouth checkout beside Interceptor:
 
+The QuantumLeap package is private. Your GitHub account must have read access;
+configure Xcode's GitHub account or a local Git credential before resolving it.
+
 ```text
 development-directory/
   Interceptor/
@@ -86,6 +89,11 @@ pull requests to `master` and pushes to `master`. It checks out the pinned
 Mudmouth revision beside Interceptor, honors `Package.resolved`, and creates a
 fresh iPhone simulator for each run. Test results and logs are retained for
 seven days in the `simulator-results` artifact.
+
+CI requires the repository secret `QUANTUMLEAP_READ_TOKEN`, a fine-grained GitHub
+token limited to `qtmleap/QuantumLeap` with **Contents: read-only** permission.
+Fork pull requests cannot access this secret and require a maintainer to run
+the changes on a trusted branch. Deploy keys are disabled for QuantumLeap.
 
 The workflow uses GitHub's [`xcode-27` preview runner](https://github.com/actions/runner-images/issues/14404).
 The local Xcode 27.0 / iOS 26.5 validation and the hosted runner's selected
