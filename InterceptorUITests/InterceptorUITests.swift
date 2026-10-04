@@ -64,6 +64,49 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
+    func testPhysicalNintendoCapture() throws {
+        #if targetEnvironment(simulator)
+        throw XCTSkip("Nintendo capture requires a logged-in Nintendo Switch App on a physical device.")
+        #else
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        tab(app, named: "Settings").tap()
+        app.buttons["Data Use and Consent"].tap()
+        if app.buttons["Agree and Continue"].exists { app.buttons["Agree and Continue"].tap() }
+        returnToSettings(app)
+        let connection = app.switches["Connection Status"]
+        defer {
+            app.activate()
+            tab(app, named: "Settings").tap()
+            app.buttons["Data Use and Consent"].tap()
+            if app.buttons["Withdraw Consent"].exists { app.buttons["Withdraw Consent"].tap() }
+        }
+        if connection.value as? String != "1" { connection.switches.firstMatch.tap() }
+        let connected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: connection)
+        XCTAssertEqual(XCTWaiter.wait(for: [connected], timeout: 20), .completed)
+        let nintendo = XCUIApplication(bundleIdentifier: "com.nintendo.znca")
+        nintendo.launch()
+        XCTAssertTrue(nintendo.wait(for: .runningForeground, timeout: 10))
+        let game = nintendo.cells["SplatNet 3"]
+        guard game.waitForExistence(timeout: 10) else {
+            attachScreenshot(nintendo, named: "Private Nintendo navigation inspection")
+            XCTFail("The SplatNet 3 entry was not found; inspect the private Nintendo UI attachment.")
+            return
+        }
+        game.tap()
+        _ = nintendo.webViews.firstMatch.waitForExistence(timeout: 20)
+        app.activate()
+        tab(app, named: "Settings").tap()
+        app.buttons["Token List"].tap()
+        XCTAssertTrue(app.navigationBars["Token List"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["api.lp1.av5ja.srv.nintendo.net"].waitForExistence(timeout: 15), "The app must extract the Splatoon 3 token from captured Nintendo traffic.")
+        // Stay on the token host list: opening token details would expose live credentials.
+        #endif
+    }
+
+    @MainActor
     func testPhysicalVPNLifecycle() async throws {
         #if targetEnvironment(simulator)
         throw XCTSkip("VPN tunnel validation requires a physical device with the certificate and VPN installed.")
