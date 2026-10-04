@@ -66,32 +66,38 @@ jobs:
           echo "SIMULATOR_UUID=$device" >> "$GITHUB_ENV"
           xcrun simctl boot "$device"
           xcrun simctl bootstatus "$device" -b
+          xcrun simctl list devices booted
 
-      - name: Build simulator architectures
+      - name: Build and run unit and UI tests
         run: |
           set -o pipefail
-          xcodebuild build \
-            -project Interceptor.xcodeproj -scheme Interceptor \
-            -destination 'generic/platform=iOS Simulator' \
-            -clonedSourcePackagesDirPath "$PLL_SOURCE_PACKAGES_PATH" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -packageAuthorizationProvider netrc -onlyUsePackageVersionsFromResolvedFile \
-            -skipPackagePluginValidation \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/build.log"
-
-      - name: Run unit and UI tests
-        run: |
-          set -o pipefail
-          xcodebuild test \
+          NSUnbufferedIO=YES xcodebuild test \
             -project Interceptor.xcodeproj -scheme Interceptor \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UUID" \
+            -destination-timeout 60 \
             -clonedSourcePackagesDirPath "$PLL_SOURCE_PACKAGES_PATH" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -packageAuthorizationProvider netrc -onlyUsePackageVersionsFromResolvedFile \
             -skipPackagePluginValidation \
             -parallel-testing-enabled NO \
             -resultBundlePath "$RUNNER_TEMP/Interceptor.xcresult" \
-            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee "$RUNNER_TEMP/test.log"
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- > >(tee "$RUNNER_TEMP/test.log") 2>&1 &
+          build_pid=$!
+          (
+            while kill -0 "$build_pid" 2>/dev/null; do
+              sleep 120 > /dev/null 2>&1
+              if kill -0 "$build_pid" 2>/dev/null; then
+                date -u
+                ps -p "$build_pid" -o pid,etime,pcpu,stat,comm
+                sample_path="$RUNNER_TEMP/xcodebuild-sample-$(date +%s).txt"
+                sample "$build_pid" 3 -file "$sample_path" || true
+                if [ -f "$sample_path" ]; then sed -n '1,100p' "$sample_path"; fi
+              fi
+            done
+          ) > >(tee "$RUNNER_TEMP/diagnostics.log") 2>&1 &
+          diagnostics_pid=$!
+          trap 'kill "$diagnostics_pid" 2>/dev/null || true' EXIT
+          wait "$build_pid"
 
       - name: Save test results and build logs
         if: always()
@@ -100,7 +106,8 @@ jobs:
           name: simulator-results
           path: |
             ${{ runner.temp }}/Interceptor.xcresult
-            ${{ runner.temp }}/build.log
             ${{ runner.temp }}/test.log
+            ${{ runner.temp }}/diagnostics.log
+            ${{ runner.temp }}/xcodebuild-sample-*.txt
           if-no-files-found: ignore
           retention-days: 7
