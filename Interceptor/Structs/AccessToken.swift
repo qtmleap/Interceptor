@@ -33,10 +33,10 @@ struct AccessToken: Codable, Identifiable, @unchecked Sendable {
         gtoken.isRefreshNeeded
     }
 
-    init(contentId: ContentId, host: String, gtoken: String, accessToken: String, timeInterval timeIntervalSinceNow: TimeInterval = 60 * 60 * 2) {
+    init(contentId: ContentId, host: String, gtoken: String, accessToken: String, timeInterval timeIntervalSinceNow: TimeInterval = 60 * 60 * 2) throws {
         self.contentId = contentId
         self.host = host
-        self.gtoken = try! .init(gtoken)
+        self.gtoken = try .init(gtoken)
         self.accessToken = accessToken
         expiresIn = .init(timeIntervalSinceNow: timeIntervalSinceNow)
     }
