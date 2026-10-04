@@ -1,0 +1,114 @@
+name: iOS Simulator
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    name: Build and test (Xcode 27)
+    runs-on: xcode-27
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: Interceptor
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: Interceptor
+          persist-credentials: false
+
+      - name: Check out local Mudmouth dependency
+        uses: actions/checkout@v4
+        with:
+          repository: qtmleap/Mudmouth
+          ref: ddcefe656c0f27289ee4f506f2112b8bbdaa407d
+          path: Mudmouth
+          persist-credentials: false
+
+      - name: Authenticate private QuantumLeap dependency
+        env:
+          QUANTUMLEAP_READ_TOKEN: ${{ secrets.QUANTUMLEAP_READ_TOKEN }}
+        run: |
+          if [ -z "$QUANTUMLEAP_READ_TOKEN" ]; then
+            echo "::error::QUANTUMLEAP_READ_TOKEN is required to read the private QuantumLeap package"
+            exit 1
+          fi
+          umask 077
+          printf 'machine github.com\n  login x-access-token\n  password %s\n' "$QUANTUMLEAP_READ_TOKEN" > "$HOME/.netrc"
+
+      - name: Select dedicated iPhone simulator
+        run: |
+          xcodebuild -version
+          echo "PLL_SOURCE_PACKAGES_PATH=$RUNNER_TEMP/SourcePackages" >> "$GITHUB_ENV"
+          xcrun simctl list runtimes --json > "$RUNNER_TEMP/runtimes.json"
+          runtime=$(python3 - "$RUNNER_TEMP/runtimes.json" <<'PY'
+          import json, sys
+          runtimes = json.load(open(sys.argv[1]))["runtimes"]
+          available = [r for r in runtimes if r.get("isAvailable") and ".iOS-" in r["identifier"] and tuple(map(int, r["version"].split("."))) >= (18, 5)]
+          if not available:
+              raise SystemExit("No available iOS 18.5+ simulator runtime")
+          print(max(available, key=lambda r: tuple(map(int, r["version"].split("."))))["identifier"])
+          PY
+          )
+          device=$(xcrun simctl create "Interceptor CI" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro "$runtime")
+          echo "SIMULATOR_UUID=$device" >> "$GITHUB_ENV"
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl list devices booted
+
+      - name: Build and run unit and UI tests
+        run: |
+          set -o pipefail
+          NSUnbufferedIO=YES xcodebuild test \
+            -project Interceptor.xcodeproj -scheme Interceptor \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UUID" \
+            -destination-timeout 60 \
+            -clonedSourcePackagesDirPath "$PLL_SOURCE_PACKAGES_PATH" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -packageAuthorizationProvider netrc -onlyUsePackageVersionsFromResolvedFile \
+            -skipPackagePluginValidation \
+            -parallel-testing-enabled NO \
+            -collect-test-diagnostics never \
+            -resultBundlePath "$RUNNER_TEMP/Interceptor.xcresult" \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- > >(tee "$RUNNER_TEMP/test.log") 2>&1 &
+          build_pid=$!
+          (
+            while kill -0 "$build_pid" 2>/dev/null; do
+              sleep 120 > /dev/null 2>&1
+              if kill -0 "$build_pid" 2>/dev/null; then
+                date -u
+                ps -p "$build_pid" -o pid,etime,pcpu,stat,comm
+                sample_path="$RUNNER_TEMP/xcodebuild-sample-$(date +%s).txt"
+                sample "$build_pid" 3 -file "$sample_path" || true
+                if [ -f "$sample_path" ]; then sed -n '1,100p' "$sample_path"; fi
+              fi
+            done
+          ) > >(tee "$RUNNER_TEMP/diagnostics.log") 2>&1 &
+          diagnostics_pid=$!
+          trap 'kill "$diagnostics_pid" 2>/dev/null || true' EXIT
+          wait "$build_pid"
+
+      - name: Save test results and build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-results
+          path: |
+            ${{ runner.temp }}/Interceptor.xcresult
+            ${{ runner.temp }}/test.log
+            ${{ runner.temp }}/diagnostics.log
+            ${{ runner.temp }}/xcodebuild-sample-*.txt
+          if-no-files-found: ignore
+          retention-days: 7
