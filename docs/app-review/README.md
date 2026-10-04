@@ -24,3 +24,11 @@ The locale files under `fastlane/metadata/en-US` and `fastlane/metadata/ja` cont
 - [Apple's App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/): review requirements. The previously reported rejection identifier is historical; use Apple's exact current response rather than assuming its numbering or that these changes resolve it.
 
 No new reviewer message or external publication is performed by these files.
+
+## Verified build preparation (2026-10-04)
+
+Build 29 passes signed Simulator unit/UI tests; a development-signed Release archive and App Store-signed IPA export succeeded. Both the app and packet-tunnel extension contain a privacy manifest declaring local/App Group UserDefaults use (Apple reasons CA92.1 and 1C8F.1). The archive has no Firebase bundles, GoogleService-Info.plist, APNs entitlement, or tracking-purpose string. These checks do not replace physical-device VPN/certificate testing or Apple's review.
+
+Mudmouth CI now builds for iOS Simulator instead of attempting to compile UIKit for macOS. Lint tool versions are fixed, and only 16 existing force-try findings are recorded in its baseline; new findings remain checked. The retired runner and nonexistent package.json release check were replaced with package metadata validation. The unavailable external AI review is manual; an independent code review was performed for these changes.
+
+App-specific policy URL: https://qleap.jp/term/interceptor_privacy_policy. Public support: https://qleap.jp/support. Confirm publication, App Store legal developer details, App Privacy answers, screenshots, and actual-device evidence before submitting.
