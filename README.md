@@ -99,7 +99,10 @@ the changes on a trusted branch. Deploy keys are disabled for QuantumLeap.
 CI uses one signed `xcodebuild test` invocation, which builds the app and test
 targets for its selected simulator and runs the full suite. This avoids a
 separate unsigned build of both simulator architectures. Build/test output and
-periodic process samples are saved to help diagnose startup waits.
+periodic process samples are saved to help diagnose waits. Automatic simulator
+sysdiagnose collection is disabled (`-collect-test-diagnostics never`) to avoid
+the hosted Simulator's post-test collection hang; normal test results and
+screenshots remain in the result bundle.
 
 The workflow uses GitHub's [`xcode-27` preview runner](https://github.com/actions/runner-images/issues/14404).
 The local Xcode 27.0 / iOS 26.5 validation and the hosted runner's selected
