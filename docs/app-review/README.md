@@ -1,10 +1,10 @@
 # App Review preparation — draft, 2026-10-04
 
-These files prepare a replacement submission for App Store app 6749347474. They have not been uploaded, submitted, or approved. Build 28's rejection and the reply sent on 2026-10-04 do not establish acceptance of the proposed changes.
+These files prepare a replacement submission for App Store app 6749347474. Build 29 has not been uploaded, submitted, or approved. Build 28's rejection and the reply sent on 2026-10-04 do not establish acceptance of the proposed changes.
 
-The locale files under `fastlane/metadata/en-US` and `fastlane/metadata/ja` contain proposed store text. Their intended behavior must match the final archive before they are published. The current Fastfile uploads TestFlight builds, not these metadata files; this directory does not add an automatic publishing step.
+The description, promotional text, and keywords under `fastlane/metadata/en-US` and `fastlane/metadata/ja` were saved in App Store Connect on 2026-10-04. They have not been released. Their intended behavior must match the final archive. The current Fastfile uploads TestFlight builds, not these metadata files; this directory does not add an automatic publishing step.
 
-`review-notes-draft.md` describes the review flow and evidence still required. `privacy-policy-draft.md` contains app-specific English and Japanese policy text. Resolve its developer contact, public policy URL, and effective date before publication, and connect the app's Privacy Policy entry to that policy. Keep the draft status notice out of final public copy only after the implementation is verified.
+`review-notes-draft.md` describes the review flow and evidence still required. `privacy-policy-draft.md` contains the policy source text. The app-specific policy is now public on qleap.jp, with its existing public support page as the contact route. The app links to it; the App Store Connect policy URL and App Privacy answers still need reconciliation before submission.
 
 ## Checks before using the drafts
 
@@ -23,7 +23,7 @@ The locale files under `fastlane/metadata/en-US` and `fastlane/metadata/ja` cont
 - [Apple's platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information): field formats and limits.
 - [Apple's App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/): review requirements. The previously reported rejection identifier is historical; use Apple's exact current response rather than assuming its numbering or that these changes resolve it.
 
-No new reviewer message or external publication is performed by these files.
+These files do not automatically send reviewer messages or publish externally.
 
 ## Verified build preparation (2026-10-04)
 
@@ -31,4 +31,6 @@ Build 29 passes signed Simulator unit/UI tests; a development-signed Release arc
 
 Mudmouth CI now builds for iOS Simulator instead of attempting to compile UIKit for macOS. Lint tool versions are fixed, and only 16 existing force-try findings are recorded in its baseline; new findings remain checked. The retired runner and nonexistent package.json release check were replaced with package metadata validation. The unavailable external AI review is manual; an independent code review was performed for these changes.
 
-App-specific policy URL: https://qleap.jp/term/interceptor_privacy_policy. Public support: https://qleap.jp/support. Confirm publication, App Store legal developer details, App Privacy answers, screenshots, and actual-device evidence before submitting.
+The consent lifecycle UI test passed on a connected iPad Air 13-inch (M3), iPadOS 26.3.1, on 2026-10-04. It checks decline, consent, withdrawal, disabled capture controls, and relaunch. This is UI evidence only; actual VPN traffic and certificate trust remain unverified. The test supports iPad's top tab buttons and preserves consent screenshots in the test result.
+
+Published app-specific policy URL: https://qleap.jp/term/interceptor_privacy_policy. Public support: https://qleap.jp/support. Confirm App Store legal developer details, App Privacy answers, screenshots, and actual-device VPN/certificate evidence before submitting.

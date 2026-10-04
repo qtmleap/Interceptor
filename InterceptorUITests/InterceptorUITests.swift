@@ -38,26 +38,28 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
         if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
         else {
-            app.tabBars.buttons["Settings"].tap()
+            tab(app, named: "Settings").tap()
             app.buttons["Data Use and Consent"].tap()
             if app.buttons["Withdraw Consent"].exists { app.buttons["Withdraw Consent"].tap() }
-            app.navigationBars.buttons.firstMatch.tap()
+            returnToSettings(app)
         }
-        XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 5))
-        app.tabBars.buttons["Settings"].tap()
+        XCTAssertTrue(tab(app, named: "Home").waitForExistence(timeout: 5))
+        tab(app, named: "Settings").tap()
         let connection = app.switches["Connection Status"]
         XCTAssertTrue(connection.waitForExistence(timeout: 5))
         XCTAssertFalse(connection.isEnabled)
         app.buttons["Data Use and Consent"].tap()
         XCTAssertTrue(app.buttons["Agree and Continue"].waitForExistence(timeout: 5))
+        attachScreenshot(app, named: "Data Use and Consent")
         app.buttons["Agree and Continue"].tap()
         XCTAssertTrue(app.buttons["Withdraw Consent"].waitForExistence(timeout: 5))
         app.buttons["Withdraw Consent"].tap()
-        app.navigationBars.buttons.firstMatch.tap()
+        attachScreenshot(app, named: "Consent Withdrawn")
+        returnToSettings(app)
         XCTAssertFalse(connection.isEnabled)
         app.terminate()
         app.launch()
-        app.tabBars.buttons["Settings"].tap()
+        tab(app, named: "Settings").tap()
         XCTAssertFalse(app.switches["Connection Status"].isEnabled)
     }
 
@@ -74,7 +76,7 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
 
         if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
-        app.tabBars.buttons["Settings"].tap()
+        tab(app, named: "Settings").tap()
         app.buttons["Data Use and Consent"].tap()
         if app.buttons["Agree and Continue"].exists { app.buttons["Agree and Continue"].tap() }
         app.navigationBars.buttons.firstMatch.tap()
@@ -89,10 +91,10 @@ final class InterceptorUITests: XCTestCase {
             XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
             app.buttons["Done"].tap()
         }
-        XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 10))
+        XCTAssertTrue(tab(app, named: "Home").waitForExistence(timeout: 10))
         attachScreenshot(app, named: "Home")
 
-        app.tabBars.buttons["Settings"].tap()
+        tab(app, named: "Settings").tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
         let autoConnect = app.switches["Auto Connect"]
         XCTAssertTrue(autoConnect.waitForExistence(timeout: 5))
@@ -123,7 +125,7 @@ final class InterceptorUITests: XCTestCase {
         app.buttons["Certificate"].tap()
         XCTAssertTrue(app.navigationBars["Certificate"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.firstMatch.tap()
-        app.tabBars.buttons["Home"].tap()
+        tab(app, named: "Home").tap()
 
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(app.buttons["Clear"].waitForExistence(timeout: 5))
@@ -132,8 +134,21 @@ final class InterceptorUITests: XCTestCase {
 
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 10))
+        XCTAssertTrue(tab(app, named: "Home").waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Next"].exists, "Completed onboarding must remain dismissed after relaunch")
+    }
+
+    @MainActor
+    private func tab(_ app: XCUIApplication, named name: String) -> XCUIElement {
+        // iPadOS exposes its top tabs as ordinary buttons, rather than a TabBar.
+        app.buttons.matching(NSPredicate(format: "label == %@", name)).firstMatch
+    }
+
+    @MainActor
+    private func returnToSettings(_ app: XCUIApplication) {
+        let back = app.navigationBars.buttons["Settings"].firstMatch
+        // iPad keeps the Settings form beside the detail view, so there is no back button.
+        if back.exists { back.tap() }
     }
 
     @MainActor
