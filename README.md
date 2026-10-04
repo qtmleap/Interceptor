@@ -30,7 +30,7 @@ From the Interceptor directory, clone Mudmouth if it does not already exist:
 
 ```bash
 git clone https://github.com/qtmleap/Mudmouth.git ../Mudmouth
-git -C ../Mudmouth checkout ddcefe656c0f27289ee4f506f2112b8bbdaa407d
+git -C ../Mudmouth checkout 698d5bcb25245a26a3be925c34ded8a4c8a2ff6a
 xcodebuild -resolvePackageDependencies -project Interceptor.xcodeproj -scheme Interceptor
 open Interceptor.xcodeproj
 ```

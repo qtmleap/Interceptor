@@ -32,6 +32,172 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
+    func testCaptureConsentLifecycle() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        else {
+            tab(app, named: "Settings").tap()
+            app.buttons["Data Use and Consent"].tap()
+            if app.buttons["Withdraw Consent"].exists { app.buttons["Withdraw Consent"].tap() }
+            returnToSettings(app)
+        }
+        XCTAssertTrue(tab(app, named: "Home").waitForExistence(timeout: 5))
+        tab(app, named: "Settings").tap()
+        let connection = app.switches["Connection Status"]
+        XCTAssertTrue(connection.waitForExistence(timeout: 5))
+        XCTAssertFalse(connection.isEnabled)
+        app.buttons["Data Use and Consent"].tap()
+        XCTAssertTrue(app.buttons["Agree and Continue"].waitForExistence(timeout: 5))
+        attachScreenshot(app, named: "Data Use and Consent")
+        app.buttons["Agree and Continue"].tap()
+        XCTAssertTrue(app.buttons["Withdraw Consent"].waitForExistence(timeout: 5))
+        app.buttons["Withdraw Consent"].tap()
+        attachScreenshot(app, named: "Consent Withdrawn")
+        returnToSettings(app)
+        XCTAssertFalse(connection.isEnabled)
+        app.terminate()
+        app.launch()
+        tab(app, named: "Settings").tap()
+        XCTAssertFalse(app.switches["Connection Status"].isEnabled)
+    }
+
+    @MainActor
+    func testPhysicalNintendoCapture() throws {
+        #if targetEnvironment(simulator)
+        throw XCTSkip("Nintendo capture requires a logged-in Nintendo Switch App on a physical device.")
+        #else
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        tab(app, named: "Settings").tap()
+        app.buttons["Data Use and Consent"].tap()
+        if app.buttons["Agree and Continue"].exists { app.buttons["Agree and Continue"].tap() }
+        returnToSettings(app)
+        let connection = app.switches["Connection Status"]
+        addTeardownBlock { @MainActor in
+            app.activate()
+            if app.alerts.buttons["OK"].exists { app.alerts.buttons["OK"].tap() }
+            self.tab(app, named: "Settings").tap()
+            app.buttons["Data Use and Consent"].tap()
+            if app.buttons["Withdraw Consent"].exists { app.buttons["Withdraw Consent"].tap() }
+        }
+        if connection.value as? String != "1" { try switchControl(app, row: connection).tap() }
+        let connected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: connection)
+        XCTAssertEqual(XCTWaiter.wait(for: [connected], timeout: 20), .completed)
+        let nintendo = XCUIApplication(bundleIdentifier: "com.nintendo.znca")
+        nintendo.launch()
+        XCTAssertTrue(nintendo.wait(for: .runningForeground, timeout: 10))
+        let game = nintendo.cells["SplatNet 3"]
+        guard game.waitForExistence(timeout: 10) else {
+            attachScreenshot(nintendo, named: "Private Nintendo navigation inspection")
+            XCTFail("The SplatNet 3 entry was not found; inspect the private Nintendo UI attachment.")
+            return
+        }
+        game.tap()
+        _ = nintendo.webViews.firstMatch.waitForExistence(timeout: 20)
+        app.activate()
+        tab(app, named: "Home").tap()
+        let capturedHost = app.staticTexts["api.lp1.av5ja.srv.nintendo.net"]
+        XCTAssertTrue(capturedHost.waitForExistence(timeout: 10))
+        capturedHost.tap()
+        XCTAssertTrue(app.staticTexts["/api/bullet_tokens"].waitForExistence(timeout: 10), "The Nintendo token request must appear in captured history.")
+        tab(app, named: "Settings").tap()
+        app.buttons["Token List"].tap()
+        XCTAssertTrue(app.navigationBars["Token List"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["api.lp1.av5ja.srv.nintendo.net"].waitForExistence(timeout: 15), "The app must extract the Splatoon 3 token from captured Nintendo traffic.")
+        // Stay on the token host list: opening token details would expose live credentials.
+        #endif
+    }
+
+    @MainActor
+    func testPhysicalVPNLifecycle() async throws {
+        #if targetEnvironment(simulator)
+        throw XCTSkip("VPN tunnel validation requires a physical device with the certificate and VPN installed.")
+        #else
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        tab(app, named: "Settings").tap()
+        app.buttons["Data Use and Consent"].tap()
+        if app.buttons["Agree and Continue"].exists { app.buttons["Agree and Continue"].tap() }
+        returnToSettings(app)
+        let connection = app.switches["Connection Status"]
+        XCTAssertTrue(connection.waitForExistence(timeout: 5))
+        XCTAssertTrue(connection.isEnabled)
+        let control = try switchControl(app, row: connection)
+        addTeardownBlock { @MainActor in
+            app.activate()
+            if app.alerts.buttons["OK"].exists { app.alerts.buttons["OK"].tap() }
+            self.tab(app, named: "Settings").tap()
+            app.buttons["Data Use and Consent"].tap()
+            if app.buttons["Withdraw Consent"].exists { app.buttons["Withdraw Consent"].tap() }
+        }
+        if connection.value as? String == "1" {
+            control.tap()
+            let initiallyStopped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0'"), object: connection)
+            XCTAssertEqual(XCTWaiter.wait(for: [initiallyStopped], timeout: 15), .completed)
+        }
+        control.tap()
+        let connected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: connection)
+        let result = XCTWaiter.wait(for: [connected], timeout: 20)
+        attachScreenshot(app, named: "Physical VPN start result")
+        if result != .completed {
+            let diagnostic = XCTAttachment(string: app.debugDescription)
+            diagnostic.name = "Physical VPN start accessibility"
+            diagnostic.lifetime = .keepAlways
+            add(diagnostic)
+        }
+        XCTAssertEqual(result, .completed, "Install the Interceptor VPN configuration before running this test; inspect the attached start result for errors.")
+        guard result == .completed else { return }
+        let probePath = "/__interceptor_review_probe_" + UUID().uuidString
+        let probeURL = try XCTUnwrap(URL(string: "https://api.lp1.av5ja.srv.nintendo.net" + probePath))
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpShouldSetCookies = false
+        configuration.timeoutIntervalForRequest = 20
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let (_, response) = try await session.data(from: probeURL)
+        XCTAssertNotNil(response as? HTTPURLResponse, "A public probe must complete TLS and receive an HTTP response.")
+        app.activate()
+        tab(app, named: "Home").tap()
+        let host = app.staticTexts["api.lp1.av5ja.srv.nintendo.net"]
+        XCTAssertTrue(host.waitForExistence(timeout: 10))
+        host.tap()
+        XCTAssertTrue(app.staticTexts[probePath].waitForExistence(timeout: 10), "The unique public probe must appear in captured history.")
+        attachScreenshot(app, named: "Physical VPN captured public HTTPS probe")
+        tab(app, named: "Settings").tap()
+        control.tap()
+        let stopped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0'"), object: connection)
+        XCTAssertEqual(XCTWaiter.wait(for: [stopped], timeout: 15), .completed)
+        control.tap()
+        let restarted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: connection)
+        XCTAssertEqual(XCTWaiter.wait(for: [restarted], timeout: 20), .completed)
+        app.buttons["Data Use and Consent"].tap()
+        app.buttons["Withdraw Consent"].tap()
+        returnToSettings(app)
+        let revoked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0' AND enabled == false"), object: connection)
+        XCTAssertEqual(XCTWaiter.wait(for: [revoked], timeout: 15), .completed)
+        attachScreenshot(app, named: "Physical VPN stopped after withdrawal")
+        let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        settings.launch()
+        let vpnSettings = settings.buttons["com.apple.settings.vpn"]
+        XCTAssertTrue(vpnSettings.waitForExistence(timeout: 5))
+        vpnSettings.tap()
+        let systemStatus = settings.switches.matching(NSPredicate(format: "label BEGINSWITH 'VPN Status'")).firstMatch
+        XCTAssertTrue(systemStatus.waitForExistence(timeout: 5))
+        let systemStopped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0'"), object: systemStatus)
+        XCTAssertEqual(XCTWaiter.wait(for: [systemStopped], timeout: 15), .completed, "iPadOS must report that the VPN stopped after consent withdrawal.")
+        attachScreenshot(settings, named: "Physical system VPN disconnected")
+        #endif
+    }
+
+    @MainActor
     func testSimulatorOnboardingAndNavigation() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
@@ -43,6 +209,13 @@ final class InterceptorUITests: XCTestCase {
         }
         app.launch()
 
+        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        tab(app, named: "Settings").tap()
+        app.buttons["Data Use and Consent"].tap()
+        if app.buttons["Agree and Continue"].exists { app.buttons["Agree and Continue"].tap() }
+        app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["Set Up Capture"].tap()
+
         // The simulator permits advancing through the device-only setup steps.
         if app.buttons["Next"].waitForExistence(timeout: 5) {
             for _ in 0..<8 {
@@ -52,10 +225,10 @@ final class InterceptorUITests: XCTestCase {
             XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
             app.buttons["Done"].tap()
         }
-        XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 10))
+        XCTAssertTrue(tab(app, named: "Home").waitForExistence(timeout: 10))
         attachScreenshot(app, named: "Home")
 
-        app.tabBars.buttons["Settings"].tap()
+        tab(app, named: "Settings").tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
         let autoConnect = app.switches["Auto Connect"]
         XCTAssertTrue(autoConnect.waitForExistence(timeout: 5))
@@ -86,7 +259,7 @@ final class InterceptorUITests: XCTestCase {
         app.buttons["Certificate"].tap()
         XCTAssertTrue(app.navigationBars["Certificate"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.firstMatch.tap()
-        app.tabBars.buttons["Home"].tap()
+        tab(app, named: "Home").tap()
 
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(app.buttons["Clear"].waitForExistence(timeout: 5))
@@ -95,8 +268,32 @@ final class InterceptorUITests: XCTestCase {
 
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 10))
+        XCTAssertTrue(tab(app, named: "Home").waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Next"].exists, "Completed onboarding must remain dismissed after relaunch")
+    }
+
+    @MainActor
+    private func switchControl(_ app: XCUIApplication, row: XCUIElement) throws -> XCUIElement {
+        // iPadOS 18 exposes the UISwitch beside its labeled row; newer versions nest it.
+        let frame = row.frame
+        return try XCTUnwrap(app.switches.allElementsBoundByIndex.first { candidate in
+            let controlFrame = candidate.frame
+            return controlFrame.width < frame.width
+                && frame.contains(CGPoint(x: controlFrame.midX, y: controlFrame.midY))
+        }, "The labeled row must expose its actual switch control.")
+    }
+
+    @MainActor
+    private func tab(_ app: XCUIApplication, named name: String) -> XCUIElement {
+        // iPadOS exposes its top tabs as ordinary buttons, rather than a TabBar.
+        app.buttons.matching(NSPredicate(format: "label == %@", name)).firstMatch
+    }
+
+    @MainActor
+    private func returnToSettings(_ app: XCUIApplication) {
+        let back = app.navigationBars.buttons["Settings"].firstMatch
+        // iPad keeps the Settings form beside the detail view, so there is no back button.
+        if back.exists { back.tap() }
     }
 
     @MainActor

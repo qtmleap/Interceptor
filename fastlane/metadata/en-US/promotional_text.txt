@@ -1,0 +1,1 @@
+Inspect selected Nintendo HTTPS traffic on your device. Review sensitive-data handling and consent before capture; withdraw consent in Settings to stop it.
