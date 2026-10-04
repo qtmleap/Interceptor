@@ -37,7 +37,7 @@ jobs:
           path: Mudmouth
           persist-credentials: false
 
-      - name: Authenticate read-only QuantumLeap dependency
+      - name: Authenticate private QuantumLeap dependency
         env:
           QUANTUMLEAP_READ_TOKEN: ${{ secrets.QUANTUMLEAP_READ_TOKEN }}
         run: |

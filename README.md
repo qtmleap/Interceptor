@@ -90,8 +90,9 @@ Mudmouth revision beside Interceptor, honors `Package.resolved`, and creates a
 fresh iPhone simulator for each run. Test results and logs are retained for
 seven days in the `simulator-results` artifact.
 
-CI requires the repository secret `QUANTUMLEAP_READ_TOKEN`, a fine-grained GitHub
-token limited to `qtmleap/QuantumLeap` with **Contents: read-only** permission.
+CI requires the repository secret `QUANTUMLEAP_READ_TOKEN`, a GitHub token with
+read access to `qtmleap/QuantumLeap`. For a dedicated CI credential, prefer a
+fine-grained token limited to that repository with **Contents: read-only**.
 Fork pull requests cannot access this secret and require a maintainer to run
 the changes on a trusted branch. Deploy keys are disabled for QuantumLeap.
 
