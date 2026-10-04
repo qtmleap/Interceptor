@@ -15,12 +15,32 @@ struct SettingsView: View {
     @EnvironmentObject private var client: Tuberose
     @AppStorage(CaptureAuthorization.key, store: CaptureAuthorization.defaults) private var consentVersion = 0
     @State private var showSetup = false
+    @State private var consentPresentation: ConsentPresentation?
+    @State private var confirmWithdrawal = false
+
+    private enum ConsentPresentation: String, Identifiable {
+        case details, consent
+        var id: String { rawValue }
+    }
+
+    private var consentStatus: LocalizedStringKey {
+        if consentVersion == CaptureAuthorization.version { return "Consented" }
+        return consentVersion == 0 ? "Not Consented" : "Consent Required"
+    }
 
     var body: some View {
         Form(content: {
             QuantumLeap.Support()
+            Section("Data Use") {
+                LabeledContent("Consent Status") { Text(consentStatus).foregroundStyle(.secondary) }
+                Button("Read Details") { consentPresentation = .details }
+                if consentVersion == CaptureAuthorization.version {
+                    Button("Withdraw Consent", role: .destructive) { confirmWithdrawal = true }
+                } else {
+                    Button("Review and Agree") { consentPresentation = .consent }
+                }
+            }
             Section {
-                NavigationLink("Data Use and Consent") { DataUseConsentView() }
                 Button("Set Up Capture") { showSetup = true }
                     .disabled(consentVersion != CaptureAuthorization.version)
                 Button("Capture Notifications") {
@@ -40,6 +60,28 @@ struct SettingsView: View {
             }
             QuantumLeap.Version()
         })
+        .sheet(item: $consentPresentation) { presentation in
+            NavigationStack {
+                switch presentation {
+                case .details:
+                    DataUseDetailsView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Close") { consentPresentation = nil }
+                            }
+                        }
+                case .consent:
+                    DataUseConsentView { _ in consentPresentation = nil }
+                        .interactiveDismissDisabled()
+                }
+            }
+        }
+        .alert("Withdraw Consent?", isPresented: $confirmWithdrawal) {
+            Button("Withdraw Consent", role: .destructive) { client.withdrawCaptureConsent() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("CONSENT_WITHDRAW_CONFIRMATION")
+        }
         .fullScreenCover(isPresented: $showSetup) { FirstLaunchView() }
         .navigationTitle(Text("TITLE_SETTINGS"))
         .navigationBarTitleDisplayMode(.inline)

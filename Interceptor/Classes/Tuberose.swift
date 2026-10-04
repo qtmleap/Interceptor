@@ -67,6 +67,14 @@ public final class Tuberose: ObservableObject {
         mudmouth.stopVPNTunnel()
     }
 
+    func withdrawCaptureConsent() {
+        CaptureAuthorization.revoke()
+        activateOnForeground = false
+        stopVPNTunnel()
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+    }
+
     func setToken(_ value: UNNotificationResponse) throws {
         try CaptureAuthorization.requireConsent()
         guard let rawID = value.notification.request.content.userInfo["recordID"] as? String,

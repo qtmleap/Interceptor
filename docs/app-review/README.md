@@ -1,10 +1,10 @@
 # App Review preparation — draft, 2026-10-04
 
-These files prepare a replacement submission for App Store app 6749347474. Build 29 has not been uploaded, submitted, or approved. Build 28's rejection and the reply sent on 2026-10-04 do not establish acceptance of the proposed changes.
+These files prepare a replacement submission for App Store app 6749347474. Build 29 was uploaded on 2026-10-04, but has not been selected, submitted, or approved. Build 30 adds the revised consent settings UI; it has not been uploaded. Build 28's rejection and the reply sent on 2026-10-04 do not establish acceptance of the proposed changes.
 
 The description, promotional text, and keywords under `fastlane/metadata/en-US` and `fastlane/metadata/ja` were saved in App Store Connect on 2026-10-04. They have not been released. Their intended behavior must match the final archive. The current Fastfile uploads TestFlight builds, not these metadata files; this directory does not add an automatic publishing step.
 
-`review-notes-draft.md` describes the review flow and evidence still required. `privacy-policy-draft.md` contains the policy source text. The app-specific policy is now public on qleap.jp, with its existing public support page as the contact route. The app links to it; the App Store Connect policy URL has been updated in Japanese and English, and App Privacy now displays Data Not Collected for the proposed release. The currently selected old build still triggers an ATT-purpose-string warning; upload/select build 29 before review.
+`review-notes-draft.md` describes the review flow and evidence still required. `privacy-policy-draft.md` contains the policy source text. The app-specific policy is now public on qleap.jp, with its existing public support page as the contact route. The app links to it; the App Store Connect policy URL has been updated in Japanese and English, and App Privacy now displays Data Not Collected for the proposed release. The currently selected old build still triggers an ATT-purpose-string warning; select a verified replacement build before review.
 
 ## Checks before using the drafts
 
@@ -50,3 +50,11 @@ After the test selector changes, the simulator build and consent lifecycle test 
 M2 evidence: [captured request list](evidence/physical-m2-capture.png). It shows request methods, status codes, generic endpoint paths and locale parameters, including successful bullet-token requests; no token values, cookies, account identifiers, or response bodies are displayed. Account and native-settings diagnostics remain private local files.
 
 The App Privacy classification follows [Apple’s data-collection definition](https://developer.apple.com/app-store/app-privacy-details/): local processing is not collected data for the label. This does not mean the app does not access sensitive local traffic; the in-app notice and public policy disclose that access and the original Nintendo request flow.
+
+## Build 30 consent settings UI verification
+
+The settings Form now shows consent status, a read-only disclosure sheet, and explicit consent or withdrawal actions. Valid consent persists across relaunch. Withdrawal requires confirmation; cancelling preserves consent, and confirming requests VPN shutdown, disables automatic reconnection, and clears notifications. Reading or closing the disclosure does not change authorization.
+
+The current Simulator build passed 11 unit tests and 9 UI tests on iOS 26.5; the two physical-only tests skipped as intended. The consent lifecycle and landscape accessibility-size disclosure tests also passed on an iPad Air M2 Simulator running iPadOS 18.5. Local results: `/tmp/interceptor-ui-final-suite.xcresult` and `/tmp/interceptor-ui-ipad18-final.xcresult`. An independent code review found no actionable issues. VoiceOver and Split View were not exercised.
+
+Build 30 physical M2 UI verification is pending device unlock. The build 29 physical VPN/capture results above do not validate the new settings UI. Build 30 has not been uploaded or submitted to App Store Connect.
