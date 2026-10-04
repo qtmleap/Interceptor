@@ -9,12 +9,13 @@
 import KeychainAccess
 import Mudmouth
 import SwiftUI
-import SwiftyLogger
+import SwiftData
+import UserNotifications
 
 @MainActor
 public final class Tuberose: ObservableObject {
     @AppStorage("ACTIVATE_ON_FOREGROUND")
-    var activateOnForeground: Bool = true
+    var activateOnForeground: Bool = false
 
     /// VPN設定
     /// NOTE: とりあえず最初はスプラ2とスプラ3のみに対応
@@ -41,9 +42,10 @@ public final class Tuberose: ObservableObject {
     @Published
     private(set) var tokens: [AccessToken] = []
 
-    private let decoder: JSONDecoder = .init()
-    private let encoder: JSONEncoder = .init()
-    private let keychain: Keychain = .init(service: Bundle.main.bundleIdentifier!).synchronizable(true)
+    private let keychain: Keychain = .init(service: Bundle.main.bundleIdentifier!)
+        .synchronizable(false)
+        .accessibility(.afterFirstUnlockThisDeviceOnly)
+    private let legacyKeychain: Keychain = .init(service: Bundle.main.bundleIdentifier!).synchronizable(true)
 
     let mudmouth: Mudmouth = .default
 
@@ -52,13 +54,12 @@ public final class Tuberose: ObservableObject {
     }
 
     init() {
-        tokens = options.map(\.host).compactMap { host in
-            try? keychain.getToken(forKey: host)
-        }
+        loadStoredTokens()
         NotificationCenter.default.addObserver(self, selector: #selector(didBecomeActiveNotification), name: UIApplication.didBecomeActiveNotification, object: nil)
     }
 
     func startVPNTunnel() async throws {
+        try CaptureAuthorization.requireConsent()
         try await mudmouth.startVPNTunnel(options: options)
     }
 
@@ -67,53 +68,81 @@ public final class Tuberose: ObservableObject {
     }
 
     func setToken(_ value: UNNotificationResponse) throws {
-        let userInfo = value.notification.request.content.userInfo
-        if let data: Data = userInfo.data(forKey: "headers"),
-           let headers: [String: String] = try? JSONSerialization.jsonObject(with: data) as? [String: String],
-           let cookies: [String: String] = headers.cookies,
-           let host: String = headers.host
-        {
-            switch host {
-                case "app.smashbros.nintendo.net":
-                    if let token: String = cookies.value(forKey: "super_smash_session"),
-                       let gtoken: String = headers.value(forKey: "X-GameWebToken")
-                    {
-                        SwiftyLogger.debug("Captured token: \(token) \(gtoken)")
-                        try? keychain.setToken(.init(contentId: .SMSP, host: host, gtoken: gtoken, accessToken: token), forKey: host)
-                    }
-                case "app.splatoon2.nintendo.net":
-                    if let token: String = cookies.value(forKey: "iksm_session"),
-                       let gtoken: String = headers.value(forKey: "X-GameWebToken")
-                    {
-                        SwiftyLogger.debug("Captured token: \(token) \(gtoken)")
-                        try? keychain.setToken(.init(contentId: .SP2, host: host, gtoken: gtoken, accessToken: token), forKey: host)
-                    }
-                case "api.lp1.av5ja.srv.nintendo.net":
-                    if let data: Data = userInfo.data(forKey: "body"),
-                       let body: [String: Any] = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let token: String = body.value(forKey: "bulletToken") as? String,
-                       let gtoken: String = cookies.value(forKey: "_gtoken")
-                    {
-                        SwiftyLogger.debug("Captured token: \(token) \(gtoken)")
-                        try? keychain.setToken(.init(contentId: .SP3, host: host, gtoken: gtoken, accessToken: token), forKey: host)
-                    }
-                default:
-                    break
+        try CaptureAuthorization.requireConsent()
+        guard let rawID = value.notification.request.content.userInfo["recordID"] as? String,
+              let recordID = UUID(uuidString: rawID) else { return }
+        var descriptor = FetchDescriptor<Record>(predicate: #Predicate { $0.id == recordID })
+        descriptor.fetchLimit = 1
+        guard try ModelContainer.default.mainContext.fetch(descriptor).first != nil else { return }
+        // A delayed notification must not overwrite a newer token with an older record.
+        try refreshTokensFromRecords()
+    }
+
+    func refreshTokensFromRecords() throws {
+        try CaptureAuthorization.requireConsent()
+        let context = ModelContainer.default.mainContext
+        for host in options.map(\.host) {
+            let descriptor = FetchDescriptor<Record>(
+                predicate: #Predicate { $0.request.host == host },
+                sortBy: [SortDescriptor(\Record.capturedAt, order: .reverse)]
+            )
+            for record in try context.fetch(descriptor) {
+                // Bad or unrelated responses are ignored; they must not erase saved tokens.
+                guard let token = try? Self.token(from: record) else { continue }
+                try keychain.setToken(token, forKey: host)
+                break
             }
         }
+        loadStoredTokens()
+    }
+
+    static func token(from record: Record) throws -> AccessToken? {
+        let host = record.request.host
+        let headers = record.request.headers.values
+        let cookies = record.request.cookies.values
+        let gtokenHeader = headers.first { $0.key.caseInsensitiveCompare("X-GameWebToken") == .orderedSame }?.value
+        switch host {
+            case "app.smashbros.nintendo.net":
+                guard let token = cookies.first(where: { $0.key == "super_smash_session" })?.value,
+                      let gtoken = gtokenHeader else { return nil }
+                return try AccessToken(contentId: .SMSP, host: host, gtoken: gtoken, accessToken: token)
+            case "app.splatoon2.nintendo.net":
+                guard let token = cookies.first(where: { $0.key == "iksm_session" })?.value,
+                      let gtoken = gtokenHeader else { return nil }
+                return try AccessToken(contentId: .SP2, host: host, gtoken: gtoken, accessToken: token)
+            case "api.lp1.av5ja.srv.nintendo.net":
+                guard let data = record.response.body,
+                      let body = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let token = body["bulletToken"] as? String,
+                      let gtoken = cookies.first(where: { $0.key == "_gtoken" })?.value else { return nil }
+                return try AccessToken(contentId: .SP3, host: host, gtoken: gtoken, accessToken: token)
+            default:
+                return nil
+        }
+    }
+
+    private func loadStoredTokens() {
         tokens = options.map(\.host).compactMap { host in
-            try? keychain.getToken(forKey: host)
+            if let local = try? keychain.getToken(forKey: host) { return local }
+            guard let legacy = try? legacyKeychain.getToken(forKey: host) else { return nil }
+            // Copy previously synced data without deleting the cloud/other-device copy.
+            try? keychain.setToken(legacy, forKey: host)
+            return legacy
         }
     }
 
     @objc
     private func didBecomeActiveNotification() {
+        guard CaptureAuthorization.isGranted else { return }
+        // Capture remains useful when notification permission is denied or no notification is tapped.
+        try? refreshTokensFromRecords()
         if activateOnForeground {
             Task(priority: .background, operation: {
                 try await startVPNTunnel()
             })
         }
     }
+
 }
 
 public extension Tuberose {
@@ -130,14 +159,15 @@ extension [String: String] {
         else {
             return nil
         }
-        return Dictionary(uniqueKeysWithValues: value.split(separator: ";").compactMap { component in
-            let parts = component.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            return parts.count == 2 ? (parts[0], parts[1]) : nil
-        })
+        return value.split(separator: ";").reduce(into: [String: String]()) { result, component in
+            let parts = component.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            if parts.count == 2, !parts[0].isEmpty { result[parts[0]] = parts[1] }
+        }
     }
 
     func value(forKey key: String) -> String? {
-        first(where: { $0.key == key })?.value
+        first(where: { $0.key.caseInsensitiveCompare(key) == .orderedSame })?.value
     }
 }
 
@@ -176,7 +206,7 @@ extension Keychain {
     }
 
     func getToken(forKey: String) throws -> AccessToken {
-        guard let data: Data = try getData(forKey)
+        guard let data: Data = try getData(forKey, ignoringAttributeSynchronizable: false)
         else {
             throw DecodingError.valueNotFound(AccessToken.self, .init(codingPath: [], debugDescription: ""))
         }

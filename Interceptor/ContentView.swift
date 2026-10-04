@@ -13,7 +13,8 @@ import SwiftyLogger
 
 struct ContentView: View {
     @Environment(\.isFirstLaunch) private var isFirstLaunch: Binding<Bool>
-    @State private var isPresented: Bool = false
+    @AppStorage("CaptureConsentDecided") private var consentDecided = false
+    @State private var showConsent = false
 
     var body: some View {
         TabView(content: {
@@ -49,9 +50,20 @@ struct ContentView: View {
             tabView.tabBar.backgroundColor = .systemBackground
             tabView.tabBar.isTranslucent = true
         })
-        .fullScreenCover(isPresented: isFirstLaunch, content: {
-            FirstLaunchView()
-        })
+        .onAppear {
+            let version = CaptureAuthorization.defaults.integer(forKey: CaptureAuthorization.key)
+            showConsent = !consentDecided || (version != 0 && version != CaptureAuthorization.version)
+            if !CaptureAuthorization.isGranted { Tuberose.default.stopVPNTunnel() }
+        }
+        .fullScreenCover(isPresented: $showConsent) {
+            NavigationStack {
+                DataUseConsentView { _ in
+                    consentDecided = true
+                    isFirstLaunch.wrappedValue = false
+                    showConsent = false
+                }
+            }.interactiveDismissDisabled()
+        }
     }
 }
 

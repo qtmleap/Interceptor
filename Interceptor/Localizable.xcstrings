@@ -768,6 +768,342 @@
           }
         }
       }
+    },
+    "Data Use and Consent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data Use and Consent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データの利用と同意"
+          }
+        }
+      }
+    },
+    "Agree and Continue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agree and Continue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意して続ける"
+          }
+        }
+      }
+    },
+    "Not Now" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は同意しない"
+          }
+        }
+      }
+    },
+    "Withdraw Consent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Withdraw Consent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意を取り消す"
+          }
+        }
+      }
+    },
+    "Set Up Capture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Up Capture"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャプチャの設定"
+          }
+        }
+      }
+    },
+    "Capture Notifications" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture Notifications"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取得時の通知"
+          }
+        }
+      }
+    },
+    "Purpose" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purpose"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用目的"
+          }
+        }
+      }
+    },
+    "Data Recorded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data Recorded"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録するデータ"
+          }
+        }
+      }
+    },
+    "Storage and Sharing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Storage and Sharing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存先と共有"
+          }
+        }
+      }
+    },
+    "Certificate and VPN" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate and VPN"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "証明書とVPN"
+          }
+        }
+      }
+    },
+    "Your Choices" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Choices"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択と取り消し"
+          }
+        }
+      }
+    },
+    "Unable to Start Capture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to Start Capture"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャプチャを開始できません"
+          }
+        }
+      }
+    },
+    "CONSENT_PURPOSE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interceptor inspects selected Nintendo HTTPS traffic on this device so you can view requests and responses and obtain game authentication tokens. It is not a general internet protection VPN."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interceptorは、この端末上の指定した任天堂サービスのHTTPS通信を解析し、リクエスト・レスポンスの閲覧やゲームの認証トークン取得に使用します。インターネット全体を保護するVPNではありません。"
+          }
+        }
+      }
+    },
+    "CONSENT_DATA" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Records may contain URLs, headers, cookies, authentication tokens, account information, and request and response bodies. These are sensitive: anyone with an authentication token may be able to access the associated account. Capture only your own authorized traffic."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL、ヘッダー、Cookie、認証トークン、アカウント情報、リクエストとレスポンスの本文が記録される場合があります。認証トークンを持つ人が関連アカウントにアクセスできる可能性があるため、慎重に扱ってください。自分が利用を許可されている通信だけを記録してください。"
+          }
+        }
+      }
+    },
+    "CONSENT_STORAGE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New records are stored in the local app storage shared with its VPN extension. New tokens and certificate keys use this device’s Keychain with iCloud synchronization disabled. Interceptor does not send captured data to its developer or analytics services. Original requests still reach Nintendo. Copying or exporting data shares it with your chosen destination. Copies synchronized by older versions may remain in iCloud. Local history storage is excluded from backup; other app settings may be backed up by the operating system."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい記録はアプリとVPN拡張が共有する端末内の領域に保存します。新しいトークンと証明書の鍵はiCloud同期を無効にした、この端末用のKeychainに保存します。取得したデータを開発者や解析サービスへ送信しません。元の通信は任天堂に届きます。コピーや書き出しを行ったデータは、選んだ宛先に共有されます。旧バージョンが同期したコピーはiCloudに残る可能性があります。履歴の保存領域はバックアップ対象から除外しますが、その他の設定はOSによりバックアップされる場合があります。"
+          }
+        }
+      }
+    },
+    "CONSENT_CERTIFICATE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Setup installs a local certificate and a VPN configuration. Trusting the certificate allows this app to decrypt selected HTTPS traffic. Agreeing here does not install either item or start capture. You choose those actions separately in Set Up Capture. You can remove the certificate and VPN configuration in iOS Settings."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定ではローカル証明書とVPN構成をインストールします。証明書を信頼すると、このアプリが指定したHTTPS通信を復号できるようになります。この画面での同意だけでは、インストールも記録の開始も行いません。「キャプチャの設定」でそれぞれ操作してください。証明書とVPN構成はiOSの設定から削除できます。"
+          }
+        }
+      }
+    },
+    "CONSENT_CHOICES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can decline and browse existing data. Capture and certificate download require consent. Notifications are optional and contain only a generic message and a local record identifier. You can withdraw consent here to stop capture and clear notifications. Withdrawal does not delete existing records, tokens, or installed certificates. Clear on Home deletes history only; uninstalling the app does not guarantee removal of Keychain items or older iCloud copies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意しなくても既存データを閲覧できます。記録と証明書のダウンロードには同意が必要です。通知は任意で、一般的なメッセージと端末内の記録IDだけを含みます。この画面で同意を取り消すと記録を停止し、通知を消去します。既存の記録・トークン・インストール済み証明書は削除されません。ホームの「消去」は履歴のみを削除します。アプリの削除でもKeychainや旧iCloudコピーが必ず消えるとは限りません。"
+          }
+        }
+      }
+    },
+    "Terms of Service" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terms of Service"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用規約"
+          }
+        }
+      }
+    },
+    "Privacy Policy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy Policy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プライバシーポリシー"
+          }
+        }
+      }
+    },
+    "Developers" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Developers"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開発者"
+          }
+        }
+      }
+    },
+    "Licenses" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenses"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンス"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

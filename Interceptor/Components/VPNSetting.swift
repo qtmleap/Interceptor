@@ -15,11 +15,21 @@ struct VPNSetting: View {
     @EnvironmentObject private var client: Tuberose
     @Environment(\.scenePhase) private var scenePhase
     @State private var isConnected: Bool = false
+    @AppStorage(CaptureAuthorization.key, store: CaptureAuthorization.defaults) private var consentVersion = 0
+    @State private var connectionError: String?
 
     var body: some View {
         Section(content: {
             Label(systemName: "wifi", color: .blue, title: {
-                Toggle(isOn: $isConnected, label: {
+                Toggle(isOn: Binding(get: { isConnected }, set: { enabled in
+                    Task {
+                        do {
+                            if enabled { try await client.startVPNTunnel() }
+                            else { client.stopVPNTunnel() }
+                            isConnected = client.isConnected
+                        } catch { connectionError = error.localizedDescription; isConnected = false }
+                    }
+                }), label: {
                     Text("LABEL_VPN_IS_CONNECTED")
                 })
             })
@@ -40,12 +50,17 @@ struct VPNSetting: View {
         .onChange(of: client.isConnected) {
             isConnected = client.isConnected
         }
-        .onChange(of: isConnected) {
-            // 値が変わったときにVPN設定を切り替える
-            Task(priority: .background, operation: {
-                isConnected ? try await client.startVPNTunnel() : client.stopVPNTunnel()
-            })
+        .disabled(consentVersion != CaptureAuthorization.version)
+        .onChange(of: consentVersion) {
+            if !CaptureAuthorization.isGranted {
+                isConnected = false
+                client.activateOnForeground = false
+                client.stopVPNTunnel()
+            }
         }
+        .alert("Unable to Start Capture", isPresented: Binding(get: { connectionError != nil }, set: { if !$0 { connectionError = nil } })) {
+            Button("OK", role: .cancel) { connectionError = nil }
+        } message: { Text(connectionError ?? "") }
     }
 }
 
