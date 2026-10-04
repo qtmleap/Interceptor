@@ -96,6 +96,11 @@ fine-grained token limited to that repository with **Contents: read-only**.
 Fork pull requests cannot access this secret and require a maintainer to run
 the changes on a trusted branch. Deploy keys are disabled for QuantumLeap.
 
+CI uses one signed `xcodebuild test` invocation, which builds the app and test
+targets for its selected simulator and runs the full suite. This avoids a
+separate unsigned build of both simulator architectures. Build/test output and
+periodic process samples are saved to help diagnose startup waits.
+
 The workflow uses GitHub's [`xcode-27` preview runner](https://github.com/actions/runner-images/issues/14404).
 The local Xcode 27.0 / iOS 26.5 validation and the hosted runner's selected
 Xcode/runtime are recorded separately in their build logs.
