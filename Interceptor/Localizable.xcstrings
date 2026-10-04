@@ -961,18 +961,18 @@
         }
       }
     },
-    "Agree and Continue" : {
+    "Agree" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agree and Continue"
+            "value" : "Agree"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同意して続ける"
+            "value" : "同意する"
           }
         }
       }

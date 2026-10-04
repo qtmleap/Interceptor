@@ -46,13 +46,16 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertFalse(connection.isEnabled)
         app.buttons["Read Details"].tap()
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Agree and Continue"].exists)
+        XCTAssertFalse(app.buttons["Agree"].exists)
         XCTAssertFalse(app.buttons["Withdraw Consent"].exists)
         app.buttons["Close"].tap()
         XCTAssertFalse(connection.isEnabled)
         app.buttons["Review and Agree"].tap()
-        XCTAssertTrue(app.buttons["Agree and Continue"].waitForExistence(timeout: 5))
-        app.buttons["Agree and Continue"].tap()
+        XCTAssertTrue(app.buttons["Agree"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars.buttons["Agree"].isHittable)
+        XCTAssertTrue(app.navigationBars.buttons["Not Now"].isHittable)
+        attachScreenshot(app, named: "Consent toolbar actions")
+        app.buttons["Agree"].tap()
         XCTAssertTrue(app.buttons["Withdraw Consent"].waitForExistence(timeout: 5))
         XCTAssertTrue(connection.isEnabled)
         app.buttons["Withdraw Consent"].tap()
@@ -64,7 +67,7 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertTrue(connection.isEnabled)
         app.terminate()
         app.launch()
-        XCTAssertFalse(app.buttons["Agree and Continue"].exists)
+        XCTAssertFalse(app.buttons["Agree"].exists)
         tab(app, named: "Settings").tap()
         XCTAssertTrue(app.buttons["Withdraw Consent"].waitForExistence(timeout: 5))
         withdrawConsent(app)
@@ -72,7 +75,7 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [revoked], timeout: 5), .completed)
         app.terminate()
         app.launch()
-        XCTAssertFalse(app.buttons["Agree and Continue"].exists)
+        XCTAssertFalse(app.buttons["Agree"].exists)
         tab(app, named: "Settings").tap()
         XCTAssertFalse(app.switches["Connection Status"].isEnabled)
     }
@@ -95,7 +98,7 @@ final class InterceptorUITests: XCTestCase {
         tab(app, named: "Settings").tap()
         settingsButton(app, named: "Read Details").tap()
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Agree and Continue"].exists)
+        XCTAssertFalse(app.buttons["Agree"].exists)
         attachScreenshot(app, named: "Consent details large text landscape")
         app.buttons["Close"].tap()
         XCTAssertTrue(app.buttons["Read Details"].waitForExistence(timeout: 5))
@@ -138,7 +141,7 @@ final class InterceptorUITests: XCTestCase {
         tab(app, named: "Settings").tap()
         if app.buttons["Review and Agree"].exists {
             app.buttons["Review and Agree"].tap()
-            app.buttons["Agree and Continue"].tap()
+            app.buttons["Agree"].tap()
         }
         let connection = app.switches["Connection Status"]
         addTeardownBlock { @MainActor in
@@ -189,7 +192,7 @@ final class InterceptorUITests: XCTestCase {
         tab(app, named: "Settings").tap()
         if app.buttons["Review and Agree"].exists {
             app.buttons["Review and Agree"].tap()
-            app.buttons["Agree and Continue"].tap()
+            app.buttons["Agree"].tap()
         }
         let connection = app.switches["Connection Status"]
         XCTAssertTrue(connection.waitForExistence(timeout: 5))
@@ -275,7 +278,7 @@ final class InterceptorUITests: XCTestCase {
         tab(app, named: "Settings").tap()
         if app.buttons["Review and Agree"].exists {
             app.buttons["Review and Agree"].tap()
-            app.buttons["Agree and Continue"].tap()
+            app.buttons["Agree"].tap()
         }
         settingsButton(app, named: "Set Up Capture").tap()
 

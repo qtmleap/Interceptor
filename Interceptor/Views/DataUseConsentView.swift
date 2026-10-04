@@ -16,7 +16,7 @@ struct DataUseDetailsView: View {
             .padding()
             .frame(maxWidth: .infinity)
         }
-        .navigationTitle("Data Use and Consent")
+        .navigationTitle("Data Use")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -35,22 +35,20 @@ struct DataUseConsentView: View {
 
     var body: some View {
         DataUseDetailsView()
-            .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 12) {
-                    Button("Agree and Continue") {
-                        client.activateOnForeground = false
-                        CaptureAuthorization.grant()
-                        onDecision(true)
-                    }.buttonStyle(.borderedProminent)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Not Now") {
                         client.withdrawCaptureConsent()
                         onDecision(false)
-                    }.buttonStyle(.bordered)
+                    }
                 }
-                .frame(maxWidth: 640)
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(.regularMaterial)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Agree") {
+                        client.activateOnForeground = false
+                        CaptureAuthorization.grant()
+                        onDecision(true)
+                    }
+                }
             }
     }
 }
