@@ -79,11 +79,12 @@ final class InterceptorUITests: XCTestCase {
         let connection = app.switches["Connection Status"]
         defer {
             app.activate()
+            if app.alerts.buttons["OK"].exists { app.alerts.buttons["OK"].tap() }
             tab(app, named: "Settings").tap()
             app.buttons["Data Use and Consent"].tap()
             if app.buttons["Withdraw Consent"].exists { app.buttons["Withdraw Consent"].tap() }
         }
-        if connection.value as? String != "1" { connection.switches.firstMatch.tap() }
+        if connection.value as? String != "1" { try switchControl(app, row: connection).tap() }
         let connected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: connection)
         XCTAssertEqual(XCTWaiter.wait(for: [connected], timeout: 20), .completed)
         let nintendo = XCUIApplication(bundleIdentifier: "com.nintendo.znca")
@@ -98,6 +99,11 @@ final class InterceptorUITests: XCTestCase {
         game.tap()
         _ = nintendo.webViews.firstMatch.waitForExistence(timeout: 20)
         app.activate()
+        tab(app, named: "Home").tap()
+        let capturedHost = app.staticTexts["api.lp1.av5ja.srv.nintendo.net"]
+        XCTAssertTrue(capturedHost.waitForExistence(timeout: 10))
+        capturedHost.tap()
+        XCTAssertTrue(app.staticTexts["/api/bullet_tokens"].waitForExistence(timeout: 10), "The Nintendo token request must appear in captured history.")
         tab(app, named: "Settings").tap()
         app.buttons["Token List"].tap()
         XCTAssertTrue(app.navigationBars["Token List"].waitForExistence(timeout: 5))
@@ -122,7 +128,7 @@ final class InterceptorUITests: XCTestCase {
         let connection = app.switches["Connection Status"]
         XCTAssertTrue(connection.waitForExistence(timeout: 5))
         XCTAssertTrue(connection.isEnabled)
-        let control = connection.switches.firstMatch
+        let control = try switchControl(app, row: connection)
         defer {
             app.activate()
             tab(app, named: "Settings").tap()
@@ -256,6 +262,17 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(tab(app, named: "Home").waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Next"].exists, "Completed onboarding must remain dismissed after relaunch")
+    }
+
+    @MainActor
+    private func switchControl(_ app: XCUIApplication, row: XCUIElement) throws -> XCUIElement {
+        // iPadOS 18 exposes the UISwitch beside its labeled row; newer versions nest it.
+        let frame = row.frame
+        return try XCTUnwrap(app.switches.allElementsBoundByIndex.first { candidate in
+            let controlFrame = candidate.frame
+            return controlFrame.width < frame.width
+                && frame.contains(CGPoint(x: controlFrame.midX, y: controlFrame.midY))
+        }, "The labeled row must expose its actual switch control.")
     }
 
     @MainActor
