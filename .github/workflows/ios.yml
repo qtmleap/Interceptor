@@ -80,6 +80,7 @@ jobs:
             -packageAuthorizationProvider netrc -onlyUsePackageVersionsFromResolvedFile \
             -skipPackagePluginValidation \
             -parallel-testing-enabled NO \
+            -collect-test-diagnostics never \
             -resultBundlePath "$RUNNER_TEMP/Interceptor.xcresult" \
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- > >(tee "$RUNNER_TEMP/test.log") 2>&1 &
           build_pid=$!
