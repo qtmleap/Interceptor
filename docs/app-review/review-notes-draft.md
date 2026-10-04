@@ -21,8 +21,8 @@ Captured data is not uploaded to developer-operated servers, sold, used for adve
 1. Launch the app on a physical iPhone or iPad. The initial Data Use and Consent screen explains the data flow. Complete any introductory screens shown only after the consent choice. Review the notice before certificate setup or starting capture.
 2. Choose Not Now to decline consent. Confirm Home and Settings remain accessible and capture cannot start, including with Auto Connect or after relaunch.
 3. Open Settings → Data Use and Consent, review the notice, and choose Agree and Continue. Agreement permits setup; it must not silently install or trust a certificate.
-4. Open Settings → Set Up Capture and follow the app's instructions to obtain the locally generated certificate. In iOS Settings, install the downloaded profile and enable full trust for this certificate under General → About → Certificate Trust Settings. Confirm the final certificate name and download flow using the archive.
-5. Return to the app, turn on the connection switch, and approve the iOS VPN configuration prompt if shown. The VPN indicator represents the local packet tunnel. Open SSL Proxying List to see configured hosts.
+4. Open Settings → Set Up Capture and follow the app's instructions to obtain the locally generated certificate. In iOS Settings, install the downloaded profile and enable full trust for this certificate under General → About → Certificate Trust Settings. Continue setup to Install VPN Configuration and approve the iOS VPN configuration prompt if shown. The configuration must be registered before capture can start.
+5. Return to Settings and turn on Connection Status. The VPN indicator represents the local packet tunnel. Open SSL Proxying List to see configured hosts.
 6. With an authorized Nintendo account and the relevant Nintendo app/service, perform a supported request. Return to Home, open its host, and inspect the request/response record. Settings → Token List displays supported saved tokens when such traffic was captured. Nintendo credentials are entered in Nintendo's own interface, not submitted to Interceptor's developer.
 7. If desired, enable Capture Notifications in Settings and approve the iOS permission prompt. Capture another supported record. Confirm the notification is generic and opening it reads the result from local storage. Denying notifications must not prevent capture or access to locally saved results.
 8. Open Settings → Data Use and Consent and choose Withdraw Consent. Confirm the connection stops; returning to the foreground or relaunching does not restart it. Existing saved records remain available. Clear request history using Home's trash/Clear action.
@@ -31,6 +31,8 @@ Captured data is not uploaded to developer-operated servers, sold, used for adve
 We are awaiting Apple's clarification about whether the proposed certificate/packet-tunnel design is acceptable and whether additional MDM-related permission is required. This draft does not assert that MDM privileges are granted or unnecessary.
 
 ## Evidence to add before submission
+
+On 2026-10-04, the physical VPN lifecycle test passed on iPad Air 13-inch (M3), iPadOS 26.3.1: tunnel start, an anonymous HTTPS probe to a configured Nintendo host recorded in local history, stop/restart, consent withdrawal, and an independent Not Connected check in iPadOS Settings. See [the public-request screenshot](evidence/physical-vpn-https-probe.png). This does not establish Nintendo account/token capture or a fresh certificate installation/removal flow. Build 29 is still not uploaded or selected for review.
 
 - Replacement build number, version, supported device/OS, and completed archive checks.
 - Verify the labels Data Use and Consent, Agree and Continue, Not Now, Withdraw Consent, Set Up Capture, and Capture Notifications in the archive; add English and Japanese screenshots before capture.

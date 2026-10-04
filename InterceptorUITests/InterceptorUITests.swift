@@ -64,6 +64,83 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
+    func testPhysicalVPNLifecycle() async throws {
+        #if targetEnvironment(simulator)
+        throw XCTSkip("VPN tunnel validation requires a physical device with the certificate and VPN installed.")
+        #else
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        tab(app, named: "Settings").tap()
+        app.buttons["Data Use and Consent"].tap()
+        if app.buttons["Agree and Continue"].exists { app.buttons["Agree and Continue"].tap() }
+        returnToSettings(app)
+        let connection = app.switches["Connection Status"]
+        XCTAssertTrue(connection.waitForExistence(timeout: 5))
+        XCTAssertTrue(connection.isEnabled)
+        let control = connection.switches.firstMatch
+        defer {
+            app.activate()
+            tab(app, named: "Settings").tap()
+            if app.alerts.buttons["OK"].exists { app.alerts.buttons["OK"].tap() }
+            app.buttons["Data Use and Consent"].tap()
+            if app.buttons["Withdraw Consent"].exists { app.buttons["Withdraw Consent"].tap() }
+        }
+        control.tap()
+        let connected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: connection)
+        let result = XCTWaiter.wait(for: [connected], timeout: 20)
+        attachScreenshot(app, named: "Physical VPN start result")
+        if result != .completed {
+            let diagnostic = XCTAttachment(string: app.debugDescription)
+            diagnostic.name = "Physical VPN start accessibility"
+            diagnostic.lifetime = .keepAlways
+            add(diagnostic)
+        }
+        XCTAssertEqual(result, .completed, "Install the Interceptor VPN configuration before running this test; inspect the attached start result for errors.")
+        guard result == .completed else { return }
+        let probePath = "/__interceptor_review_probe_" + UUID().uuidString
+        let probeURL = try XCTUnwrap(URL(string: "https://api.lp1.av5ja.srv.nintendo.net" + probePath))
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpShouldSetCookies = false
+        configuration.timeoutIntervalForRequest = 20
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let (_, response) = try await session.data(from: probeURL)
+        XCTAssertNotNil(response as? HTTPURLResponse, "A public probe must complete TLS and receive an HTTP response.")
+        app.activate()
+        tab(app, named: "Home").tap()
+        let host = app.staticTexts["api.lp1.av5ja.srv.nintendo.net"]
+        XCTAssertTrue(host.waitForExistence(timeout: 10))
+        host.tap()
+        XCTAssertTrue(app.staticTexts[probePath].waitForExistence(timeout: 10), "The unique public probe must appear in captured history.")
+        attachScreenshot(app, named: "Physical VPN captured public HTTPS probe")
+        tab(app, named: "Settings").tap()
+        control.tap()
+        let stopped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0'"), object: connection)
+        XCTAssertEqual(XCTWaiter.wait(for: [stopped], timeout: 15), .completed)
+        control.tap()
+        let restarted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: connection)
+        XCTAssertEqual(XCTWaiter.wait(for: [restarted], timeout: 20), .completed)
+        app.buttons["Data Use and Consent"].tap()
+        app.buttons["Withdraw Consent"].tap()
+        returnToSettings(app)
+        let revoked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0' AND enabled == false"), object: connection)
+        XCTAssertEqual(XCTWaiter.wait(for: [revoked], timeout: 15), .completed)
+        attachScreenshot(app, named: "Physical VPN stopped after withdrawal")
+        let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        settings.launch()
+        settings.buttons["com.apple.settings.general"].tap()
+        let vpnSettings = settings.cells["ManagedConfigurationList"]
+        if !vpnSettings.isHittable { settings.swipeUp() }
+        XCTAssertTrue(vpnSettings.waitForExistence(timeout: 5))
+        vpnSettings.tap()
+        XCTAssertTrue(settings.staticTexts["Not Connected"].waitForExistence(timeout: 15), "iPadOS must report that the VPN stopped after consent withdrawal.")
+        attachScreenshot(settings, named: "Physical system VPN disconnected")
+        #endif
+    }
+
+    @MainActor
     func testSimulatorOnboardingAndNavigation() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
