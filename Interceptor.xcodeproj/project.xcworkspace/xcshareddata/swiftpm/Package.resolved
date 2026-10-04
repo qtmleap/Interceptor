@@ -1,5 +1,5 @@
 {
-  "originHash" : "aaa6085c096db72590a6bebadcdf293e0a23f1b4238edb1da67e8d5cf5ec4940",
+  "originHash" : "ae275c1f2220b3ee02617d3d89e557987fda1816c03980da0f975edea7d47070",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -177,7 +177,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/qtmleap/QuantumLeap.git",
       "state" : {
-        "revision" : "d7e8cf36ade39306a8e1f3943c380352285db9ee",
+        "revision" : "30dac2509deea3d935bb70fcc3f1730a24248641",
         "version" : "0.0.7"
       }
     },
@@ -186,8 +186,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/simonbs/Runestone.git",
       "state" : {
-        "revision" : "1fad339aab99cf2136ce6bf8c32da3265b2e85e5",
-        "version" : "0.5.1"
+        "revision" : "592434a103a4d1ab83e14f87ac6eef569dd7a99d",
+        "version" : "0.5.2"
       }
     },
     {
@@ -249,8 +249,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "334e682869394ee239a57dbe9262bff3cd9495bd",
-        "version" : "3.14.0"
+        "revision" : "95ba0316a9b733e92bb6b071255ff46263bbe7dc",
+        "version" : "3.15.1"
       }
     },
     {
