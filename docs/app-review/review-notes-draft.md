@@ -32,11 +32,11 @@ We are awaiting Apple's clarification about whether the proposed certificate/pac
 
 ## Evidence to add before submission
 
-On 2026-10-04, the physical VPN lifecycle test passed on iPad Air 13-inch (M3), iPadOS 26.3.1: tunnel start, an anonymous HTTPS probe to a configured Nintendo host recorded in local history, stop/restart, consent withdrawal, and an independent Not Connected check in iPadOS Settings. See [the public-request screenshot](evidence/physical-vpn-https-probe.png). This does not establish Nintendo account/token capture or a fresh certificate installation/removal flow. Build 29 is still not uploaded or selected for review.
+On 2026-10-04, the physical VPN lifecycle test passed on iPad Air 13-inch (M3), iPadOS 26.3.1: tunnel start, an anonymous HTTPS probe to a configured Nintendo host recorded in local history, stop/restart, consent withdrawal, and an independent Not Connected check in iPadOS Settings. See [the public-request screenshot](evidence/physical-vpn-https-probe.png). On M2 (iPadOS 18.6.2), the user completed fresh certificate installation/trust and Nintendo sign-in; both physical tests passed at 14:30 and 14:33 JST. Nintendo capture checked the bullet-token request in history and the host in Token List, without exposing or comparing raw token values. Profile removal was not exercised. Build 29 is still not uploaded or selected for review.
 
 - Replacement build number, version, supported device/OS, and completed archive checks.
 - Verify the labels Data Use and Consent, Agree and Continue, Not Now, Withdraw Consent, Set Up Capture, and Capture Notifications in the archive; add English and Japanese screenshots before capture.
 - Physical-device proof of consent gating, revocation, restart prevention, and supported HTTPS capture.
 - A synthetic/redacted demonstration video or reviewer attachment. Never attach live account cookies, private keys, or authentication tokens.
 - A verified reviewer test path and any account/access requirement. No working Nintendo test account or capture fixture is provided by this draft.
-- Public app-specific privacy policy URL, reachable support URL, updated App Privacy answers, and Apple's pending clarification.
+- The public app-specific policy and support URL are reachable. App Store Connect now has the app-specific URL in both languages and Data Not Collected for the revised release. The old selected binary still raises an ATT-string warning; select the new binary. Apple's clarification remains pending.
