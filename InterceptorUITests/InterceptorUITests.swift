@@ -32,6 +32,36 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
+    func testCaptureConsentLifecycle() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        else {
+            app.tabBars.buttons["Settings"].tap()
+            app.buttons["Data Use and Consent"].tap()
+            if app.buttons["Withdraw Consent"].exists { app.buttons["Withdraw Consent"].tap() }
+            app.navigationBars.buttons.firstMatch.tap()
+        }
+        XCTAssertTrue(app.tabBars.buttons["Home"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Settings"].tap()
+        let connection = app.switches["Connection Status"]
+        XCTAssertTrue(connection.waitForExistence(timeout: 5))
+        XCTAssertFalse(connection.isEnabled)
+        app.buttons["Data Use and Consent"].tap()
+        XCTAssertTrue(app.buttons["Agree and Continue"].waitForExistence(timeout: 5))
+        app.buttons["Agree and Continue"].tap()
+        XCTAssertTrue(app.buttons["Withdraw Consent"].waitForExistence(timeout: 5))
+        app.buttons["Withdraw Consent"].tap()
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertFalse(connection.isEnabled)
+        app.terminate()
+        app.launch()
+        app.tabBars.buttons["Settings"].tap()
+        XCTAssertFalse(app.switches["Connection Status"].isEnabled)
+    }
+
+    @MainActor
     func testSimulatorOnboardingAndNavigation() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
@@ -42,6 +72,13 @@ final class InterceptorUITests: XCTestCase {
             return true
         }
         app.launch()
+
+        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        app.tabBars.buttons["Settings"].tap()
+        app.buttons["Data Use and Consent"].tap()
+        if app.buttons["Agree and Continue"].exists { app.buttons["Agree and Continue"].tap() }
+        app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["Set Up Capture"].tap()
 
         // The simulator permits advancing through the device-only setup steps.
         if app.buttons["Next"].waitForExistence(timeout: 5) {
