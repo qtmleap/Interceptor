@@ -30,7 +30,7 @@ P1は高、P2は中の修正優先度。前回レビューではコンパイル�
 | 依存 | 現在の指定 | パッケージ本体の同梱 |
 | --- | --- | --- |
 | Mudmouth | ローカルパッケージ`../Mudmouth` | 同梱なし。追加依頼により`https://github.com/qtmleap/Mudmouth`を兄弟ディレクトリにクローンした。取得SHAは`ddcefe656c0f27289ee4f506f2112b8bbdaa407d`。 |
-| QuantumLeap | GitHubのリモートSwiftパッケージ | なし。固定SHAの取得失敗あり。 |
+| QuantumLeap | 非公開GitHubのリモートSwiftパッケージ | なし。固定SHAの取得失敗と、読み取り認証が必要。 |
 | Firebase iOS SDK | GitHubのリモートSwiftパッケージ | なし。SPMによる取得が必要。 |
 | Runestone | GitHubのリモートSwiftパッケージ | なし。SPMによる取得が必要。 |
 | treesitterlanguages | GitHubのリモートSwiftパッケージ | なし。SPMによる取得が必要。 |
@@ -238,3 +238,5 @@ DEVELOPER_DIR=/Applications/Xcode-27.0.0.app/Contents/Developer PLL_SOURCE_PACKA
 GitHub Actionsの既存ワークフローはなかったため、`.github/workflows/ios.yml`を追加した。masterへのPRとpushで、Xcode 27ランナーを使ってSimulatorのコンパイルと全テストを実行する。Mudmouthはローカル確認と同じSHAに固定し、専用Simulatorを作成する。ビルドログとxcresultは7日間保存する。
 
 独立レビューで、ローカルXcodeのプラグイン承認省略設定にCIが依存してしまう点を確認した。CIの両コマンドに`-skipPackagePluginValidation`を指定し、READMEにも初回のプラグイン承認手順を追記した。修正後の独立レビューにはマージを妨げる指摘は残っていない。ホストされたCIの成功を確認してからmasterへ反映する。
+
+ホストされたCIではQuantumLeapの認証不足で依存取得が失敗した（run 37165605990）。QuantumLeapは非公開で、InterceptorのGITHUB_TOKENでは取得できない。CI専用の読み取りDeploy Keyの登録も、QuantumLeap側のポリシーによりHTTP 422で禁止されていた。個人アカウントの広い権限のトークンを転用せず、QuantumLeapだけのContents読み取り権限を持つ`QUANTUMLEAP_READ_TOKEN`をRepository Secretとして設定する構成にした。Secret設定後にCIを再実行し、成功後にmasterへマージする。
