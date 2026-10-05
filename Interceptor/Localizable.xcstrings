@@ -1206,13 +1206,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You can decline and browse existing data. Capture and certificate download require consent. Notifications are optional and contain only a generic message and a local record identifier. You can withdraw consent in Settings → Data Use to stop capture and clear notifications. Withdrawal does not delete existing records, tokens, or installed certificates. Clear on Home deletes history only; uninstalling the app does not guarantee removal of Keychain items or older iCloud copies."
+            "value" : "Agree to this notice to access the app. Until you agree, this screen remains open and capture is unavailable. Notifications are optional and contain only a generic message and a local record identifier. You can withdraw consent in Settings → Privacy to stop capture and clear notifications. Withdrawal does not delete existing records, tokens, or installed certificates. Clear on Home deletes history only; uninstalling the app does not guarantee removal of Keychain items or older iCloud copies."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同意しなくても既存データを閲覧できます。記録と証明書のダウンロードには同意が必要です。通知は任意で、一般的なメッセージと端末内の記録IDだけを含みます。設定の「データ利用」から同意を撤回すると記録を停止し、通知を消去します。既存の記録・トークン・インストール済み証明書は削除されません。ホームの「消去」は履歴のみを削除します。アプリの削除でもKeychainや旧iCloudコピーが必ず消えるとは限りません。"
+            "value" : "この説明に同意するとアプリを利用できます。同意するまではこの画面を表示し、通信の記録は行いません。通知は任意で、一般的なメッセージと端末内の記録IDだけを含みます。設定の「プライバシー」から同意を撤回すると記録を停止し、通知を消去します。既存の記録・トークン・インストール済み証明書は削除されません。ホームの「消去」は履歴のみを削除します。アプリの削除でもKeychainや旧iCloudコピーが必ず消えるとは限りません。"
           }
         }
       }
@@ -1231,6 +1231,12 @@
             "value" : "利用規約"
           }
         }
+      }
+    },
+    "Privacy" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Privacy" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プライバシー" } }
       }
     },
     "Privacy Policy" : {

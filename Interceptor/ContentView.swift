@@ -13,10 +13,42 @@ import SwiftyLogger
 
 struct ContentView: View {
     @Environment(\.isFirstLaunch) private var isFirstLaunch: Binding<Bool>
-    @AppStorage("CaptureConsentDecided") private var consentDecided = false
-    @State private var showConsent = false
+    @EnvironmentObject private var client: Tuberose
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(CaptureAuthorization.key, store: CaptureAuthorization.defaults) private var consentVersion = 0
+
+    private var requiresConsent: Bool { consentVersion != CaptureAuthorization.version }
 
     var body: some View {
+        Group {
+            if requiresConsent {
+                // Keep history, settings and their presentations unavailable until agreement.
+                Color(.systemBackground).ignoresSafeArea()
+            } else {
+                mainTabs
+            }
+        }
+        .onAppear { stopCaptureIfUnauthorized() }
+        .onChange(of: consentVersion) { stopCaptureIfUnauthorized() }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active {
+                consentVersion = CaptureAuthorization.defaults.integer(forKey: CaptureAuthorization.key)
+                stopCaptureIfUnauthorized()
+            }
+        }
+        .fullScreenCover(isPresented: Binding(get: { requiresConsent }, set: { _ in })) {
+            NavigationStack {
+                DataUseConsentView { isFirstLaunch.wrappedValue = false }
+            }
+            .interactiveDismissDisabled()
+        }
+    }
+
+    private func stopCaptureIfUnauthorized() {
+        if !CaptureAuthorization.isGranted { client.stopVPNTunnel() }
+    }
+
+    private var mainTabs: some View {
         TabView(content: {
             NavigationView(content: {
                 HomeView()
@@ -50,20 +82,6 @@ struct ContentView: View {
             tabView.tabBar.backgroundColor = .systemBackground
             tabView.tabBar.isTranslucent = true
         })
-        .onAppear {
-            let version = CaptureAuthorization.defaults.integer(forKey: CaptureAuthorization.key)
-            showConsent = !consentDecided || (version != 0 && version != CaptureAuthorization.version)
-            if !CaptureAuthorization.isGranted { Tuberose.default.stopVPNTunnel() }
-        }
-        .fullScreenCover(isPresented: $showConsent) {
-            NavigationStack {
-                DataUseConsentView { _ in
-                    consentDecided = true
-                    isFirstLaunch.wrappedValue = false
-                    showConsent = false
-                }
-            }.interactiveDismissDisabled()
-        }
     }
 }
 

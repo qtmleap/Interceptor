@@ -37,78 +37,136 @@ final class InterceptorUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US",
                                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
         app.launch()
-        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        // Establish revoked authorization through the UI, regardless of previous test state.
+        agreeIfNeeded(app)
+        revokeForStartupTest(app)
+        assertStartupConsent(app)
+        app.swipeDown()
+        assertStartupConsent(app)
+        attachScreenshot(app, named: "Mandatory launch consent")
+
+        app.terminate()
+        // A legacy decision flag must not bypass revoked shared authorization (version 0).
+        app.launchArguments += ["-CaptureConsentDecided", "YES"]
+        app.launch()
+        assertStartupConsent(app)
+        app.terminate()
+        app.launch()
+        assertStartupConsent(app)
+        agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        XCTAssertTrue(app.buttons["Read Details"].waitForExistence(timeout: 5))
-        attachScreenshot(app, named: "Data use settings")
-        if app.buttons["Withdraw Consent"].exists { withdrawConsent(app) }
-        let connection = app.switches["Connection Status"]
-        XCTAssertFalse(connection.isEnabled)
-        app.buttons["Read Details"].tap()
-        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Agree"].exists)
+        XCTAssertTrue(app.switches["Connection Status"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches["Connection Status"].isEnabled)
+        XCTAssertFalse(app.staticTexts["Consent Status"].exists)
+        XCTAssertFalse(app.buttons["Read Details"].exists)
+        XCTAssertFalse(app.buttons["Review and Agree"].exists)
         XCTAssertFalse(app.buttons["Withdraw Consent"].exists)
-        app.buttons["Close"].tap()
-        XCTAssertFalse(connection.isEnabled)
-        app.buttons["Review and Agree"].tap()
-        XCTAssertTrue(app.buttons["Agree"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.navigationBars.buttons["Agree"].isHittable)
-        XCTAssertTrue(app.navigationBars.buttons["Not Now"].isHittable)
-        attachScreenshot(app, named: "Consent toolbar actions")
-        app.buttons["Agree"].tap()
-        XCTAssertTrue(app.buttons["Withdraw Consent"].waitForExistence(timeout: 5))
-        XCTAssertTrue(connection.isEnabled)
-        app.buttons["Withdraw Consent"].tap()
+        settingsButton(app, named: "Privacy").tap()
+        XCTAssertTrue(app.navigationBars["Privacy"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Purpose"].exists)
+        XCTAssertFalse(app.buttons["Agree"].exists)
+        settingsButton(app, named: "Withdraw Consent").tap()
         XCTAssertTrue(app.alerts.buttons["Cancel"].waitForExistence(timeout: 5))
         app.alerts.buttons["Cancel"].tap()
-        XCTAssertTrue(connection.isEnabled)
-        app.buttons["Read Details"].tap()
-        app.buttons["Close"].tap()
-        XCTAssertTrue(connection.isEnabled)
+        XCTAssertFalse(app.buttons["Agree"].exists)
+        XCTAssertTrue(app.navigationBars["Privacy"].exists)
         app.terminate()
         app.launch()
+        XCTAssertTrue(tab(app, named: "Settings").waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Agree"].exists)
-        tab(app, named: "Settings").tap()
-        XCTAssertTrue(app.buttons["Withdraw Consent"].waitForExistence(timeout: 5))
+        openPrivacy(app)
         withdrawConsent(app)
-        let revoked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == false"), object: app.switches["Connection Status"])
-        XCTAssertEqual(XCTWaiter.wait(for: [revoked], timeout: 5), .completed)
+        assertStartupConsent(app)
         app.terminate()
         app.launch()
-        XCTAssertFalse(app.buttons["Agree"].exists)
-        tab(app, named: "Settings").tap()
-        XCTAssertFalse(app.switches["Connection Status"].isEnabled)
+        assertStartupConsent(app)
+        // Leave consent granted so other navigation tests do not depend on ordering.
+        agreeIfNeeded(app)
     }
 
     @MainActor
     func testConsentDetailsLargeTextLandscape() throws {
-        XCUIDevice.shared.orientation = .landscapeLeft
         let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
+        app.launch()
+        agreeIfNeeded(app)
+        revokeForStartupTest(app)
+        app.terminate()
+        XCUIDevice.shared.orientation = .landscapeLeft
         addTeardownBlock { @MainActor in
             XCUIDevice.shared.orientation = .portrait
             app.terminate()
-            app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US",
-                                   "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
-            app.launch()
         }
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US",
                                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
-        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
-        tab(app, named: "Settings").tap()
-        settingsButton(app, named: "Read Details").tap()
-        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
+        assertStartupConsent(app)
+        XCTAssertTrue(app.navigationBars.buttons["Agree"].isHittable)
+        attachScreenshot(app, named: "Mandatory consent large text landscape")
+        agreeIfNeeded(app)
+        openPrivacy(app)
+        XCTAssertTrue(app.staticTexts["Purpose"].exists)
         XCTAssertFalse(app.buttons["Agree"].exists)
-        attachScreenshot(app, named: "Consent details large text landscape")
-        app.buttons["Close"].tap()
-        XCTAssertTrue(app.buttons["Read Details"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Close"].exists)
+        attachScreenshot(app, named: "Privacy large text landscape")
+    }
+
+    @MainActor
+    private func assertStartupConsent(_ app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["Agree"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Not Now"].exists)
+        XCTAssertFalse(app.buttons["Cancel"].exists)
+        XCTAssertFalse(app.buttons["Close"].exists)
+        XCTAssertFalse(tab(app, named: "Settings").exists)
+        XCTAssertFalse(app.switches["Connection Status"].exists)
+    }
+
+    @MainActor
+    private func agreeIfNeeded(_ app: XCUIApplication) {
+        if app.buttons["Agree"].waitForExistence(timeout: 3) {
+            app.buttons["Agree"].tap()
+        }
+        XCTAssertTrue(tab(app, named: "Settings").waitForExistence(timeout: 5))
+        // Existing installations may have dismissed the old optional consent screen.
+        // Grant through its old settings action before establishing a revoked baseline.
+        tab(app, named: "Settings").tap()
+        if app.buttons["Review and Agree"].exists {
+            settingsButton(app, named: "Review and Agree").tap()
+            XCTAssertTrue(app.buttons["Agree"].waitForExistence(timeout: 5))
+            app.buttons["Agree"].tap()
+        }
+    }
+
+    @MainActor
+    private func revokeForStartupTest(_ app: XCUIApplication) {
+        tab(app, named: "Settings").tap()
+        // Normalize consent using either the old settings section or its replacement.
+        // This also lets the regression fail on the mandatory gate before the UI changes.
+        if !app.buttons["Read Details"].exists {
+            settingsButton(app, named: "Privacy").tap()
+        }
+        withdrawConsent(app)
+    }
+
+    @MainActor
+    private func openPrivacy(_ app: XCUIApplication) {
+        tab(app, named: "Settings").tap()
+        settingsButton(app, named: "Privacy").tap()
+        XCTAssertTrue(app.navigationBars["Privacy"].waitForExistence(timeout: 5))
     }
 
     @MainActor
     private func settingsButton(_ app: XCUIApplication, named name: String) -> XCUIElement {
         let button = app.buttons[name]
-        let form = app.collectionViews.firstMatch
-        for _ in 0..<6 {
+        let form: XCUIElement
+        if app.navigationBars["Privacy"].exists && app.scrollViews.firstMatch.exists {
+            form = app.scrollViews.firstMatch
+        } else {
+            form = app.collectionViews.firstMatch.exists
+                ? app.collectionViews.firstMatch : app.scrollViews.firstMatch
+        }
+        for _ in 0..<10 {
             if button.exists && button.isHittable { return button }
             // Keep the gesture in the visible part of iPad's displaced sidebar.
             let start = form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.75))
@@ -121,7 +179,7 @@ final class InterceptorUITests: XCTestCase {
 
     @MainActor
     private func withdrawConsent(_ app: XCUIApplication) {
-        app.buttons["Withdraw Consent"].tap()
+        settingsButton(app, named: "Withdraw Consent").tap()
         let confirm = app.alerts.buttons["Withdraw Consent"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
@@ -137,18 +195,16 @@ final class InterceptorUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US",
                                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
         app.launch()
-        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        if app.buttons["Review and Agree"].exists {
-            app.buttons["Review and Agree"].tap()
-            app.buttons["Agree"].tap()
-        }
         let connection = app.switches["Connection Status"]
         addTeardownBlock { @MainActor in
             app.activate()
             if app.alerts.buttons["OK"].exists { app.alerts.buttons["OK"].tap() }
-            self.tab(app, named: "Settings").tap()
-            if app.buttons["Withdraw Consent"].exists { self.withdrawConsent(app) }
+            if !app.buttons["Agree"].exists {
+                self.openPrivacy(app)
+                self.withdrawConsent(app)
+            }
         }
         if connection.value as? String != "1" { try switchControl(app, row: connection).tap() }
         let connected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: connection)
@@ -188,12 +244,8 @@ final class InterceptorUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US",
                                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
         app.launch()
-        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        if app.buttons["Review and Agree"].exists {
-            app.buttons["Review and Agree"].tap()
-            app.buttons["Agree"].tap()
-        }
         let connection = app.switches["Connection Status"]
         XCTAssertTrue(connection.waitForExistence(timeout: 5))
         XCTAssertTrue(connection.isEnabled)
@@ -201,8 +253,10 @@ final class InterceptorUITests: XCTestCase {
         addTeardownBlock { @MainActor in
             app.activate()
             if app.alerts.buttons["OK"].exists { app.alerts.buttons["OK"].tap() }
-            self.tab(app, named: "Settings").tap()
-            if app.buttons["Withdraw Consent"].exists { self.withdrawConsent(app) }
+            if !app.buttons["Agree"].exists {
+                self.openPrivacy(app)
+                self.withdrawConsent(app)
+            }
         }
         if connection.value as? String == "1" {
             control.tap()
@@ -244,10 +298,10 @@ final class InterceptorUITests: XCTestCase {
         control.tap()
         let restarted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: connection)
         XCTAssertEqual(XCTWaiter.wait(for: [restarted], timeout: 20), .completed)
+        openPrivacy(app)
         withdrawConsent(app)
-        let revoked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0' AND enabled == false"), object: connection)
-        XCTAssertEqual(XCTWaiter.wait(for: [revoked], timeout: 15), .completed)
-        attachScreenshot(app, named: "Physical VPN stopped after withdrawal")
+        assertStartupConsent(app)
+        attachScreenshot(app, named: "Physical mandatory consent after withdrawal")
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         settings.launch()
         let vpnSettings = settings.buttons["com.apple.settings.vpn"]
@@ -274,12 +328,8 @@ final class InterceptorUITests: XCTestCase {
         }
         app.launch()
 
-        if app.buttons["Not Now"].waitForExistence(timeout: 3) { app.buttons["Not Now"].tap() }
+        agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        if app.buttons["Review and Agree"].exists {
-            app.buttons["Review and Agree"].tap()
-            app.buttons["Agree"].tap()
-        }
         settingsButton(app, named: "Set Up Capture").tap()
 
         // The simulator permits advancing through the device-only setup steps.
