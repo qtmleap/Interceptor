@@ -1137,6 +1137,18 @@
         }
       }
     },
+    "About Data Use" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "About Data Use" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "データ利用について" } }
+      }
+    },
+    "CONSENT_INTRODUCTION" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Before using the app, please review how your data is handled." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "利用前に、データの扱いをご確認ください。" } }
+      }
+    },
     "CONSENT_PURPOSE" : {
       "localizations" : {
         "en" : {
