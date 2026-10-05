@@ -1,6 +1,6 @@
-# App Review preparation — draft, 2026-10-04
+# App Review preparation — updated 2026-10-05
 
-These files prepare a replacement submission for App Store app 6749347474. Build 29 was uploaded on 2026-10-04, but has not been selected, submitted, or approved. Build 30 adds the revised consent settings UI; it has not been uploaded. Build 28's rejection and the reply sent on 2026-10-04 do not establish acceptance of the proposed changes.
+These files prepare a replacement submission for App Store app 6749347474. Build 29 was uploaded on 2026-10-04, but has not been selected, submitted, or approved. Build 30 adds the revised consent settings UI and was uploaded on 2026-10-05. Apple processing is VALID and internalBuildState is IN_BETA_TESTING; the existing internal Developer group has automatic access to all builds. External testing remains READY_FOR_BETA_SUBMISSION, and no external Beta App Review was submitted. Build 28's rejection and the reply sent on 2026-10-04 do not establish acceptance of the proposed changes.
 
 The description, promotional text, and keywords under `fastlane/metadata/en-US` and `fastlane/metadata/ja` were saved in App Store Connect on 2026-10-04. They have not been released. Their intended behavior must match the final archive. The current Fastfile uploads TestFlight builds, not these metadata files; this directory does not add an automatic publishing step.
 
@@ -57,6 +57,14 @@ The settings Form now shows consent status, a read-only disclosure sheet, and ex
 
 The current Simulator build passed 11 unit tests and 9 UI tests on iOS 26.5; the two physical-only tests skipped as intended. The consent lifecycle and landscape accessibility-size disclosure tests also passed on an iPad Air M2 Simulator running iPadOS 18.5. Local results: `/tmp/interceptor-ui-final-suite.xcresult` and `/tmp/interceptor-ui-ipad18-final.xcresult`. An independent code review found no actionable issues. VoiceOver and Split View were not exercised.
 
-Build 30 physical M2 UI verification is pending device unlock. The build 29 physical VPN/capture results above do not validate the new settings UI. Build 30 has not been uploaded or submitted to App Store Connect.
+Build 30 physical M2 UI verification has not been repeated. The build 29 physical VPN/capture results above do not validate the new settings UI. Build 30 has been uploaded to TestFlight; it has not been selected or submitted for App Store review.
 
 The consent-screen follow-up removes its custom bottom action band and uses system toolbar cancellation/confirmation actions (`Not Now` and `Agree`). The updated consent lifecycle passed on iOS 26.5 iPhone Simulator and iPadOS 18.5 M2 Simulator; the iPad landscape maximum-text-size disclosure test also passed. Results: `/tmp/interceptor-consent-toolbar-final.xcresult` (short title), `/tmp/interceptor-consent-toolbar-iphone.xcresult`, and `/tmp/interceptor-consent-toolbar-ipad.xcresult`. The preceding full-suite results apply to the settings implementation before this toolbar follow-up.
+
+## TestFlight build 30 — 2026-10-05
+
+Source: commit `618f19f8a77c186cbc713fec87291f27dc5126e9` on `codex/consent-settings-ui`. Fresh Xcode 27 unit tests passed: 11/11. The Release archive and Xcode App Store Connect upload completed successfully using the existing Xcode account. Both app and PacketTunnel bundle versions are 1.0.0 (30). Signature verification succeeded; non-exempt encryption is false and neither tracking-purpose strings, remote-notification background modes nor Firebase assets were present in the inspected bundles.
+
+Apple's authenticated build record confirms VALID, internal IN_BETA_TESTING and external READY_FOR_BETA_SUBMISSION. This establishes internal TestFlight availability, not external approval or App Store approval. The internal Developer group already has access to all builds; no testers were added, prior builds expired, or public link enabled by this upload.
+
+A supplemental M2 iPadOS 18.5 Simulator UI run was interrupted because the test-launch stage did not progress, even after the simulator booted successfully. It produced no new UI pass/fail result and is not counted as verification. Previously recorded consent UI results and CI refer to the same source commit; physical build 30 UI/VPN testing remains outstanding. Local archive and fresh unit evidence: `/tmp/Interceptor-testflight-30-20261005.xcarchive`, `/tmp/interceptor-testflight-20261005-unit.xcresult`. No credentials or binary artifacts are committed.
