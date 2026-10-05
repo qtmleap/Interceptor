@@ -12,34 +12,12 @@ import QuantumLeap
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject private var client: Tuberose
     @AppStorage(CaptureAuthorization.key, store: CaptureAuthorization.defaults) private var consentVersion = 0
     @State private var showSetup = false
-    @State private var consentPresentation: ConsentPresentation?
-    @State private var confirmWithdrawal = false
-
-    private enum ConsentPresentation: String, Identifiable {
-        case details, consent
-        var id: String { rawValue }
-    }
-
-    private var consentStatus: LocalizedStringKey {
-        if consentVersion == CaptureAuthorization.version { return "Consented" }
-        return consentVersion == 0 ? "Not Consented" : "Consent Required"
-    }
 
     var body: some View {
         Form(content: {
             QuantumLeap.Support()
-            Section("Data Use") {
-                LabeledContent("Consent Status") { Text(consentStatus).foregroundStyle(.secondary) }
-                Button("Read Details") { consentPresentation = .details }
-                if consentVersion == CaptureAuthorization.version {
-                    Button("Withdraw Consent", role: .destructive) { confirmWithdrawal = true }
-                } else {
-                    Button("Review and Agree") { consentPresentation = .consent }
-                }
-            }
             Section {
                 Button("Set Up Capture") { showSetup = true }
                     .disabled(consentVersion != CaptureAuthorization.version)
@@ -50,6 +28,7 @@ struct SettingsView: View {
             QuantumLeap.VPNSettingList()
             QuantumLeap.Tools()
             Section {
+                NavigationLink("Privacy") { DataUseDetailsView(showsWithdrawal: true) }
                 Link("Terms of Service", destination: URL(string: "https://qleap.jp/term/eula")!)
                 Link("Privacy Policy", destination: URL(string: "https://qleap.jp/term/interceptor_privacy_policy")!)
                 Link("Developers", destination: URL(string: "https://qleap.jp")!)
@@ -60,28 +39,6 @@ struct SettingsView: View {
             }
             QuantumLeap.Version()
         })
-        .sheet(item: $consentPresentation) { presentation in
-            NavigationStack {
-                switch presentation {
-                case .details:
-                    DataUseDetailsView()
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button("Close") { consentPresentation = nil }
-                            }
-                        }
-                case .consent:
-                    DataUseConsentView { _ in consentPresentation = nil }
-                        .interactiveDismissDisabled()
-                }
-            }
-        }
-        .alert("Withdraw Consent?", isPresented: $confirmWithdrawal) {
-            Button("Withdraw Consent", role: .destructive) { client.withdrawCaptureConsent() }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("CONSENT_WITHDRAW_CONFIRMATION")
-        }
         .fullScreenCover(isPresented: $showSetup) { FirstLaunchView() }
         .navigationTitle(Text("TITLE_SETTINGS"))
         .navigationBarTitleDisplayMode(.inline)

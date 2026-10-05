@@ -2,6 +2,8 @@
 
 Source draft prepared 2026-10-04. An adapted bilingual policy was published on qleap.jp on 2026-10-04; use the public page as the authoritative published text. This source describes the revised release, not rejected build 28.
 
+Draft updated 2026-10-06 for the proposed mandatory startup consent flow. This update has not been submitted to Apple or published to the public policy page. Uploaded build 30 retains the previous consent flow; verify the replacement build before using this draft.
+
 Developer: Interceptor developer (qtmleap). The App Store legal developer entity has not been reconciled with the website business information.
 Privacy contact: https://qleap.jp/support (existing public support path).
 Published public policy URL: https://qleap.jp/term/interceptor_privacy_policy.
@@ -27,7 +29,7 @@ Earlier app versions may have saved synchronizable Keychain data. Disabling new 
 
 ### Consent and controls
 
-The app explains these uses and asks for consent before certificate setup or capture. You may decline and still browse the app. You may withdraw consent in Settings; this stops capture and blocks automatic restart until you consent again. Withdrawal does not delete saved records, saved tokens, older cloud copies, or certificate profiles.
+At startup, if you have not agreed to the current version of the data-use notice, the app presents a full-screen consent view that cannot be dismissed to access the main interface. Agreeing dismisses this view; without agreement, the main interface remains unavailable. Agreement does not start capture, install or trust a certificate, install a VPN configuration, or request notification permission. These remain separate user actions. You may read the notice and withdraw consent in Settings → Privacy. Withdrawal stops the VPN, disables automatic reconnection and clears capture notifications, and returns the app to the required consent view until you agree again. Withdrawal does not delete saved records, saved tokens, older cloud copies, certificates, or private keys, and does not remove installed certificate profiles.
 
 Use Home's Clear action to delete the app's saved request history. This action does not claim to delete separately stored Keychain tokens or certificates. Data can remain until you delete it through an applicable control, and prior backups or manually copied data may remain separately. To end the certificate's trust and remove its installed profile, use iOS Settings; remove the VPN configuration there when no longer needed. Revoking or rotating a Nintendo session/token requires Nintendo's account or service controls.
 
@@ -57,7 +59,7 @@ Interceptorは、iOSのVPN設定と端末内のプロキシを使い、自分の
 
 ### 同意と操作
 
-証明書の設定や通信の取得を始める前に、アプリ内で用途を説明して同意を求めます。同意しなくてもアプリ内を閲覧できます。設定から同意を撤回すると取得を停止し、再び同意するまで自動再開しません。撤回だけでは、保存済みの通信記録、トークン、過去のクラウド上のコピー、証明書プロファイルは削除されません。
+起動時に現在のバージョンのデータ利用説明への同意がない場合、閉じてメイン画面へ進むことのできない全画面の同意画面を表示します。「同意する」を選ぶとこの画面が閉じます。同意するまではメイン画面を利用できません。同意しただけで通信の取得、証明書のインストールや信頼、VPN設定のインストール、通知の許可要求は行いません。これらは、それぞれ別の利用者の操作で行います。設定の「プライバシー」から説明を再確認し、同意を撤回できます。撤回するとVPNを停止し、自動再接続を無効にし、取得通知を消去して、再び同意するまで必須の同意画面を表示します。撤回だけでは、保存済みの通信記録、トークン、過去のクラウド上のコピー、証明書、秘密鍵や、インストールした証明書プロファイルは削除されません。
 
 通信履歴はホームの消去操作で削除できます。この操作で、別に保存されたKeychainのトークンや証明書も削除されるとは限りません。該当する削除操作を行うまでデータが残ることがあり、過去のバックアップや自分でコピーしたデータは別に残る場合があります。証明書の信頼を停止してプロファイルを削除する場合や、VPN設定が不要になった場合は、iOSの設定から操作してください。任天堂のセッションやトークンを無効化・更新する場合は、任天堂のアカウントやサービスの操作が必要です。
 
