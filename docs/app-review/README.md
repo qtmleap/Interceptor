@@ -1,10 +1,10 @@
-# App Review preparation — draft, 2026-10-04
+# App Review preparation — updated 2026-10-05
 
-These files prepare a replacement submission for App Store app 6749347474. Build 29 has not been uploaded, submitted, or approved. Build 28's rejection and the reply sent on 2026-10-04 do not establish acceptance of the proposed changes.
+These files prepare a replacement submission for App Store app 6749347474. Build 29 was uploaded on 2026-10-04, but has not been selected, submitted, or approved. Build 30 adds the revised consent settings UI and was uploaded on 2026-10-05. Apple processing is VALID and internalBuildState is IN_BETA_TESTING; the existing internal Developer group has automatic access to all builds. External testing remains READY_FOR_BETA_SUBMISSION, and no external Beta App Review was submitted. Build 28's rejection and the reply sent on 2026-10-04 do not establish acceptance of the proposed changes.
 
 The description, promotional text, and keywords under `fastlane/metadata/en-US` and `fastlane/metadata/ja` were saved in App Store Connect on 2026-10-04. They have not been released. Their intended behavior must match the final archive. The current Fastfile uploads TestFlight builds, not these metadata files; this directory does not add an automatic publishing step.
 
-`review-notes-draft.md` describes the review flow and evidence still required. `privacy-policy-draft.md` contains the policy source text. The app-specific policy is now public on qleap.jp, with its existing public support page as the contact route. The app links to it; the App Store Connect policy URL has been updated in Japanese and English, and App Privacy now displays Data Not Collected for the proposed release. The currently selected old build still triggers an ATT-purpose-string warning; upload/select build 29 before review.
+`review-notes-draft.md` describes the review flow and evidence still required. `privacy-policy-draft.md` contains the policy source text. The app-specific policy is now public on qleap.jp, with its existing public support page as the contact route. The app links to it; the App Store Connect policy URL has been updated in Japanese and English, and App Privacy now displays Data Not Collected for the proposed release. The currently selected old build still triggers an ATT-purpose-string warning; select a verified replacement build before review.
 
 ## Checks before using the drafts
 
@@ -50,3 +50,37 @@ After the test selector changes, the simulator build and consent lifecycle test 
 M2 evidence: [captured request list](evidence/physical-m2-capture.png). It shows request methods, status codes, generic endpoint paths and locale parameters, including successful bullet-token requests; no token values, cookies, account identifiers, or response bodies are displayed. Account and native-settings diagnostics remain private local files.
 
 The App Privacy classification follows [Apple’s data-collection definition](https://developer.apple.com/app-store/app-privacy-details/): local processing is not collected data for the label. This does not mean the app does not access sensitive local traffic; the in-app notice and public policy disclose that access and the original Nintendo request flow.
+
+## Build 30 consent settings UI verification
+
+The settings Form now shows consent status, a read-only disclosure sheet, and explicit consent or withdrawal actions. Valid consent persists across relaunch. Withdrawal requires confirmation; cancelling preserves consent, and confirming requests VPN shutdown, disables automatic reconnection, and clears notifications. Reading or closing the disclosure does not change authorization.
+
+The current Simulator build passed 11 unit tests and 9 UI tests on iOS 26.5; the two physical-only tests skipped as intended. The consent lifecycle and landscape accessibility-size disclosure tests also passed on an iPad Air M2 Simulator running iPadOS 18.5. Local results: `/tmp/interceptor-ui-final-suite.xcresult` and `/tmp/interceptor-ui-ipad18-final.xcresult`. An independent code review found no actionable issues. VoiceOver and Split View were not exercised.
+
+Build 30 physical M2 UI verification has not been repeated. The build 29 physical VPN/capture results above do not validate the new settings UI. Build 30 has been uploaded to TestFlight; it has not been selected or submitted for App Store review.
+
+The historical build 30 consent-screen follow-up removes its custom bottom action band and uses system toolbar cancellation/confirmation actions (`Not Now` and `Agree`). The updated consent lifecycle passed on iOS 26.5 iPhone Simulator and iPadOS 18.5 M2 Simulator; the iPad landscape maximum-text-size disclosure test also passed. Results: `/tmp/interceptor-consent-toolbar-final.xcresult` (short title), `/tmp/interceptor-consent-toolbar-iphone.xcresult`, and `/tmp/interceptor-consent-toolbar-ipad.xcresult`. The preceding full-suite results apply to the settings implementation before this toolbar follow-up.
+
+## TestFlight build 30 — 2026-10-05
+
+Source: commit `618f19f8a77c186cbc713fec87291f27dc5126e9` on `codex/consent-settings-ui`. Fresh Xcode 27 unit tests passed: 11/11. The Release archive and Xcode App Store Connect upload completed successfully using the existing Xcode account. Both app and PacketTunnel bundle versions are 1.0.0 (30). Signature verification succeeded; non-exempt encryption is false and neither tracking-purpose strings, remote-notification background modes nor Firebase assets were present in the inspected bundles.
+
+Apple's authenticated build record confirms VALID, internal IN_BETA_TESTING and external READY_FOR_BETA_SUBMISSION. This establishes internal TestFlight availability, not external approval or App Store approval. The internal Developer group already has access to all builds; no testers were added, prior builds expired, or public link enabled by this upload.
+
+A supplemental M2 iPadOS 18.5 Simulator UI run was interrupted because the test-launch stage did not progress, even after the simulator booted successfully. It produced no new UI pass/fail result and is not counted as verification. Previously recorded consent UI results and CI refer to the same source commit; physical build 30 UI/VPN testing remains outstanding. Local archive and fresh unit evidence: `/tmp/Interceptor-testflight-30-20261005.xcarchive`, `/tmp/interceptor-testflight-20261005-unit.xcresult`. No credentials or binary artifacts are committed.
+
+
+## Required startup consent — 2026-10-06
+
+The working tree now requires agreement to the current notice before constructing Home or Settings. A root full-screen cover has no cancellation action and blocks interactive dismissal. Agree saves the shared authorization and reveals the app; valid consent persists across relaunch. A legacy decision flag cannot bypass revoked authorization. Settings no longer has a Data Use section: Settings → Privacy holds the disclosure and confirmed withdrawal, which stops capture, disables automatic reconnection, clears capture notifications, and returns to the required cover.
+
+The regression first failed on the old implementation because withdrawal did not return to consent. Native Xcode 27 verification passed 11 unit tests and three selected iPhone Simulator UI tests (lifecycle, landscape maximum text size, and setup/navigation). The final localized-title and stricter selector follow-up passed both lifecycle and maximum-text-size landscape tests on the M2 iPadOS 18.5 Simulator. Results: `/tmp/interceptor-mandatory-consent-green.xcresult` and `/tmp/interceptor-mandatory-consent-ipad.xcresult`. Japanese startup screenshots were visually checked on both simulator sizes. Independent Claude reviews found no remaining blocking code findings; LocalGPT could not complete a review because its response job failed with `draft_unsupported`.
+
+This source has not been uploaded or submitted. Uploaded TestFlight build 30 retains the previous consent behavior. Current public-policy and store-description changes remain drafts; the published qleap.jp policy must be reconciled before submitting a replacement build. VoiceOver, Split View, and this change on physical devices have not been verified. The obsolete build 30 physical test waiting for M2 unlock was cancelled; it did not produce a completed result.
+
+
+## Consent cards — 2026-10-06
+
+The approved A concept is now the startup disclosure: an SF Symbols badge, localized “About Data Use” heading (“データ利用について”), and five icon cards. The five English/Japanese disclosure bodies are unchanged. Consent and withdrawal behavior is unchanged; Settings → Privacy keeps the plain disclosure. Semantic grouped backgrounds follow system appearance, decorative icons are hidden from accessibility, and card headings stack below their icons at accessibility text sizes.
+
+The consent lifecycle and landscape maximum-text-size tests passed on both the iPhone iOS 26.5 Simulator and M2 iPadOS 18.5 Simulator (four UI test executions). Results: `/tmp/interceptor-consent-cards-iphone.xcresult` and `/tmp/interceptor-consent-cards-ipad.xcresult`. Japanese startup screenshots on both sizes and iPhone dark appearance were visually checked. Independent Claude plan and actual-diff reviews found no blocking code findings. This is source verification; no replacement TestFlight upload or physical-device verification was performed for this visual change.

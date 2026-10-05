@@ -1,0 +1,25 @@
+Interceptor 1.0.0 (31)
+
+This submission addresses the in-app disclosure requested in your October 5 reply about Guideline 5.5.
+
+At startup, Data Use / About Data Use explains the purpose, sensitive data recorded, storage/sharing, certificate/VPN setup and withdrawal before access to the main interface. Agree saves explicit consent; it does not start capture, install/trust a certificate or VPN, or request notifications. Without agreement the notice remains. Settings > Privacy provides the disclosure and Withdraw Consent, which stops capture, disables automatic reconnection, clears capture notifications and returns to the notice.
+
+Interceptor inspects selected Nintendo-related HTTPS hosts on the user's device. The packet-tunnel-provider entitlement routes traffic through a local proxy at 127.0.0.1:6836. Certificate download is served at http://127.0.0.1:8888. It provides an X.509 CA certificate for manual installation and trust, not MDM enrollment. There is no remote device administration or remote VPN server. Please clarify if an MDM entitlement is still required for this certificate-only and Network Extension setup.
+
+Inspection reads requests/responses that may contain headers, cookies, tokens, account identifiers and bodies. New records use local App Group storage; new tokens, certificates and keys use non-synchronizing Keychain items. Captured records are not uploaded to developer servers, sold, used for advertising or automatically shared. Original requests still reach Nintendo. Manual copying, old cloud copies and OS backups are separate flows described in the notice and public policy. Withdrawal does not delete saved data or certificate/VPN profiles.
+
+Firebase, App Check, Messaging, remote push registration and ATT prompts were removed. Optional local notifications contain a generic message and a local record identifier, not captured headers, bodies, cookies or tokens. Records are saved and viewable without notification permission. Nintendo app installation and notification permission no longer block setup.
+
+Review steps (English labels):
+1. Launch, read Data Use and choose Agree. No Interceptor login is required.
+2. Settings > Set Up Capture: Next is available on the optional Nintendo app and notification steps without installing the app or allowing notifications.
+3. Download the certificate; install it in iOS Settings > General > VPN & Device Management and enable full trust under General > About > Certificate Trust Settings. Return to setup, install the VPN configuration and approve the system prompt.
+4. Enable Settings > Connection Status. SSL Proxying List shows the configured hosts.
+5. An anonymous browser request to https://api.lp1.av5ja.srv.nintendo.net/__interceptor_review_probe_build31 can generate traffic for inspection. An HTTP error for this nonexistent path is expected. Return to Home to inspect the host/path. Token extraction also requires the user's own authorized Nintendo service account; no Nintendo credentials are entered into Interceptor or supplied as a test account.
+6. Settings > Privacy > Withdraw Consent stops capture and returns to the required notice, including after relaunch. Home's Clear deletes request history, separately from tokens and profiles.
+7. Remove certificate profiles or VPN configuration in iOS Settings > General > VPN & Device Management when needed.
+
+Verification: consent/relaunch/large-text UI passed on iPhone and M2 iPad simulators. The optional-step fix compiled for the device Release target. Capture, token extraction and VPN stop/restart passed on physical M2 on an earlier build; the current UI has not been reverified physically. Recorded physical probe tests used URLSession; the browser path is a suggested review procedure.
+
+Policy: https://qleap.jp/term/interceptor_privacy_policy
+Support: https://qleap.jp/support

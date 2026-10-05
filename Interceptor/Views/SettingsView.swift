@@ -12,7 +12,6 @@ import QuantumLeap
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject private var client: Tuberose
     @AppStorage(CaptureAuthorization.key, store: CaptureAuthorization.defaults) private var consentVersion = 0
     @State private var showSetup = false
 
@@ -20,7 +19,6 @@ struct SettingsView: View {
         Form(content: {
             QuantumLeap.Support()
             Section {
-                NavigationLink("Data Use and Consent") { DataUseConsentView() }
                 Button("Set Up Capture") { showSetup = true }
                     .disabled(consentVersion != CaptureAuthorization.version)
                 Button("Capture Notifications") {
@@ -30,6 +28,7 @@ struct SettingsView: View {
             QuantumLeap.VPNSettingList()
             QuantumLeap.Tools()
             Section {
+                NavigationLink("Privacy") { DataUseDetailsView(showsWithdrawal: true) }
                 Link("Terms of Service", destination: URL(string: "https://qleap.jp/term/eula")!)
                 Link("Privacy Policy", destination: URL(string: "https://qleap.jp/term/interceptor_privacy_policy")!)
                 Link("Developers", destination: URL(string: "https://qleap.jp")!)
