@@ -1,0 +1,26 @@
+Draft — do not send until build 30 physical verification completes. The Safari probe procedure below still needs direct validation; existing probe tests use URLSession. Current M2 run is waiting for device unlock.
+
+Interceptor 1.0.0 (30) — replacement for build 28
+
+Guideline 5.5: the app now presents Data Use before certificate setup or capture. It explains purpose, data recorded, storage/sharing, certificate/VPN behavior and the user's choices. Agree is explicit. Not Now leaves browsing available but disables capture. Settings > Data Use > Review and Agree reopens authorization; Read Details is read-only. Withdraw Consent stops capture and disables automatic restart until renewed agreement.
+
+This is a local HTTPS inspection tool for configured Nintendo-related hosts, not a remote VPN service. The packet tunnel uses a proxy at 127.0.0.1:6836 on the same device. The locally generated certificate profile must be installed and trusted manually in iOS Settings. No remote device administration is performed.
+
+Recorded traffic can contain headers, cookies, authentication tokens, account identifiers and bodies. It is processed to show request/response records and supported service tokens. New records use local App Group storage; new tokens, certificates and keys use non-synchronizing Keychain items. Captured records are not uploaded to developer servers, sold, used for advertising or automatically shared. Original requests still go to Nintendo. User-initiated copying, previous iCloud copies and OS backups are separate flows described in the policy. Withdrawal does not erase saved records or remove profiles.
+
+Firebase, App Check, Messaging, remote push registration and ATT permission requests have been removed. Capture Notifications are optional local notifications with generic content, without captured headers, bodies, cookies or tokens. Notification permission is not required to inspect stored results.
+
+Review steps (English labels):
+1. Launch and read Data Use before setup. Choose Not Now; Settings > Connection Status must be disabled.
+2. Choose Settings > Data Use > Review and Agree, then Agree.
+3. Open Set Up Capture. Download the local certificate profile, install it in iOS Settings and enable full trust under General > About > Certificate Trust Settings. Return to setup and Install VPN Configuration; approve the system prompt.
+4. Enable Settings > Connection Status. SSL Proxying List shows the configured hosts.
+5. No Interceptor account is needed. To inspect an anonymous request without a Nintendo login, visit https://api.lp1.av5ja.srv.nintendo.net/__interceptor_review_probe_build30 in Safari. An HTTP error for this nonexistent path is expected. Return to Home, select that host and find the probe path in the stored requests. Use a different probe suffix for another run.
+6. Supported service token extraction additionally requires the user's own authorized Nintendo account and Nintendo Switch App. No Nintendo credentials are entered into Interceptor. No third-party test account is supplied.
+7. Withdraw Consent and confirm. Connection stops and stays disabled after relaunch. Existing records remain. Home's Clear action deletes request history, separately from Keychain tokens.
+8. To remove the certificate profile or VPN configuration, use iOS Settings > General > VPN & Device Management. Withdrawal alone does not uninstall them.
+
+Policy: https://qleap.jp/term/interceptor_privacy_policy
+Support: https://qleap.jp/support
+
+日本語: ビルド30は証明書設定・通信取得前にアプリ内で用途、機密情報を含む取得データ、保存先と送信、証明書/VPN、同意と撤回を説明します。同意しなくても閲覧できます。撤回すると取得と自動再開を停止します。端末内解析でも本来の任天堂宛通信は継続します。上記の匿名リクエストはログイン不要で、実際のサービスのトークン取得には利用者自身の任天堂アカウントが必要です。
