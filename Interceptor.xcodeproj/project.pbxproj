@@ -849,7 +849,7 @@
 			repositoryURL = "https://github.com/qtmleap/QuantumLeap.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.4;
+				minimumVersion = 1.0.0;
 			};
 		};
 		10FBBF2B2E522C5E00CC57B0 /* XCRemoteSwiftPackageReference "Runestone" */ = {
