@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: qtmleap/Mudmouth
-          ref: 5c97774f645023b22366db5abe86797915da2d33
+          ref: 3c1468aaaea5140835982bc8e38c9d3bfc49d2a0
           path: Mudmouth
           persist-credentials: false
 
