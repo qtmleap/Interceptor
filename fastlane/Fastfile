@@ -13,27 +13,69 @@
 # Uncomment the line if you want fastlane to automatically update itself
 # update_fastlane
 
-default_platform(:ios)
+require_relative "lib/testflight_config"
 
-before_all do |lane, options|
-  if lane == :beta && ENV["ENVIRONMENT"] == "CI"
-    setup_ci(provider: ENV["SETUP_CI_PROVIDER"])
-  end
-end
+default_platform(:ios)
 
 platform :ios do
   desc "Push a new beta build to TestFlight"
   lane :beta do
-    # scan
-    fetch_testflight_profile
-    increment_build_number(xcodeproj: "Interceptor.xcodeproj")
-    build_app(scheme: "Interceptor", xcargs: "-allowProvisioningUpdates", clean: true)
-    upload_to_testflight(
-      skip_waiting_for_build_processing: true,
-      demo_account_required: false,
-      notify_external_testers: false,
-      expire_previous_builds: true
+    TestFlightConfig.validate_credentials!(ENV)
+    api_key = asc_api_key
+    version = get_version_number(xcodeproj: "Interceptor.xcodeproj", target: "Interceptor")
+    local_number = get_build_number(xcodeproj: "Interceptor.xcodeproj")
+    remote_number = latest_testflight_build_number(
+      api_key: api_key,
+      app_identifier: TestFlightConfig::APP_IDENTIFIER,
+      version: version,
+      initial_build_number: 0
     )
+    build_number = TestFlightConfig.next_build_number(local: local_number, remote: remote_number)
+    fetch_testflight_profile
+    profiles = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING]
+    TestFlightConfig.signing_targets(profiles).each do |target, profile|
+      update_code_signing_settings(
+        path: "Interceptor.xcodeproj",
+        targets: [target],
+        build_configurations: ["Release"],
+        use_automatic_signing: false,
+        team_id: TestFlightConfig::TEAM_ID,
+        code_sign_identity: "Apple Distribution",
+        profile_name: profile
+      )
+    end
+    increment_build_number(build_number: build_number, xcodeproj: "Interceptor.xcodeproj")
+    output_path = ENV.fetch("RELEASE_OUTPUT_PATH", "build")
+    ipa = build_app(
+      project: "Interceptor.xcodeproj",
+      scheme: "Interceptor",
+      configuration: "Release",
+      clean: true,
+      export_method: "app-store",
+      export_team_id: TestFlightConfig::TEAM_ID,
+      export_options: {signingStyle: "manual", provisioningProfiles: profiles},
+      cloned_source_packages_path: ENV["PLL_SOURCE_PACKAGES_PATH"],
+      derived_data_path: ENV["RELEASE_DERIVED_DATA_PATH"],
+      output_directory: output_path,
+      archive_path: File.join(output_path, "Interceptor.xcarchive"),
+      buildlog_path: File.join(output_path, "logs"),
+      xcargs: "-packageAuthorizationProvider netrc -onlyUsePackageVersionsFromResolvedFile -skipPackagePluginValidation"
+    )
+    # Transporter writes AuthKey_<id>.p8 under HOME. Keep that file in the
+    # per-run private directory rather than the self-hosted runner's real home.
+    TestFlightConfig.with_upload_home(ENV.fetch("RELEASE_UPLOAD_HOME")) do
+      upload_to_testflight(
+        api_key: api_key,
+        app_identifier: TestFlightConfig::APP_IDENTIFIER,
+        ipa: ipa,
+        skip_waiting_for_build_processing: false,
+        wait_processing_timeout_duration: 1800,
+        demo_account_required: false,
+        distribute_external: false,
+        notify_external_testers: false,
+        expire_previous_builds: false
+      )
+    end
   end
 
   desc "Fetch TestFlight profile and cert"
@@ -42,11 +84,10 @@ platform :ios do
     match(
       api_key: api_key,
       type: "appstore",
-      app_identifier: [
-        "jp.qleap.intrcptr",
-        "jp.qleap.intrcptr.packet-tunnel",
-      ],
-      readonly: ENV["MATCH_FETCH_READ_ONLY_MODE"]
+      app_identifier: TestFlightConfig::TARGETS.values,
+      readonly: true,
+      keychain_name: ENV["MATCH_KEYCHAIN_NAME"],
+      keychain_password: ENV["MATCH_KEYCHAIN_PASSWORD"]
     )
   end
 

@@ -2,19 +2,42 @@ name: iOS Simulator
 
 on:
   pull_request:
-    branches: [master]
+    branches: [master, develop]
   push:
-    branches: [master]
+    branches: [master, develop]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  # Keep simulator verification and the signing build on the same package commit.
+  MUDMOUTH_REV: 3c1468aaaea5140835982bc8e38c9d3bfc49d2a0
+
 concurrency:
-  group: ios-${{ github.workflow }}-${{ github.ref }}
+  # Every develop push must reach the deployment queue. PR runs still supersede
+  # older tests, but separate develop pushes must not cancel one another.
+  group: ios-${{ github.workflow }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' && github.run_id || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  release_checks:
+    name: Validate TestFlight automation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Validate release configuration and cleanup
+        run: |
+          ruby -c fastlane/Fastfile
+          ruby fastlane/test/testflight_config_test.rb
+          python3 -m unittest discover -s scripts/tests -v
+          bash -n scripts/ci-testflight.sh
+
   simulator:
     name: Build and test (Xcode 27)
     runs-on: xcode-27
@@ -33,7 +56,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: qtmleap/Mudmouth
-          ref: 3c1468aaaea5140835982bc8e38c9d3bfc49d2a0
+          ref: ${{ env.MUDMOUTH_REV }}
           path: Mudmouth
           persist-credentials: false
 
@@ -112,3 +135,59 @@ jobs:
             ${{ runner.temp }}/xcodebuild-sample-*.txt
           if-no-files-found: ignore
           retention-days: 7
+
+  testflight:
+    name: Deploy to TestFlight
+    needs: [simulator, release_checks]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: xcode-27
+    timeout-minutes: 90
+    environment: testflight
+    concurrency:
+      group: interceptor-testflight
+      cancel-in-progress: false
+      queue: max
+    defaults:
+      run:
+        working-directory: Interceptor
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: Interceptor
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: qtmleap/Mudmouth
+          ref: ${{ env.MUDMOUTH_REV }}
+          path: Mudmouth
+          persist-credentials: false
+      - name: Select Ruby on the self-hosted Mac
+        run: |
+          if ! brew list --versions ruby@3.3 >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ruby@3.3
+          fi
+          echo "$(brew --prefix ruby@3.3)/bin" >> "$GITHUB_PATH"
+          echo "GEM_HOME=$RUNNER_TEMP/testflight-gems" >> "$GITHUB_ENV"
+          echo "GEM_PATH=$RUNNER_TEMP/testflight-gems" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/testflight-gems/bin" >> "$GITHUB_PATH"
+          echo "BUNDLE_PATH=$RUNNER_TEMP/testflight-bundle" >> "$GITHUB_ENV"
+          echo "BUNDLE_FROZEN=true" >> "$GITHUB_ENV"
+      - name: Install locked fastlane dependencies
+        run: |
+          ruby --version
+          gem install bundler -v 2.6.9 --no-document
+          bundle _2.6.9_ install
+      - name: Archive and upload the tested commit
+        env:
+          QUANTUMLEAP_READ_TOKEN: ${{ secrets.QUANTUMLEAP_READ_TOKEN }}
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+        run: bash scripts/ci-testflight.sh
+      - name: Remove per-job Ruby dependencies
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/testflight-gems" "$RUNNER_TEMP/testflight-bundle"

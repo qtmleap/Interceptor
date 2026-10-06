@@ -177,3 +177,6 @@ GoogleService-Info.plist
 .env
 .env.*
 !.env.example
+
+# Release automation test artifacts
+__pycache__/
