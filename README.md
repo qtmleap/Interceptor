@@ -1,5 +1,62 @@
 ## Interceptor
 
+### Automatic TestFlight deployment
+
+Pushes to `develop` (including merged pull requests) run the simulator and release
+automation checks. If both succeed, the same commit is archived and uploaded to
+TestFlight. Pull requests and `master` pushes run checks only. App Store submission
+and external beta review are separate release actions.
+
+Deployments are serialized with GitHub Actions `queue: max`; up to 100 pending
+deployments can wait without replacing earlier pending runs. Build numbers start
+after the maximum of the project number, the latest TestFlight number for the
+marketing version, and the previously uploaded build 31. The job waits for Apple
+to finish processing before releasing the deployment queue. A failed processing
+step must be investigated before retrying; the upload may already exist on Apple.
+
+Configure these repository secrets (or secrets in the `testflight` environment):
+
+| Secret | Purpose |
+| --- | --- |
+| `QUANTUMLEAP_READ_TOKEN` | Read the private QuantumLeap Swift package; already used by simulator CI. |
+| `APP_STORE_CONNECT_API_KEY_KEY_ID` | App Store Connect API key ID. |
+| `APP_STORE_CONNECT_API_KEY_ISSUER_ID` | App Store Connect API issuer ID. |
+| `APP_STORE_CONNECT_API_KEY_KEY` | Base64-encoded contents of the API key's `.p8` file. |
+| `MATCH_PASSWORD` | Password for encrypted signing assets in `qtmleap/match`. |
+| `MATCH_GIT_BASIC_AUTHORIZATION` | Base64-encoded `github-user:read-token`, with access to `qtmleap/match`. |
+
+Use an App Manager API key with access to Interceptor. The upload uses the official
+App Store Connect API and does not require an Apple ID browser session or 2FA.
+Keep keys, passwords, and tokens outside this repository. Register secrets through
+GitHub's secret settings or `gh secret set` using file/stdin input.
+
+The signing repository must contain a valid App Store distribution certificate
+and private key, plus App Store profiles for `jp.qleap.intrcptr` and
+`jp.qleap.intrcptr.packet-tunnel` with the app's required entitlements. The lane
+reads existing assets only; it does not create certificates or profiles.
+
+The `xcode-27` runner must have Xcode 27 and Homebrew. The deployment job selects
+Homebrew Ruby 3.3 and installs the checked-in Gemfile.lock with Bundler 2.6.9.
+Use a dedicated macOS runner account: signing temporarily changes its keychain
+search list and `.netrc`. Both are restored by the release wrapper, including on
+failure. Its private working directory contains the temporary signing keychain,
+Transporter key files, archive output, and package checkouts and is removed on exit.
+Other signing jobs must not use that account concurrently. For automatic delivery,
+the `testflight` environment must allow `develop` deployments without a required
+manual reviewer. Protect `develop` so changes enter through reviewed pull requests.
+
+Validate the release automation locally without Apple credentials:
+
+```sh
+ruby fastlane/test/testflight_config_test.rb
+python3 -m unittest discover -s scripts/tests -v
+bash -n scripts/ci-testflight.sh
+```
+
+The actual upload is performed by `bash scripts/ci-testflight.sh`, with the same
+credentials supplied via environment variables. This command uploads a build;
+the checks above do not contact Apple.
+
 This is an iOS application that uses a self-signed certificate to obtain an access token from Nintendo Switch Online.
 
 ### Requirements
