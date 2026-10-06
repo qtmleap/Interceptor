@@ -32,6 +32,30 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
+    func testHowToUseCanCloseAndReopen() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        agreeIfNeeded(app)
+        tab(app, named: "Settings").tap()
+        for _ in 0..<2 {
+            settingsButton(app, named: "How to Use").tap()
+            XCTAssertTrue(app.buttons["Next"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["Close"].isHittable)
+            attachScreenshot(app, named: "How to Use sheet")
+            app.buttons["Close"].tap()
+            XCTAssertTrue(app.buttons["Next"].waitForNonExistence(timeout: 5))
+            XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["Agree"].exists)
+        }
+        settingsButton(app, named: "Set Up Capture").tap()
+        XCTAssertTrue(app.buttons["Next"].waitForExistence(timeout: 5))
+        app.buttons["Close"].tap()
+        XCTAssertTrue(app.buttons["Next"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testCaptureConsentLifecycle() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US",
@@ -348,15 +372,13 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
         let autoConnect = app.switches["Auto Connect"]
         XCTAssertTrue(autoConnect.waitForExistence(timeout: 5))
-        let initialValue = try XCTUnwrap(autoConnect.value as? String)
-        // SwiftUI exposes the labeled row as the switch's accessibility frame.
-        // Tap the trailing control rather than the center of the row's label.
-        let control = autoConnect.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
+        let control = try switchControl(app, row: autoConnect)
+        let initialValue = try XCTUnwrap(control.value as? String)
         control.tap()
-        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", initialValue), object: autoConnect)
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", initialValue), object: control)
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed)
         control.tap()
-        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", initialValue), object: autoConnect)
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", initialValue), object: control)
         XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 5), .completed)
         attachScreenshot(app, named: "Settings")
 
@@ -365,16 +387,26 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["api.lp1.av5ja.srv.nintendo.net"].exists)
         XCTAssertTrue(app.staticTexts["app.splatoon2.nintendo.net"].exists)
         attachScreenshot(app, named: "Proxy Hosts")
-        app.navigationBars.buttons.firstMatch.tap()
+        returnFromSettingsDetail(app)
 
         settingsButton(app, named: "Token List").tap()
         XCTAssertTrue(app.navigationBars["Token List"].waitForExistence(timeout: 5))
         attachScreenshot(app, named: "Token List")
-        app.navigationBars.buttons.firstMatch.tap()
+        returnFromSettingsDetail(app)
 
         settingsButton(app, named: "Certificate").tap()
         XCTAssertTrue(app.navigationBars["Certificate"].waitForExistence(timeout: 5))
-        app.navigationBars.buttons.firstMatch.tap()
+        returnFromSettingsDetail(app)
+        settingsButton(app, named: "Licenses").tap()
+        XCTAssertTrue(app.navigationBars["Licenses"].waitForExistence(timeout: 5))
+        attachScreenshot(app, named: "Licenses detail title")
+        let license = app.staticTexts["BetterSafariView"].firstMatch
+        XCTAssertTrue(license.waitForExistence(timeout: 5))
+        license.tap()
+        XCTAssertTrue(app.navigationBars["BetterSafariView"].waitForExistence(timeout: 5))
+        attachScreenshot(app, named: "Individual license inline title")
+        app.navigationBars.buttons["Licenses"].firstMatch.tap()
+        returnFromSettingsDetail(app)
         tab(app, named: "Home").tap()
 
         app.navigationBars.buttons.firstMatch.tap()
@@ -386,6 +418,15 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(tab(app, named: "Home").waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Next"].exists, "Completed onboarding must remain dismissed after relaunch")
+    }
+
+    @MainActor
+    private func returnFromSettingsDetail(_ app: XCUIApplication) {
+        // iPad replaces the secondary root while keeping Settings visible in the sidebar.
+        // iPhone pushes the destination and exposes Settings as its back button.
+        let back = app.navigationBars.buttons["Settings"].firstMatch
+        if back.exists { back.tap() }
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
     }
 
     @MainActor

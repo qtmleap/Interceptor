@@ -18,6 +18,7 @@ struct SettingsView: View {
     var body: some View {
         Form(content: {
             QuantumLeap.Support()
+                .environment(\.isFirstLaunch, $showSetup)
             Section {
                 Button("Set Up Capture") { showSetup = true }
                     .disabled(consentVersion != CaptureAuthorization.version)
@@ -33,13 +34,17 @@ struct SettingsView: View {
                 Link("Privacy Policy", destination: URL(string: "https://qleap.jp/term/interceptor_privacy_policy")!)
                 Link("Developers", destination: URL(string: "https://qleap.jp")!)
                 NavigationLink("Licenses") {
-                    LicenseListView().licenseViewStyle(.withRepositoryAnchorLink)
+                    LicenseListView().licenseViewStyle(InlineRepositoryLicenseViewStyle())
                         .navigationTitle("Licenses")
+                        .navigationBarTitleDisplayMode(.inline)
                 }
             }
             QuantumLeap.Version()
         })
-        .fullScreenCover(isPresented: $showSetup) { FirstLaunchView() }
+        .sheet(isPresented: $showSetup) {
+            FirstLaunchView()
+                .presentationDetents([.large])
+        }
         .navigationTitle(Text("TITLE_SETTINGS"))
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -49,4 +54,13 @@ struct SettingsView: View {
     ContentView()
         .environmentIsFirstLaunch()
         .environmentObject(Tuberose.default)
+}
+
+private struct InlineRepositoryLicenseViewStyle: LicenseViewStyle {
+    @MainActor
+    func makeBody(configuration: Configuration) -> some View {
+        WithRepositoryAnchorLinkLicenseViewStyle()
+            .makeBody(configuration: configuration)
+            .navigationBarTitleDisplayMode(.inline)
+    }
 }
