@@ -1,0 +1,32 @@
+name: iOS CI
+on:
+  pull_request:
+    branches: [develop, master]
+  push:
+    branches: [develop, master]
+permissions:
+  contents: read
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  policy:
+    name: Release Policy
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest, docker]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      # No Environment or protected App credential is available to PR policy checks.
+      - name: Ruby policy
+        uses: qtmleap/actions/actions/ruby-check@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          command: 'ruby -c fastlane/Fastfile; ruby fastlane/test/run_all.rb'
+      - name: Validate workflow syntax
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "${GITHUB_WORKSPACE}:/work:ro" -w /work \
+            rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
+            -color -shellcheck=

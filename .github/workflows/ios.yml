@@ -23,26 +23,21 @@ concurrency:
 jobs:
   release_checks:
     name: Validate TestFlight automation
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest, docker]
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.3'
       - name: Validate release configuration and cleanup
-        run: |
-          ruby -c fastlane/Fastfile
-          ruby fastlane/test/testflight_config_test.rb
-          python3 -m unittest discover -s scripts/tests -v
-          bash -n scripts/ci-testflight.sh
+        uses: qtmleap/actions/actions/ruby-check@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          command: 'ruby -c fastlane/Fastfile; ruby fastlane/test/run_all.rb; bash -n scripts/ci-release.sh scripts/ci-release-cleanup.sh scripts/verify-toolchain.sh'
 
   simulator:
     name: Build and test (Xcode 27)
-    # Only trusted repository branches run on the organization Mac fleet.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, macos-latest]
+    runs-on: [self-hosted, macos-27]
     timeout-minutes: 45
     defaults:
       run:
@@ -62,16 +57,12 @@ jobs:
           path: Mudmouth
           persist-credentials: false
 
-      - name: Authenticate private QuantumLeap dependency
-        env:
-          QUANTUMLEAP_READ_TOKEN: ${{ secrets.QUANTUMLEAP_READ_TOKEN }}
-        run: |
-          if [ -z "$QUANTUMLEAP_READ_TOKEN" ]; then
-            echo "::error::QUANTUMLEAP_READ_TOKEN is required to read the private QuantumLeap package"
-            exit 1
-          fi
-          umask 077
-          printf 'machine github.com\n  login x-access-token\n  password %s\n' "$QUANTUMLEAP_READ_TOKEN" > "$HOME/.netrc"
+      - name: Verify the Xcode toolchain
+        uses: qtmleap/actions/actions/apple-toolchain@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          xcode-version: '27'
+          developer-dir: /Applications/Xcode_27.app/Contents/Developer
 
       - name: Select dedicated iPhone simulator
         run: |
@@ -93,6 +84,21 @@ jobs:
           xcrun simctl bootstatus "$device" -b
           xcrun simctl list devices booted
 
+      - name: Resolve private package dependencies
+        env:
+          QUANTUMLEAP_READ_TOKEN: ${{ secrets.QUANTUMLEAP_READ_TOKEN }}
+        run: ruby scripts/ci-simulator-resolve.rb
+
+      - name: Restore dependency authentication
+        if: always()
+        env:
+          RELEASE_WORK: ${{ runner.temp }}/simulator-resolution
+        uses: qtmleap/actions/actions/run-adapter@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          adapter: fastlane/adapter.rb
+          operation: cleanup
+
       - name: Build and run unit and UI tests
         run: |
           set -o pipefail
@@ -102,7 +108,8 @@ jobs:
             -destination-timeout 60 \
             -clonedSourcePackagesDirPath "$PLL_SOURCE_PACKAGES_PATH" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -packageAuthorizationProvider netrc -onlyUsePackageVersionsFromResolvedFile \
+            -onlyUsePackageVersionsFromResolvedFile -disableAutomaticPackageResolution \
+            -skipPackageUpdates \
             -skipPackagePluginValidation \
             -parallel-testing-enabled NO \
             -collect-test-diagnostics never \
@@ -137,59 +144,3 @@ jobs:
             ${{ runner.temp }}/xcodebuild-sample-*.txt
           if-no-files-found: ignore
           retention-days: 7
-
-  testflight:
-    name: Deploy to TestFlight
-    needs: [simulator, release_checks]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    runs-on: [self-hosted, macos-latest]
-    timeout-minutes: 90
-    environment: testflight
-    concurrency:
-      group: interceptor-testflight
-      cancel-in-progress: false
-      queue: max
-    defaults:
-      run:
-        working-directory: Interceptor
-        shell: bash
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          path: Interceptor
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          repository: qtmleap/Mudmouth
-          ref: ${{ env.MUDMOUTH_REV }}
-          path: Mudmouth
-          persist-credentials: false
-      - name: Select Ruby on the self-hosted Mac
-        run: |
-          if ! brew list --versions ruby@3.3 >/dev/null 2>&1; then
-            HOMEBREW_NO_AUTO_UPDATE=1 brew install ruby@3.3
-          fi
-          echo "$(brew --prefix ruby@3.3)/bin" >> "$GITHUB_PATH"
-          echo "GEM_HOME=$RUNNER_TEMP/testflight-gems" >> "$GITHUB_ENV"
-          echo "GEM_PATH=$RUNNER_TEMP/testflight-gems" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/testflight-gems/bin" >> "$GITHUB_PATH"
-          echo "BUNDLE_PATH=$RUNNER_TEMP/testflight-bundle" >> "$GITHUB_ENV"
-          echo "BUNDLE_FROZEN=true" >> "$GITHUB_ENV"
-      - name: Install locked fastlane dependencies
-        run: |
-          ruby --version
-          gem install bundler -v 2.6.9 --no-document
-          bundle _2.6.9_ install
-      - name: Archive and upload the tested commit
-        env:
-          QUANTUMLEAP_READ_TOKEN: ${{ secrets.QUANTUMLEAP_READ_TOKEN }}
-          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
-          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-        run: bash scripts/ci-testflight.sh
-      - name: Remove per-job Ruby dependencies
-        if: always()
-        run: rm -rf "$RUNNER_TEMP/testflight-gems" "$RUNNER_TEMP/testflight-bundle"

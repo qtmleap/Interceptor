@@ -2,76 +2,29 @@
 
 ### Automatic TestFlight deployment
 
-Pushes to `develop` (including merged pull requests) run the simulator and release
-automation checks. If both succeed, the same commit is archived and uploaded to
-TestFlight. Pull requests and `master` pushes run checks only. App Store submission
-and external beta review are separate release actions.
+`.github/workflows/testflight.yaml` uploads only after a genuine same-repository
+pull request is merged into `develop` or `master`. A secret-free self-hosted Linux
+verifier requires the exact merge SHA, trusted PR checks, first run attempt and
+current branch tip. Direct pushes, tags, manual runs, reruns and obsolete merges
+cannot upload. The guarded lane repeats source checks immediately before upload.
 
-Deployments are serialized with GitHub Actions `queue: max`; up to 100 pending
-deployments can wait without replacing earlier pending runs. Build numbers start
-after the maximum of the project number, the latest TestFlight number for the
-marketing version, and the previously uploaded build 31. The job waits for Apple
-to finish processing before releasing the deployment queue. A failed processing
-step must be investigated before retrying; the upload may already exist on Apple.
+The deployment job uses `[self-hosted, macOS, ARM64, macos-27]` in a disposable VM.
+It uses the protected `testflight` Environment's `TESTFLIGHT_` ASC, match password
+and shared GitHub App credentials. The App issues separate Contents-read tokens
+limited to `match` and `QuantumLeap`; neither token is stored in the repository.
+The app and packet tunnel retain separate provisioning profiles. Signing is
+read-only, builds use an immutable copy, and temporary keychain/dependency
+credentials are restored after success, failure or interruption.
 
-Configure these repository secrets (or secrets in the `testflight` environment):
+Both branches share one non-cancelling upload queue. The uploaded build number
+exceeds the applicable remote/project/CI floor; successful uploads preserve a
+`testflight-shipped-<merge SHA>` record artifact. CI never commits source changes.
+See [SETUP.md](SETUP.md) for configuration, checks and upload-record handling.
 
-| Secret | Purpose |
-| --- | --- |
-| `QUANTUMLEAP_READ_TOKEN` | Read the private QuantumLeap Swift package; already used by simulator CI. |
-| `APP_STORE_CONNECT_API_KEY_KEY_ID` | App Store Connect API key ID. |
-| `APP_STORE_CONNECT_API_KEY_ISSUER_ID` | App Store Connect API issuer ID. |
-| `APP_STORE_CONNECT_API_KEY_KEY` | Base64-encoded contents of the API key's `.p8` file. |
-| `MATCH_PASSWORD` | Password for encrypted signing assets in `qtmleap/match`. |
-| `MATCH_GIT_BASIC_AUTHORIZATION` | Base64-encoded `github-user:read-token`, with access to `qtmleap/match`. |
-
-Use an App Manager API key with access to Interceptor. The upload uses the official
-App Store Connect API and does not require an Apple ID browser session or 2FA.
-Keep keys, passwords, and tokens outside this repository. Register secrets through
-GitHub's secret settings or `gh secret set` using file/stdin input.
-
-The signing repository must contain a valid App Store distribution certificate
-and private key, plus App Store profiles for `jp.qleap.intrcptr` and
-`jp.qleap.intrcptr.packet-tunnel` with the app's required entitlements. The lane
-reads existing assets only; it does not create certificates or profiles.
-
-Build and deployment use `[self-hosted, macos-latest]` in the organization's
-`Mac Studio` runner group. Its on-demand macOS 27 profile provides Xcode 27
-and Homebrew in a fresh Tart VM for each job, deleted after the job finishes.
-The runner group must allow this repository, including public repositories.
-The deployment job selects
-Homebrew Ruby 3.3 and installs the checked-in Gemfile.lock with Bundler 2.6.9.
-Use a dedicated macOS runner account: signing temporarily changes its keychain
-search list and `.netrc`. Both are restored by the release wrapper, including on
-failure. Its private working directory contains the temporary signing keychain,
-Transporter key files, archive output, and package checkouts and is removed on exit.
-Other signing jobs must not use that account concurrently. For automatic delivery,
-the `testflight` environment must allow `develop` deployments without a required
-manual reviewer. Protect `develop` so changes enter through reviewed pull requests.
-
-Validate the release automation locally without Apple credentials:
-
-```sh
-ruby fastlane/test/testflight_config_test.rb
-python3 -m unittest discover -s scripts/tests -v
-bash -n scripts/ci-testflight.sh
-```
-
-The actual upload is performed by `bash scripts/ci-testflight.sh`, with the same
-credentials supplied via environment variables. This command uploads a build;
-the checks above do not contact Apple.
-
-This is an iOS application that uses a self-signed certificate to obtain an access token from Nintendo Switch Online.
-
-### Requirements
-
-- iOS 17 or later
-- Xcode 27 with Swift 6.4 or later (required by QuantumLeap 1.0.0)
-- fastlane
-
-The simulator build was verified with Xcode 27.0 on 2026-10-04 using
-`swift-crypto` 3.15.1 and Runestone 0.5.2. Keep the checked-in `Package.resolved`
-to use these compatible dependency versions.
+Simulator PR checks remain in `.github/workflows/ios.yml`; their existing
+`QUANTUMLEAP_READ_TOKEN` resolves only the private package before compilation.
+Native code uses the latest stable QuantumLeap 1.0.0 at immutable revision
+`c346aad25a1e7d09d22bf3ea32b7c341f13512ef`.
 
 ### Local development
 
@@ -167,7 +120,7 @@ sysdiagnose collection is disabled (`-collect-test-diagnostics never`) to avoid
 the hosted Simulator's post-test collection hang; normal test results and
 screenshots remain in the result bundle.
 
-The simulator and TestFlight jobs use `[self-hosted, macos-latest]`; the
+The simulator and TestFlight jobs use `[self-hosted, macOS, ARM64, macos-27]`; the
 `self-hosted` label prevents routing them to GitHub-hosted runners. The
 Mac Studio supervisor starts its Xcode 27 VM profile when jobs are queued.
 Local validation and the VM's selected Xcode/runtime are recorded separately

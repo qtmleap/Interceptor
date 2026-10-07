@@ -1,0 +1,156 @@
+name: TestFlight
+# Environment deployment-branch rules reject pull_request merge refs, so this runs on pushes to
+# develop / master. A secret-free Linux job proves the push is one new same-repository PR merge
+# (with a read-only GITHUB_TOKEN) before any Mac runner or credential is involved; the protected
+# `testflight` Environment job receives only the verified SHA and PR number.
+# There is no manual, tag, schedule or rerun path: only the first attempt of a push may upload.
+on:
+  push:
+    branches: [develop, master]
+
+permissions:
+  contents: read
+
+# Serialize uploads across both branches. Running uploads are never cancelled;
+# queued obsolete merges are rejected by the exact live-tip check.
+concurrency:
+  group: interceptor-testflight
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify merge
+    if: github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest, docker]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+      actions: read
+    outputs:
+      pr_number: ${{ steps.verify.outputs.pr_number }}
+      sha: ${{ steps.verify.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: Interceptor
+          # The first parent is needed to diff against it.
+          fetch-depth: 0
+          persist-credentials: false
+      # No secret is passed. Run as the caller's uid so the workspace does not become root-owned.
+      - name: Verify that this push is a new PR merge
+        id: verify
+        uses: qtmleap/actions/actions/verify-merge@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          adapter: fastlane/lib/merge_verifier.rb
+          github-token: ${{ github.token }}
+
+  deploy:
+    name: Deploy to TestFlight
+    needs: verify
+    # Stops a duplicate upload even if only this job is re-run.
+    if: success() && !cancelled() && github.run_attempt == 1
+    runs-on: [self-hosted, macos-27]
+    environment: testflight
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      INTERCEPTOR_VERIFIED_SHA: ${{ needs.verify.outputs.sha }}
+      INTERCEPTOR_VERIFIED_PR: ${{ needs.verify.outputs.pr_number }}
+      RELEASE_SOURCE_READ_TOKEN: ${{ github.token }}
+      RBENV_VERSION: '3.4.10'
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+      BUNDLE_FROZEN: 'true'
+      GIT_TERMINAL_PROMPT: '0'
+    defaults:
+      run:
+        shell: bash
+        working-directory: Interceptor
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: Interceptor
+          # Only the merged content that the event points at is built, even if the branch moves on.
+          ref: ${{ needs.verify.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          repository: qtmleap/Mudmouth
+          ref: 3c1468aaaea5140835982bc8e38c9d3bfc49d2a0
+          path: Mudmouth
+          persist-credentials: false
+      - name: Verify the Xcode toolchain
+        uses: qtmleap/actions/actions/apple-toolchain@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          xcode-version: '27'
+          developer-dir: /Applications/Xcode_27.app/Contents/Developer
+      - name: Prepare Ruby and fastlane
+        uses: qtmleap/actions/actions/setup-ruby@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          ruby-version: '3.4.10'
+      - name: Validate merged deployment target
+        uses: qtmleap/actions/actions/run-adapter@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          adapter: fastlane/adapter.rb
+          operation: authorize
+      # Short-lived tokens are minted only after verification and validation, from the Environment's
+      # App credentials passed as inputs (never as env vars). Each is revoked by its post step.
+      - name: Create short-lived signing token
+        id: signing-token
+        uses: qtmleap/actions/actions/repository-token@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          client-id: ${{ secrets.TESTFLIGHT_MATCH_APP_CLIENT_ID }}
+          private-key: ${{ secrets.TESTFLIGHT_MATCH_APP_PRIVATE_KEY }}
+          repository: match
+      # Separate token, scoped to the private package only, minted right before the build. It never
+      # falls back to the signing token, a PR token or any repository secret.
+      - name: Create short-lived QuantumLeap read token
+        id: dependency-token
+        uses: qtmleap/actions/actions/repository-token@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          client-id: ${{ secrets.TESTFLIGHT_MATCH_APP_CLIENT_ID }}
+          private-key: ${{ secrets.TESTFLIGHT_MATCH_APP_PRIVATE_KEY }}
+          repository: QuantumLeap
+      - name: Build, verify and upload
+        id: deploy
+        env:
+          TESTFLIGHT_ASC_KEY_ID: ${{ secrets.TESTFLIGHT_ASC_KEY_ID }}
+          TESTFLIGHT_ASC_ISSUER_ID: ${{ secrets.TESTFLIGHT_ASC_ISSUER_ID }}
+          TESTFLIGHT_ASC_KEY_CONTENT: ${{ secrets.TESTFLIGHT_ASC_KEY_CONTENT }}
+          TESTFLIGHT_MATCH_PASSWORD: ${{ secrets.TESTFLIGHT_MATCH_PASSWORD }}
+          TESTFLIGHT_MATCH_GIT_TOKEN: ${{ steps.signing-token.outputs.token }}
+          TESTFLIGHT_QUANTUMLEAP_READ_TOKEN: ${{ steps.dependency-token.outputs.token }}
+        uses: qtmleap/actions/actions/run-adapter@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          adapter: fastlane/adapter.rb
+          operation: build
+      # Also covers cancellation, where the script's own cleanup may not have run.
+      - name: Clean up keychain, credentials and work files
+        if: always()
+        env:
+          RELEASE_WORK: ${{ runner.temp }}/release-work
+        uses: qtmleap/actions/actions/run-adapter@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          adapter: fastlane/adapter.rb
+          operation: cleanup
+      - name: Preserve shipped build record
+        if: always()
+        uses: qtmleap/actions/actions/release-record@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          name: testflight-shipped-${{ needs.verify.outputs.sha }}
+          path: ${{ runner.temp }}/release-record/last_shipped.json
+          expected-source-sha: ${{ needs.verify.outputs.sha }}
+          if-no-files-found: ignore

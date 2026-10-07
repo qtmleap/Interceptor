@@ -1,103 +1,17 @@
-# This file contains the fastlane.tools configuration
-# You can find the documentation at https://docs.fastlane.tools
-#
-# For a list of all available actions, check out
-#
-#     https://docs.fastlane.tools/actions
-#
-# For a list of all available plugins, check out
-#
-#     https://docs.fastlane.tools/plugins/available-plugins
-#
+# TestFlight release. The only upload entry point is `beta`, and it runs only in the verified CI
+# workflow (.github/workflows/testflight.yaml). There is no local, manual or App Store lane.
+require_relative "lib/release_pipeline"
+require_relative "lib/fastlane_adapter"
 
-# Uncomment the line if you want fastlane to automatically update itself
-# update_fastlane
-
-require_relative "lib/testflight_config"
+REPO_ROOT = File.expand_path("..", __dir__)
 
 default_platform(:ios)
 
 platform :ios do
-  desc "Push a new beta build to TestFlight"
+  desc "CI only: build the verified merge commit from a clean copy and upload it to TestFlight"
   lane :beta do
-    TestFlightConfig.validate_credentials!(ENV)
-    api_key = asc_api_key
-    version = get_version_number(xcodeproj: "Interceptor.xcodeproj", target: "Interceptor")
-    local_number = get_build_number(xcodeproj: "Interceptor.xcodeproj")
-    remote_number = latest_testflight_build_number(
-      api_key: api_key,
-      app_identifier: TestFlightConfig::APP_IDENTIFIER,
-      version: version,
-      initial_build_number: 0
-    )
-    build_number = TestFlightConfig.next_build_number(local: local_number, remote: remote_number)
-    fetch_testflight_profile
-    profiles = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING]
-    TestFlightConfig.signing_targets(profiles).each do |target, profile|
-      update_code_signing_settings(
-        path: "Interceptor.xcodeproj",
-        targets: [target],
-        build_configurations: ["Release"],
-        use_automatic_signing: false,
-        team_id: TestFlightConfig::TEAM_ID,
-        code_sign_identity: "Apple Distribution",
-        profile_name: profile
-      )
-    end
-    increment_build_number(build_number: build_number, xcodeproj: "Interceptor.xcodeproj")
-    output_path = ENV.fetch("RELEASE_OUTPUT_PATH", "build")
-    ipa = build_app(
-      project: "Interceptor.xcodeproj",
-      scheme: "Interceptor",
-      configuration: "Release",
-      clean: true,
-      export_method: "app-store",
-      export_team_id: TestFlightConfig::TEAM_ID,
-      export_options: {signingStyle: "manual", provisioningProfiles: profiles},
-      cloned_source_packages_path: ENV["PLL_SOURCE_PACKAGES_PATH"],
-      derived_data_path: ENV["RELEASE_DERIVED_DATA_PATH"],
-      output_directory: output_path,
-      archive_path: File.join(output_path, "Interceptor.xcarchive"),
-      buildlog_path: File.join(output_path, "logs"),
-      xcargs: "-packageAuthorizationProvider netrc -onlyUsePackageVersionsFromResolvedFile -skipPackagePluginValidation"
-    )
-    # Transporter writes AuthKey_<id>.p8 under HOME. Keep that file in the
-    # per-run private directory rather than the self-hosted runner's real home.
-    TestFlightConfig.with_upload_home(ENV.fetch("RELEASE_UPLOAD_HOME")) do
-      upload_to_testflight(
-        api_key: api_key,
-        app_identifier: TestFlightConfig::APP_IDENTIFIER,
-        ipa: ipa,
-        skip_waiting_for_build_processing: false,
-        wait_processing_timeout_duration: 1800,
-        demo_account_required: false,
-        distribute_external: false,
-        notify_external_testers: false,
-        expire_previous_builds: false
-      )
-    end
-  end
-
-  desc "Fetch TestFlight profile and cert"
-  lane :fetch_testflight_profile do
-    api_key = asc_api_key
-    match(
-      api_key: api_key,
-      type: "appstore",
-      app_identifier: TestFlightConfig::TARGETS.values,
-      readonly: true,
-      keychain_name: ENV["MATCH_KEYCHAIN_NAME"],
-      keychain_password: ENV["MATCH_KEYCHAIN_PASSWORD"]
-    )
-  end
-
-  def asc_api_key
-    app_store_connect_api_key(
-      key_id: ENV["APP_STORE_CONNECT_API_KEY_KEY_ID"],
-      issuer_id: ENV["APP_STORE_CONNECT_API_KEY_ISSUER_ID"],
-      key_content: ENV["APP_STORE_CONNECT_API_KEY_KEY"],
-      in_house: false,
-      is_key_content_base64: true
-    )
+    # ReleasePipeline authorizes (CI context, exact live tip, clean checkout) before reading any
+    # credential, creating a keychain or building.
+    ReleasePipeline.run(adapter: FastlaneAdapter.new(self), repo_root: REPO_ROOT)
   end
 end
