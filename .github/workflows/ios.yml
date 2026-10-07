@@ -62,7 +62,7 @@ jobs:
         with:
           repo-root: Interceptor
           xcode-version: '27'
-          developer-dir: /Applications/Xcode.app/Contents/Developer
+          developer-dir: /Applications/Xcode_27.app/Contents/Developer
 
       - name: Select dedicated iPhone simulator
         run: |
