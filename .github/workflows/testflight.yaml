@@ -51,7 +51,7 @@ jobs:
     name: Deploy to TestFlight
     needs: verify
     # Stops a duplicate upload even if only this job is re-run.
-    if: github.run_attempt == 1
+    if: success() && !cancelled() && github.run_attempt == 1
     runs-on: [self-hosted, macos-27]
     environment: testflight
     timeout-minutes: 90
