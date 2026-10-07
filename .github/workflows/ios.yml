@@ -40,7 +40,9 @@ jobs:
 
   simulator:
     name: Build and test (Xcode 27)
-    runs-on: xcode-27
+    # Only trusted repository branches run on the organization Mac fleet.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macos-latest]
     timeout-minutes: 45
     defaults:
       run:
@@ -140,7 +142,7 @@ jobs:
     name: Deploy to TestFlight
     needs: [simulator, release_checks]
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    runs-on: xcode-27
+    runs-on: [self-hosted, macos-latest]
     timeout-minutes: 90
     environment: testflight
     concurrency:

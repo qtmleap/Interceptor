@@ -35,7 +35,11 @@ and private key, plus App Store profiles for `jp.qleap.intrcptr` and
 `jp.qleap.intrcptr.packet-tunnel` with the app's required entitlements. The lane
 reads existing assets only; it does not create certificates or profiles.
 
-The `xcode-27` runner must have Xcode 27 and Homebrew. The deployment job selects
+Build and deployment use `[self-hosted, macos-latest]` in the organization's
+`Mac Studio` runner group. Its on-demand macOS 27 profile provides Xcode 27
+and Homebrew in a fresh Tart VM for each job, deleted after the job finishes.
+The runner group must allow this repository, including public repositories.
+The deployment job selects
 Homebrew Ruby 3.3 and installs the checked-in Gemfile.lock with Bundler 2.6.9.
 Use a dedicated macOS runner account: signing temporarily changes its keychain
 search list and `.netrc`. Both are restored by the release wrapper, including on
@@ -151,8 +155,9 @@ seven days in the `simulator-results` artifact.
 CI requires the repository secret `QUANTUMLEAP_READ_TOKEN`, a GitHub token with
 read access to `qtmleap/QuantumLeap`. For a dedicated CI credential, prefer a
 fine-grained token limited to that repository with **Contents: read-only**.
-Fork pull requests cannot access this secret and require a maintainer to run
-the changes on a trusted branch. Deploy keys are disabled for QuantumLeap.
+Fork pull requests cannot access this secret; the self-hosted simulator job
+is skipped for them. A maintainer must review and run the changes on a trusted
+repository branch. Deploy keys are disabled for QuantumLeap.
 
 CI uses one signed `xcodebuild test` invocation, which builds the app and test
 targets for its selected simulator and runs the full suite. This avoids a
@@ -162,9 +167,11 @@ sysdiagnose collection is disabled (`-collect-test-diagnostics never`) to avoid
 the hosted Simulator's post-test collection hang; normal test results and
 screenshots remain in the result bundle.
 
-The workflow uses GitHub's [`xcode-27` preview runner](https://github.com/actions/runner-images/issues/14404).
-The local Xcode 27.0 / iOS 26.5 validation and the hosted runner's selected
-Xcode/runtime are recorded separately in their build logs.
+The simulator and TestFlight jobs use `[self-hosted, macos-latest]`; the
+`self-hosted` label prevents routing them to GitHub-hosted runners. The
+Mac Studio supervisor starts its Xcode 27 VM profile when jobs are queued.
+Local validation and the VM's selected Xcode/runtime are recorded separately
+in their build logs. Release configuration checks remain on `ubuntu-latest`.
 
 ## Contributors
 
