@@ -21,12 +21,9 @@ jobs:
           persist-credentials: false
       # No Environment or protected App credential is available to PR policy checks.
       - name: Ruby policy
-        run: |
-          docker run --rm --user "$(id -u):$(id -g)" \
-            -e HOME=/tmp -e GEM_HOME=/tmp/gems \
-            -v "${GITHUB_WORKSPACE}:/work:ro" -w /work \
-            ruby:3.4.10@sha256:ce3b7a999d9e430e59e1a12456c631fbea3dd18948c89cf8a913c3566c77b2ae \
-            bash -euc 'ruby -c fastlane/Fastfile; ruby fastlane/test/run_all.rb'
+        uses: qtmleap/actions/actions/ruby-check@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          command: 'ruby -c fastlane/Fastfile; ruby fastlane/test/run_all.rb'
       - name: Validate workflow syntax
         run: |
           docker run --rm --user "$(id -u):$(id -g)" \

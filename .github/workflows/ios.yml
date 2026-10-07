@@ -30,17 +30,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate release configuration and cleanup
-        run: |
-          docker run --rm --user "$(id -u):$(id -g)" \
-            -e HOME=/tmp -v "${GITHUB_WORKSPACE}:/work:ro" -w /work \
-            ruby:3.4.10@sha256:ce3b7a999d9e430e59e1a12456c631fbea3dd18948c89cf8a913c3566c77b2ae \
-            bash -euc 'ruby -c fastlane/Fastfile; ruby fastlane/test/run_all.rb'
-          bash -n scripts/ci-release.sh scripts/ci-release-cleanup.sh scripts/verify-toolchain.sh
+        uses: qtmleap/actions/actions/ruby-check@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          command: 'ruby -c fastlane/Fastfile; ruby fastlane/test/run_all.rb; bash -n scripts/ci-release.sh scripts/ci-release-cleanup.sh scripts/verify-toolchain.sh'
 
   simulator:
     name: Build and test (Xcode 27)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, macOS, ARM64, macos-27]
+    runs-on: [self-hosted, macos-27]
     timeout-minutes: 45
     defaults:
       run:
@@ -59,6 +56,13 @@ jobs:
           ref: ${{ env.MUDMOUTH_REV }}
           path: Mudmouth
           persist-credentials: false
+
+      - name: Verify the Xcode toolchain
+        uses: qtmleap/actions/actions/apple-toolchain@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          xcode-version: '27'
+          developer-dir: /Applications/Xcode.app/Contents/Developer
 
       - name: Select dedicated iPhone simulator
         run: |
@@ -89,7 +93,11 @@ jobs:
         if: always()
         env:
           RELEASE_WORK: ${{ runner.temp }}/simulator-resolution
-        run: bash scripts/ci-release-cleanup.sh
+        uses: qtmleap/actions/actions/run-adapter@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          adapter: fastlane/adapter.rb
+          operation: cleanup
 
       - name: Build and run unit and UI tests
         run: |

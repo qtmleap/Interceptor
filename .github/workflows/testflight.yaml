@@ -36,32 +36,23 @@ jobs:
         with:
           path: Interceptor
           # The first parent is needed to diff against it.
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
       # No secret is passed. Run as the caller's uid so the workspace does not become root-owned.
       - name: Verify that this push is a new PR merge
         id: verify
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -e HOME=/tmp \
-            -e GITHUB_TOKEN -e GITHUB_ACTIONS -e RUNNER_ENVIRONMENT -e GITHUB_EVENT_NAME -e GITHUB_REF \
-            -e GITHUB_REPOSITORY -e GITHUB_SHA -e GITHUB_RUN_ATTEMPT -e GITHUB_WORKFLOW_REF \
-            -e GITHUB_EVENT_PATH -e GITHUB_OUTPUT \
-            -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}" \
-            -v "${RUNNER_TEMP}:${RUNNER_TEMP}" \
-            -w "${GITHUB_WORKSPACE}/Interceptor" \
-            ruby:3.4.10@sha256:ce3b7a999d9e430e59e1a12456c631fbea3dd18948c89cf8a913c3566c77b2ae \
-            ruby fastlane/lib/merge_verifier.rb
+        uses: qtmleap/actions/actions/verify-merge@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          adapter: fastlane/lib/merge_verifier.rb
+          github-token: ${{ github.token }}
 
   deploy:
     name: Deploy to TestFlight
     needs: verify
     # Stops a duplicate upload even if only this job is re-run.
     if: github.run_attempt == 1
-    runs-on: [self-hosted, macOS, ARM64, macos-27]
+    runs-on: [self-hosted, macos-27]
     environment: testflight
     timeout-minutes: 90
     permissions:
@@ -94,52 +85,42 @@ jobs:
           path: Mudmouth
           persist-credentials: false
       - name: Verify the Xcode toolchain
-        run: bash scripts/verify-toolchain.sh
+        uses: qtmleap/actions/actions/apple-toolchain@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          xcode-version: '27'
+          developer-dir: /Applications/Xcode.app/Contents/Developer
       - name: Prepare Ruby and fastlane
-        run: |
-          ruby_bin="$HOME/.rbenv/versions/$RBENV_VERSION/bin"
-          if [ ! -x "$ruby_bin/ruby" ]; then
-            echo "::error::Ruby $RBENV_VERSION is missing at $ruby_bin"
-            exit 1
-          fi
-          bundler_version=$(awk '/^BUNDLED WITH/ { getline; print $1 }' Gemfile.lock)
-          if [ -z "$bundler_version" ]; then
-            echo "::error::Gemfile.lock has no BUNDLED WITH version"
-            exit 1
-          fi
-          export GEM_HOME="$RUNNER_TEMP/gems"
-          export GEM_PATH="$GEM_HOME"
-          export BUNDLE_PATH="$RUNNER_TEMP/bundle"
-          export PATH="$ruby_bin:$GEM_HOME/bin:$PATH"
-          printf '%s\n' "$ruby_bin" "$GEM_HOME/bin" >> "$GITHUB_PATH"
-          printf '%s\n' "GEM_HOME=$GEM_HOME" "GEM_PATH=$GEM_PATH" "BUNDLE_PATH=$BUNDLE_PATH" >> "$GITHUB_ENV"
-          ruby --version
-          gem install bundler --version "$bundler_version" --no-document
-          bundle "_${bundler_version}_" install --jobs 4 --retry 2
+        uses: qtmleap/actions/actions/setup-ruby@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          ruby-version: '3.4.10'
       - name: Validate merged deployment target
-        run: bundle exec ruby fastlane/lib/deployment_policy.rb
+        uses: qtmleap/actions/actions/run-adapter@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          adapter: fastlane/adapter.rb
+          operation: authorize
       # Short-lived tokens are minted only after verification and validation, from the Environment's
       # App credentials passed as inputs (never as env vars). Each is revoked by its post step.
       - name: Create short-lived signing token
         id: signing-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: qtmleap/actions/actions/repository-token@00c36aeda988735333907b407d98f6a4a9478b64
         with:
+          repo-root: Interceptor
           client-id: ${{ secrets.TESTFLIGHT_MATCH_APP_CLIENT_ID }}
           private-key: ${{ secrets.TESTFLIGHT_MATCH_APP_PRIVATE_KEY }}
-          owner: qtmleap
-          repositories: match
-          permission-contents: read
+          repository: match
       # Separate token, scoped to the private package only, minted right before the build. It never
       # falls back to the signing token, a PR token or any repository secret.
       - name: Create short-lived QuantumLeap read token
         id: dependency-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: qtmleap/actions/actions/repository-token@00c36aeda988735333907b407d98f6a4a9478b64
         with:
+          repo-root: Interceptor
           client-id: ${{ secrets.TESTFLIGHT_MATCH_APP_CLIENT_ID }}
           private-key: ${{ secrets.TESTFLIGHT_MATCH_APP_PRIVATE_KEY }}
-          owner: qtmleap
-          repositories: QuantumLeap
-          permission-contents: read
+          repository: QuantumLeap
       - name: Build, verify and upload
         id: deploy
         env:
@@ -149,18 +130,27 @@ jobs:
           TESTFLIGHT_MATCH_PASSWORD: ${{ secrets.TESTFLIGHT_MATCH_PASSWORD }}
           TESTFLIGHT_MATCH_GIT_TOKEN: ${{ steps.signing-token.outputs.token }}
           TESTFLIGHT_QUANTUMLEAP_READ_TOKEN: ${{ steps.dependency-token.outputs.token }}
-        run: bash scripts/ci-release.sh
+        uses: qtmleap/actions/actions/run-adapter@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
+          adapter: fastlane/adapter.rb
+          operation: build
       # Also covers cancellation, where the script's own cleanup may not have run.
       - name: Clean up keychain, credentials and work files
         if: always()
         env:
           RELEASE_WORK: ${{ runner.temp }}/release-work
-        run: bash scripts/ci-release-cleanup.sh
-      - name: Preserve shipped build record
-        if: success()
-        uses: actions/upload-artifact@v4
+        uses: qtmleap/actions/actions/run-adapter@00c36aeda988735333907b407d98f6a4a9478b64
         with:
+          repo-root: Interceptor
+          adapter: fastlane/adapter.rb
+          operation: cleanup
+      - name: Preserve shipped build record
+        if: always()
+        uses: qtmleap/actions/actions/release-record@00c36aeda988735333907b407d98f6a4a9478b64
+        with:
+          repo-root: Interceptor
           name: testflight-shipped-${{ needs.verify.outputs.sha }}
           path: ${{ runner.temp }}/release-record/last_shipped.json
-          if-no-files-found: error
-          retention-days: 90
+          expected-source-sha: ${{ needs.verify.outputs.sha }}
+          if-no-files-found: ignore
