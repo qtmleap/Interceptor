@@ -101,7 +101,7 @@ jobs:
             -clonedSourcePackagesDirPath "$PLL_SOURCE_PACKAGES_PATH" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -onlyUsePackageVersionsFromResolvedFile -disableAutomaticPackageResolution \
-            -skipPackageRepositoryFetches \
+            -skipPackageUpdates \
             -skipPackagePluginValidation \
             -parallel-testing-enabled NO \
             -collect-test-diagnostics never \
