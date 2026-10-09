@@ -13,6 +13,7 @@ struct DataUseDetailsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 if usesCards { introduction }
+                disclosure("Apple Policy Disclaimer", "CONSENT_APPLE_DISCLAIMER", symbol: "info.circle")
                 disclosure("Purpose", "CONSENT_PURPOSE", symbol: "network")
                 disclosure("Data Recorded", "CONSENT_DATA", symbol: "doc.text.magnifyingglass", emphasized: true)
                 disclosure("Storage and Sharing", "CONSENT_STORAGE", symbol: "internaldrive")

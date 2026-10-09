@@ -127,13 +127,115 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
         assertStartupConsent(app)
         XCTAssertTrue(app.navigationBars.buttons["Agree"].isHittable)
-        attachScreenshot(app, named: "Mandatory consent large text landscape")
+        attachDeviceScreenshot(named: "Mandatory consent large text landscape")
         agreeIfNeeded(app)
         openPrivacy(app)
         XCTAssertTrue(app.staticTexts["Purpose"].exists)
         XCTAssertFalse(app.buttons["Agree"].exists)
         XCTAssertFalse(app.buttons["Close"].exists)
-        attachScreenshot(app, named: "Privacy large text landscape")
+        attachDeviceScreenshot(named: "Privacy large text landscape")
+    }
+
+    private struct DisclaimerLocale {
+        let args: [String]
+        let isJapanese: Bool
+        let title: String
+        let settingsTab: String
+        let privacy: String
+        let agree: String
+        let withdraw: String
+
+        static let english = DisclaimerLocale(
+            args: ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"], isJapanese: false,
+            title: "Apple Policy Disclaimer", settingsTab: "Settings", privacy: "Privacy",
+            agree: "Agree", withdraw: "Withdraw Consent")
+        static let japanese = DisclaimerLocale(
+            args: ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP"], isJapanese: true,
+            title: "Appleポリシーに基づく注意事項", settingsTab: "設定", privacy: "プライバシー",
+            agree: "同意する", withdraw: "同意を取り消す")
+    }
+
+    /// Verifies the Apple policy disclaimer card before consent and in Settings > Privacy, per locale.
+    @MainActor
+    func testAppleDisclaimerShownBeforeConsentAndInPrivacy() throws {
+        XCUIDevice.shared.orientation = .portrait
+        for loc in [DisclaimerLocale.english, .japanese] {
+            let app = XCUIApplication()
+            app.launchArguments = loc.args
+            app.launch()
+            addTeardownBlock { @MainActor in app.terminate() }
+
+            // Precondition: revoke consent through the UI (agree first if the gate is showing).
+            let agree = app.buttons[loc.agree]
+            let settings = tab(app, named: loc.settingsTab)
+            XCTAssertTrue(agree.waitForExistence(timeout: 5) || settings.waitForExistence(timeout: 5),
+                          "app must show the gate or the main UI (\(loc.title))")
+            if agree.exists { agree.tap() }
+            XCTAssertTrue(settings.waitForExistence(timeout: 5))
+            settings.tap()
+            scrollTo(app, app.buttons[loc.privacy]).tap()
+            XCTAssertTrue(app.navigationBars[loc.privacy].waitForExistence(timeout: 5))
+            scrollTo(app, app.buttons[loc.withdraw]).tap()
+            let confirm = app.alerts.buttons[loc.withdraw]
+            XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+            confirm.tap()
+
+            // Before consent: gate blocks main UI, and the disclaimer is visible without scrolling.
+            XCTAssertTrue(agree.waitForExistence(timeout: 5), "Agree gate must appear (\(loc.title))")
+            XCTAssertFalse(tab(app, named: loc.settingsTab).exists, "main UI must be blocked before Agree")
+            let title = app.staticTexts[loc.title]
+            XCTAssertTrue(title.waitForExistence(timeout: 5), "disclaimer title must render before consent")
+            XCTAssertTrue(title.isHittable, "title must be visible without scrolling")
+            XCTAssertTrue(app.windows.firstMatch.frame.contains(title.frame))
+            assertDisclaimerBody(app, title: title, loc: loc)
+            attachScreenshot(app, named: "Apple disclaimer before consent \(loc.isJapanese ? "ja" : "en")")
+
+            agree.tap()
+            XCTAssertTrue(settings.waitForExistence(timeout: 5))
+
+            // Persistent: still available in Settings > Privacy after consent.
+            settings.tap()
+            scrollTo(app, app.buttons[loc.privacy]).tap()
+            XCTAssertTrue(app.navigationBars[loc.privacy].waitForExistence(timeout: 5))
+            let privacyTitle = scrollTo(app, app.staticTexts[loc.title])
+            XCTAssertFalse(app.buttons[loc.agree].exists)
+            assertDisclaimerBody(app, title: privacyTitle, loc: loc)
+            attachScreenshot(app, named: "Apple disclaimer in Privacy \(loc.isJapanese ? "ja" : "en")")
+            app.terminate()
+        }
+    }
+
+    /// The rendered body below the title must be real localized text, not empty or a raw key.
+    @MainActor
+    private func assertDisclaimerBody(_ app: XCUIApplication, title: XCUIElement, loc: DisclaimerLocale) {
+        let titleFrame = title.frame
+        let body = app.staticTexts.allElementsBoundByIndex
+            .filter { $0.frame.minY >= titleFrame.maxY - 1 && !$0.label.isEmpty && $0.label != loc.title }
+            .min { $0.frame.minY < $1.frame.minY }
+        guard let text = body?.label else {
+            XCTFail("disclaimer must render a body below its title (\(loc.title))")
+            return
+        }
+        XCTAssertGreaterThanOrEqual(text.count, 20, "body must be substantive: \(text)")
+        XCTAssertNil(text.range(of: "^[A-Z0-9_.]+$", options: .regularExpression), "raw key shown: \(text)")
+        let hasJapanese = text.range(of: "[\\u3040-\\u30FF\\u4E00-\\u9FFF]", options: .regularExpression) != nil
+        XCTAssertEqual(hasJapanese, loc.isJapanese, "body must be in the launch locale: \(text)")
+    }
+
+    @MainActor
+    @discardableResult
+    private func scrollTo(_ app: XCUIApplication, _ element: XCUIElement) -> XCUIElement {
+        for _ in 0..<10 {
+            if element.exists && element.isHittable { return element }
+            let isPrivacy = app.navigationBars["Privacy"].exists || app.navigationBars["プライバシー"].exists
+            let form = isPrivacy && app.scrollViews.firstMatch.exists
+                ? app.scrollViews.firstMatch
+                : (app.collectionViews.firstMatch.exists ? app.collectionViews.firstMatch : app.scrollViews.firstMatch)
+            form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.75))
+                .press(forDuration: 0.05, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.2)))
+        }
+        XCTFail("Must be able to scroll to \(element)")
+        return element
     }
 
     @MainActor
@@ -449,6 +551,15 @@ final class InterceptorUITests: XCTestCase {
     @MainActor
     private func attachScreenshot(_ app: XCUIApplication, named name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
+    private func attachDeviceScreenshot(named name: String) {
+        // Application screenshots can retain portrait bounds after a landscape launch.
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)

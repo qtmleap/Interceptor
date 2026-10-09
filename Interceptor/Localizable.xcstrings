@@ -1149,6 +1149,18 @@
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "利用前に、データの扱いをご確認ください。" } }
       }
     },
+    "Apple Policy Disclaimer" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Apple Policy Disclaimer" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Appleポリシーに基づく注意事項" } }
+      }
+    },
+    "CONSENT_APPLE_DISCLAIMER" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "In accordance with Apple’s App Review Guidelines, Interceptor does not collect traffic data without your explicit consent. Interceptor does not sell captured data or automatically send or share it with its developer, analytics services, or third parties. Original Nintendo service requests and copying or exporting you initiate are separate activities, explained below in Storage and Sharing." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "AppleのApp Reviewガイドラインに基づき、Interceptorは明示的な同意なく通信データを取得しません。取得したデータを販売したり、開発者・解析サービス・第三者へ自動的に送信・共有したりすることもありません。元の任天堂サービスへの通信や、あなた自身が行うコピー・書き出しは別の操作です。詳しくは「保存先と共有」をご確認ください。" } }
+      }
+    },
     "CONSENT_PURPOSE" : {
       "localizations" : {
         "en" : {
