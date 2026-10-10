@@ -22,17 +22,22 @@ struct SettingsView: View {
             Section {
                 Button("Set Up Capture") { showSetup = true }
                     .disabled(consentVersion != CaptureAuthorization.version)
+                    .foregroundStyle(.primary)
                 Button("Capture Notifications") {
                     Task { _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) }
                 }.disabled(consentVersion != CaptureAuthorization.version)
+                    .foregroundStyle(.primary)
             }
             QuantumLeap.VPNSettingList()
             QuantumLeap.Tools()
             Section {
                 NavigationLink("Privacy") { DataUseDetailsView(showsWithdrawal: true) }
                 Link("Terms of Service", destination: URL(string: "https://qleap.jp/term/eula")!)
+                    .foregroundStyle(.primary)
                 Link("Privacy Policy", destination: URL(string: "https://qleap.jp/term/interceptor_privacy_policy")!)
+                    .foregroundStyle(.primary)
                 Link("Developers", destination: URL(string: "https://qleap.jp")!)
+                    .foregroundStyle(.primary)
                 NavigationLink("Licenses") {
                     LicenseListView().licenseViewStyle(InlineRepositoryLicenseViewStyle())
                         .navigationTitle("Licenses")
