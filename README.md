@@ -23,8 +23,8 @@ See [SETUP.md](SETUP.md) for configuration, checks and upload-record handling.
 
 Simulator PR checks remain in `.github/workflows/ios.yml`; their existing
 `QUANTUMLEAP_READ_TOKEN` resolves only the private package before compilation.
-Native code uses the latest stable QuantumLeap 1.0.0 at immutable revision
-`c346aad25a1e7d09d22bf3ea32b7c341f13512ef`.
+Native code uses the latest stable QuantumLeap 1.0.1 at immutable revision
+`4070b8707b824c3264f2cd1bb672a81aea8318a3`.
 
 ### Local development
 
@@ -51,7 +51,7 @@ open Interceptor.xcodeproj
 
 The revision above is the Mudmouth revision selected for the local setup on
 2026-10-06 and matches CI. It removes the unused Introspect 1.x dependency so
-QuantumLeap 1.0.0 can resolve Introspect 27.x. Keep the checkout on its development branch when editing Mudmouth;
+QuantumLeap 1.0.1 can resolve Introspect 27.x. Keep the checkout on its development branch when editing Mudmouth;
 record any dependency revision changes alongside the application changes.
 
 To check simulator compilation without signing:

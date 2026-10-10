@@ -57,6 +57,6 @@ bash -n scripts/ci-release.sh scripts/ci-release-cleanup.sh scripts/verify-toolc
 Files under `fastlane/lib/*.rb` (except `release_config.rb`), `fastlane/Fastfile`, `fastlane/test/` and
 `scripts/` are shared across repositories; edit `fastlane/lib/release_config.rb` for per-app constants.
 
-QuantumLeap uses the latest stable release, 1.0.0, at immutable revision
-`c346aad25a1e7d09d22bf3ea32b7c341f13512ef`. Its tree matches the old locked
-1.0.0 revision; the current tag was verified against the published release.
+QuantumLeap uses the latest stable release, 1.0.1, at immutable revision
+`4070b8707b824c3264f2cd1bb672a81aea8318a3`. This is the peeled commit of the
+1.0.1 tag and includes the shared support-button dark-mode fix.
