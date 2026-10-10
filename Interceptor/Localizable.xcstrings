@@ -1009,12 +1009,12 @@
         }
       }
     },
-    "Set Up Capture" : {
+    "Capture Setup" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Set Up Capture"
+            "value" : "Capture Setup"
           }
         },
         "ja" : {
@@ -1025,18 +1025,18 @@
         }
       }
     },
-    "Capture Notifications" : {
+    "Allow Notifications" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Capture Notifications"
+            "value" : "Allow Notifications"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "取得時の通知"
+            "value" : "通知を許可"
           }
         }
       }
@@ -1214,7 +1214,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Setup installs a local certificate and a VPN configuration. Trusting the certificate allows this app to decrypt selected HTTPS traffic. Agreeing here does not install either item or start capture. You choose those actions separately in Set Up Capture. You can remove the certificate and VPN configuration in iOS Settings."
+            "value" : "Setup installs a local certificate and a VPN configuration. Trusting the certificate allows this app to decrypt selected HTTPS traffic. Agreeing here does not install either item or start capture. You choose those actions separately in Capture Setup. You can remove the certificate and VPN configuration in iOS Settings."
           }
         },
         "ja" : {

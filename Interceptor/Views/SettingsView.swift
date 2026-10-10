@@ -20,10 +20,10 @@ struct SettingsView: View {
             QuantumLeap.Support()
                 .environment(\.isFirstLaunch, $showSetup)
             Section {
-                Button("Set Up Capture") { showSetup = true }
+                Button("Capture Setup") { showSetup = true }
                     .disabled(consentVersion != CaptureAuthorization.version)
                     .foregroundStyle(.primary)
-                Button("Capture Notifications") {
+                Button("Allow Notifications") {
                     Task { _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) }
                 }.disabled(consentVersion != CaptureAuthorization.version)
                     .foregroundStyle(.primary)

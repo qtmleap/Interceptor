@@ -48,7 +48,7 @@ final class InterceptorUITests: XCTestCase {
             XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
             XCTAssertFalse(app.buttons["Agree"].exists)
         }
-        settingsButton(app, named: "Set Up Capture").tap()
+        settingsButton(app, named: "Capture Setup").tap()
         XCTAssertTrue(app.buttons["Next"].waitForExistence(timeout: 5))
         app.buttons["Close"].tap()
         XCTAssertTrue(app.buttons["Next"].waitForNonExistence(timeout: 5))
@@ -456,7 +456,7 @@ final class InterceptorUITests: XCTestCase {
 
         agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        settingsButton(app, named: "Set Up Capture").tap()
+        settingsButton(app, named: "Capture Setup").tap()
 
         // The simulator permits advancing through the device-only setup steps.
         if app.buttons["Next"].waitForExistence(timeout: 5) {
