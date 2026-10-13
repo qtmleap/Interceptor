@@ -14,6 +14,7 @@
 		1089BCFE2E5239CA0088488B /* TreeSitterJSONRunestone in Frameworks */ = {isa = PBXBuildFile; productRef = 1089BCFD2E5239CA0088488B /* TreeSitterJSONRunestone */; };
 		1089BD002E5239CA0088488B /* TreeSitterLanguagesCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 1089BCFF2E5239CA0088488B /* TreeSitterLanguagesCommon */; };
 		10925F5D2E4CFA25003611AA /* QuantumLeap in Frameworks */ = {isa = PBXBuildFile; productRef = 10925F5C2E4CFA25003611AA /* QuantumLeap */; };
+		10A0E1D12F0000000000A101 /* QuantumLeapUpdates in Frameworks */ = {isa = PBXBuildFile; productRef = 10A0E1D12F0000000000A102 /* QuantumLeapUpdates */; };
 		10B520E52E52A344006C2045 /* TreeSitterJavaScript in Frameworks */ = {isa = PBXBuildFile; productRef = 10B520E42E52A344006C2045 /* TreeSitterJavaScript */; };
 		10B520E72E52A344006C2045 /* TreeSitterJavaScriptQueries in Frameworks */ = {isa = PBXBuildFile; productRef = 10B520E62E52A344006C2045 /* TreeSitterJavaScriptQueries */; };
 		10B520E92E52A344006C2045 /* TreeSitterJavaScriptRunestone in Frameworks */ = {isa = PBXBuildFile; productRef = 10B520E82E52A344006C2045 /* TreeSitterJavaScriptRunestone */; };
@@ -129,6 +130,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				10925F5D2E4CFA25003611AA /* QuantumLeap in Frameworks */,
+				10A0E1D12F0000000000A101 /* QuantumLeapUpdates in Frameworks */,
 				10B520E52E52A344006C2045 /* TreeSitterJavaScript in Frameworks */,
 				104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */,
 				104F3BB22E49135800A2D6F1 /* Mudmouth in Frameworks */,
@@ -224,6 +226,7 @@
 				104F3BAE2E49131900A2D6F1 /* Mudmouth */,
 				104F3BB12E49135800A2D6F1 /* Mudmouth */,
 				10925F5C2E4CFA25003611AA /* QuantumLeap */,
+				10A0E1D12F0000000000A102 /* QuantumLeapUpdates */,
 				10FBBF2C2E522C5E00CC57B0 /* Runestone */,
 				1089BCF92E5239CA0088488B /* TreeSitterJSON */,
 				1089BCFB2E5239CA0088488B /* TreeSitterJSONQueries */,
@@ -849,7 +852,7 @@
 			repositoryURL = "https://github.com/qtmleap/QuantumLeap.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.4;
+				minimumVersion = 1.0.0;
 			};
 		};
 		10FBBF2B2E522C5E00CC57B0 /* XCRemoteSwiftPackageReference "Runestone" */ = {
@@ -895,6 +898,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */;
 			productName = QuantumLeap;
+		};
+		10A0E1D12F0000000000A102 /* QuantumLeapUpdates */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */;
+			productName = QuantumLeapUpdates;
 		};
 		10B520E42E52A344006C2045 /* TreeSitterJavaScript */ = {
 			isa = XCSwiftPackageProductDependency;

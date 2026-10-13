@@ -1,0 +1,34 @@
+name: QuantumLeap package access
+description: >-
+  Preflight for the private QuantumLeap Swift package. Fails with a clear message when the
+  token is missing, otherwise gives git an Authorization header scoped to that one repository
+  for the rest of the job. Nothing is written to ~/.netrc or any global credential cache.
+inputs:
+  token:
+    description: QUANTUMLEAP_READ_TOKEN (read-only access to qtmleap/QuantumLeap)
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Check QuantumLeap token and scope git credentials
+      shell: bash
+      env:
+        QUANTUMLEAP_READ_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        if [ -z "$QUANTUMLEAP_READ_TOKEN" ]; then
+          echo "::error title=QUANTUMLEAP_READ_TOKEN missing::The private package qtmleap/QuantumLeap cannot be resolved. Add a read-only QUANTUMLEAP_READ_TOKEN secret to this repository (or an environment this job uses)."
+          exit 1
+        fi
+        header=$(printf 'x-access-token:%s' "$QUANTUMLEAP_READ_TOKEN" | base64 | tr -d '\r\n')
+        echo "::add-mask::$header"
+        # GIT_CONFIG_* is read by every git child process, including the ones SwiftPM and
+        # xcodebuild start, and lives only as long as this job's environment.
+        {
+          echo "GIT_TERMINAL_PROMPT=0"
+          echo "GIT_CONFIG_COUNT=2"
+          echo "GIT_CONFIG_KEY_0=http.https://github.com/qtmleap/QuantumLeap.git.extraheader"
+          echo "GIT_CONFIG_VALUE_0=Authorization: Basic $header"
+          echo "GIT_CONFIG_KEY_1=http.https://github.com/qtmleap/QuantumLeap.extraheader"
+          echo "GIT_CONFIG_VALUE_1=Authorization: Basic $header"
+        } >> "$GITHUB_ENV"

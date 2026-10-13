@@ -1,4 +1,5 @@
 import Mudmouth
+import QuantumLeapUpdates
 import SwiftData
 import SwiftUI
 import UserNotifications
@@ -29,6 +30,7 @@ struct Interceptor: App {
                 .environmentIsFirstLaunch()
                 .modelContainer(ModelContainer.default)
                 .onAppear { appDelegate.tuberose = tuberose }
+                .quantumLeapUpdates(countryCode: "JP")
         }
     }
 }

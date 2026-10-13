@@ -17,7 +17,9 @@ concurrency:
 jobs:
   simulator:
     name: Build and test (Xcode 27)
-    runs-on: xcode-27
+    # Same-repository pull requests only: the runner is a real machine.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macos, arm64, xcode-27]
     timeout-minutes: 45
     defaults:
       run:
@@ -33,24 +35,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: qtmleap/Mudmouth
-          ref: 5c97774f645023b22366db5abe86797915da2d33
+          ref: 3c1468aaaea5140835982bc8e38c9d3bfc49d2a0
           path: Mudmouth
           persist-credentials: false
 
-      - name: Authenticate private QuantumLeap dependency
-        env:
-          QUANTUMLEAP_READ_TOKEN: ${{ secrets.QUANTUMLEAP_READ_TOKEN }}
-        run: |
-          if [ -z "$QUANTUMLEAP_READ_TOKEN" ]; then
-            echo "::error::QUANTUMLEAP_READ_TOKEN is required to read the private QuantumLeap package"
-            exit 1
-          fi
-          umask 077
-          printf 'machine github.com\n  login x-access-token\n  password %s\n' "$QUANTUMLEAP_READ_TOKEN" > "$HOME/.netrc"
+      - name: QuantumLeap package access
+        uses: ./Interceptor/.github/actions/quantumleap-auth
+        with:
+          token: ${{ secrets.QUANTUMLEAP_READ_TOKEN }}
 
       - name: Select dedicated iPhone simulator
         run: |
           xcodebuild -version
+          xcodebuild -version | grep -q '^Xcode 27' || { echo "::error::Xcode 27 is required"; exit 1; }
           echo "PLL_SOURCE_PACKAGES_PATH=$RUNNER_TEMP/SourcePackages" >> "$GITHUB_ENV"
           xcrun simctl list runtimes --json > "$RUNNER_TEMP/runtimes.json"
           runtime=$(python3 - "$RUNNER_TEMP/runtimes.json" <<'PY'
@@ -77,7 +74,7 @@ jobs:
             -destination-timeout 60 \
             -clonedSourcePackagesDirPath "$PLL_SOURCE_PACKAGES_PATH" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -packageAuthorizationProvider netrc -onlyUsePackageVersionsFromResolvedFile \
+            -onlyUsePackageVersionsFromResolvedFile \
             -skipPackagePluginValidation \
             -parallel-testing-enabled NO \
             -collect-test-diagnostics never \

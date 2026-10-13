@@ -13,26 +13,110 @@
 # Uncomment the line if you want fastlane to automatically update itself
 # update_fastlane
 
+require "fileutils"
+require "tmpdir"
+require "xcodeproj"
+require_relative "lib/release_signing"
+
 default_platform(:ios)
 
-before_all do |lane, options|
-  if lane == :beta && ENV["ENVIRONMENT"] == "CI"
-    setup_ci(provider: ENV["SETUP_CI_PROVIDER"])
-  end
-end
+APP_IDENTIFIER = "jp.qleap.intrcptr".freeze
+TUNNEL_IDENTIFIER = "jp.qleap.intrcptr.packet-tunnel".freeze
+TUNNEL_TARGET = "PacketTunnel".freeze # Xcodeproj target name; packet-tunnel is only the bundle id suffix
+TEAM_ID = "5Q94QJ7G98".freeze
+XCODEPROJ = "Interceptor.xcodeproj".freeze
+REPO_ROOT = File.expand_path("..", __dir__)
+# Both targets' IPHONEOS_DEPLOYMENT_TARGET in the project.
+MIN_OS = "17.0".freeze
 
 platform :ios do
   desc "Push a new beta build to TestFlight"
   lane :beta do
-    # scan
-    fetch_testflight_profile
-    increment_build_number(xcodeproj: "Interceptor.xcodeproj")
-    build_app(scheme: "Interceptor", xcargs: "-allowProvisioningUpdates", clean: true)
+    key = asc_api_key
+    # Ask App Store Connect for the next build of this version instead of a counter
+    # kept in the project, so a build number is never guessed.
+    version = get_version_number(xcodeproj: XCODEPROJ, target: "Interceptor")
+    build_number = latest_testflight_build_number(
+      api_key: key,
+      app_identifier: APP_IDENTIFIER,
+      version: version,
+      platform: "ios",
+      initial_build_number: 0
+    ) + 1
+    UI.message("build number: #{build_number}")
+
+    # Fail before any keychain or match work if a signing target is not in the project.
+    # Targets are Xcodeproj target names; "packet-tunnel" is the product name, not a target.
+    signing_targets = { "Interceptor" => APP_IDENTIFIER, TUNNEL_TARGET => TUNNEL_IDENTIFIER }
+    ReleaseSigning.resolve_targets(Xcodeproj::Project.open(File.join(REPO_ROOT, XCODEPROJ)), signing_targets.keys)
+
+    # Signing happens in a keychain made for this run (random password, never the default),
+    # which is removed again however the lane ends.
+    ReleaseSigning.with_isolated_keychain do |keychain|
+      match(
+        **ReleaseSigning.match_options(
+          api_key: key,
+          app_identifier: [APP_IDENTIFIER, TUNNEL_IDENTIFIER],
+          keychain: keychain
+        )
+      )
+      mapping = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING]
+
+      # Manual signing is applied to the two shipping targets only and the project file is
+      # restored afterwards, so a crash cannot leave the profile names behind.
+      pbxproj_path = File.join(REPO_ROOT, XCODEPROJ, "project.pbxproj")
+      pbxproj_backup = File.join(Dir.tmpdir, "interceptor-pbxproj-#{Process.pid}.bak")
+      FileUtils.cp(pbxproj_path, pbxproj_backup)
+      begin
+        signing_targets.each do |target, bundle_id|
+          update_code_signing_settings(
+            path: XCODEPROJ,
+            targets: [target],
+            use_automatic_signing: false,
+            team_id: TEAM_ID,
+            code_sign_identity: "Apple Distribution",
+            profile_name: mapping.fetch(bundle_id),
+            bundle_identifier: bundle_id
+          )
+        end
+        ReleaseSigning.verify_modified(
+          Xcodeproj::Project.open(File.join(REPO_ROOT, XCODEPROJ)),
+          signing_targets.to_h { |target, bundle_id| [target, mapping.fetch(bundle_id)] }
+        )
+        # No -allowProvisioningUpdates: the profiles come from match, read-only.
+        build_app(
+          project: XCODEPROJ,
+          scheme: "Interceptor",
+          configuration: "Release",
+          export_method: "app-store",
+          xcargs: "CURRENT_PROJECT_VERSION=#{build_number}",
+          export_options: {
+            signingStyle: "manual",
+            provisioningProfiles: mapping.slice(APP_IDENTIFIER, TUNNEL_IDENTIFIER)
+          },
+          clean: true
+        )
+      ensure
+        FileUtils.cp(pbxproj_backup, pbxproj_path)
+        FileUtils.rm_f(pbxproj_backup)
+      end
+    end
+
+    sh(
+      "python3", File.join(REPO_ROOT, "scripts", "verify-ipa.py"),
+      lane_context[SharedValues::IPA_OUTPUT_PATH],
+      "--bundle-id", APP_IDENTIFIER, "--version", version, "--build", build_number.to_s,
+      "--min-os", MIN_OS, "--platform", "ios", "--families", "1,2", "--team", TEAM_ID,
+      "--extension", "#{TUNNEL_IDENTIFIER}:#{MIN_OS}"
+    )
+
     upload_to_testflight(
+      api_key: key,
+      app_identifier: APP_IDENTIFIER,
       skip_waiting_for_build_processing: true,
       demo_account_required: false,
       notify_external_testers: false,
-      expire_previous_builds: true
+      expire_previous_builds: false
     )
   end
 
@@ -42,10 +126,8 @@ platform :ios do
     match(
       api_key: api_key,
       type: "appstore",
-      app_identifier: [
-        "jp.qleap.intrcptr",
-        "jp.qleap.intrcptr.packet-tunnel",
-      ],
+      app_identifier: [APP_IDENTIFIER, TUNNEL_IDENTIFIER],
+      # Never mints certificates or profiles; a missing one fails the lane.
       readonly: ENV["MATCH_FETCH_READ_ONLY_MODE"]
     )
   end
