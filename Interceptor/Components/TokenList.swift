@@ -27,9 +27,17 @@ struct ServiceTokenLink: View {
                         })
                     })
                 }, header: {
-                    Text("HEADER_SERVICE_TOKENS")
+                    if !client.tokens.isEmpty {
+                        Text("HEADER_SERVICE_TOKENS")
+                    }
                 })
             })
+            .overlay {
+                if client.tokens.isEmpty {
+                    ContentUnavailableView("EMPTY_TOKENS_TITLE", systemImage: "key.horizontal",
+                                           description: Text("EMPTY_TOKENS_DESCRIPTION"))
+                }
+            }
             .navigationTitle(Text("TITLE_SERVICE_TOKENS"))
             .navigationBarTitleDisplayMode(.inline)
         }, label: {
@@ -41,74 +49,63 @@ struct ServiceTokenLink: View {
 }
 
 struct ServiceTokenView: View {
-//    @Binding var token: AccessToken
-    @State private var apiURL: String = ""
-    @State private var urlScheme: String = ""
-    @State private var isEditable: Bool = false
+    @State private var isTokenVisible = false
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isCopied = false
+    @State private var copyGeneration = 0
     let token: AccessToken
+
+    private func copyToken() {
+        UIPasteboard.general.string = token.accessToken
+        isCopied = true
+        copyGeneration += 1
+        AccessibilityNotification.Announcement(String(localized: "LABEL_TOKEN_COPIED")).post()
+    }
 
     var body: some View {
         Form(content: {
             Section(content: {
-                Label(title: {
-                    Toggle(isOn: .constant(false), label: {
-                        Text("LABEL_REGENERATE_FROM_GAME_WEB_TOKEN")
+                Button(action: copyToken, label: {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if isTokenVisible {
+                                Text(token.accessToken)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            } else {
+                                Text("LABEL_TOKEN_HIDDEN")
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(isCopied ? "LABEL_TOKEN_COPIED" : "LABEL_TOKEN_COPY_HINT")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                })
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .contextMenu {
+                    Button(action: copyToken, label: {
+                        Text("LABEL_COPY_TOKEN")
                     })
-                    .disabled(true)
-                }, icon: {
-                    Image(systemName: "lock")
-                })
-                Label(title: {
-                    Toggle(isOn: .constant(false), label: {
-                        Text("LABEL_OPEN_APP_WHEN_TOKEN_EXPIRED")
+                    Button(action: { isTokenVisible.toggle() }, label: {
+                        Text(isTokenVisible ? "LABEL_HIDE_TOKEN" : "LABEL_SHOW_TOKEN")
                     })
-                    .disabled(true)
-                }, icon: {
-                    Image(systemName: "lock")
-                })
-            }, header: {
-                Text("HEADER_GAME_WEB_TOKEN_EXPIRED_ACTION")
-            }, footer: {
-                Text("LABEL_GAME_WEB_TOKEN_EXPIRED_ACTION_FOOTER")
-            })
-            .disabled(true)
-            Section(content: {
-                Label(title: {
-                    TextField("LABEL_DESTINATION_URL", text: $apiURL)
-                        .keyboardType(.URL)
-                        .disabled(true)
-                }, icon: {
-                    Image(systemName: "lock")
-                })
-                Label(title: {
-                    TextField("LABEL_URL_SCHEME", text: $urlScheme)
-                        .keyboardType(.URL)
-                        .disabled(true)
-                }, icon: {
-                    Image(systemName: "lock")
-                })
-                Label(title: {
-                    NavigationLink(destination: {
-                        EmptyView()
-                    }, label: {
-                        Text("LABEL_JAVASCRIPT_CODE")
-                    })
-                    .disabled(true)
-                }, icon: {
-                    Image(systemName: "lock")
-                })
-            }, header: {
-                Text("HEADER_SERVICE_SETTING")
-            }, footer: {
-                Text("FOOTER_SERVICE_SETTING")
-            })
-            .disabled(true)
-            Section(content: {
-                LabeledContent(NSLocalizedString("LABEL_ACCESS_TOKEN", bundle: .main, comment: ""), content: {
-                    Text(token.accessToken)
-                        .lineLimit(1)
-                        .textSelection(.enabled)
-                })
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("LABEL_COPY_TOKEN"))
+                .accessibilityIdentifier("access-token-copy")
+                .accessibilityValue(isCopied ? Text("LABEL_TOKEN_COPIED") : (isTokenVisible ? Text(verbatim: token.accessToken) : Text("LABEL_TOKEN_HIDDEN")))
+                .accessibilityHint(Text("LABEL_TOKEN_COPY_ACCESSIBILITY_HINT"))
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction(named: Text(isTokenVisible ? "LABEL_HIDE_TOKEN" : "LABEL_SHOW_TOKEN")) {
+                    isTokenVisible.toggle()
+                }
             }, header: {
                 Text("HEADER_ACCESS_TOKEN")
             }, footer: {
@@ -123,7 +120,8 @@ struct ServiceTokenView: View {
                 })
                 LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_AUD", comment: ""), content: {
                     Text(token.gtoken.payload.aud)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
                 })
                 LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_EXP", comment: ""), content: {
                     Text(Date(timeIntervalSince1970: TimeInterval(token.gtoken.payload.exp)).formatted())
@@ -135,11 +133,13 @@ struct ServiceTokenView: View {
                 })
                 LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_ISS", comment: ""), content: {
                     Text(token.gtoken.payload.iss)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
                 })
                 LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_JTI", comment: ""), content: {
                     Text(token.gtoken.payload.jti.uuidString)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
                 })
                 LabeledContent(NSLocalizedString("LABEL_TOKEN_PAYLOAD_SUB", comment: ""), content: {
                     Text(token.gtoken.payload.sub, format: .number)
@@ -156,6 +156,22 @@ struct ServiceTokenView: View {
                 Text("LABEL_OPEN_APP")
             })
         })
+        .task(id: copyGeneration) {
+            guard isCopied else { return }
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            isCopied = false
+        }
+        .onDisappear {
+            isTokenVisible = false
+            isCopied = false
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                isTokenVisible = false
+                isCopied = false
+            }
+        }
         .monospacedDigit()
         .navigationTitle(Text(token.host))
         .navigationBarTitleDisplayMode(.inline)

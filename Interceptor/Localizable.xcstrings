@@ -1,6 +1,102 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "EMPTY_SETTINGS_TITLE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a Setting"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定項目を選択"
+          }
+        }
+      }
+    },
+    "EMPTY_SETTINGS_DESCRIPTION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose an item in the sidebar to view its details."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サイドバーの項目を選択すると、詳細が表示されます。"
+          }
+        }
+      }
+    },
+    "EMPTY_REQUESTS_TITLE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Captured Requests"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信履歴がありません"
+          }
+        }
+      }
+    },
+    "EMPTY_REQUESTS_DESCRIPTION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Complete Capture Setup in Settings and turn on Status to start capturing requests."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定の「キャプチャの設定」を済ませ、接続状態をオンにすると通信履歴が表示されます。"
+          }
+        }
+      }
+    },
+    "EMPTY_TOKENS_TITLE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Tokens Yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "トークンがありません"
+          }
+        }
+      }
+    },
+    "EMPTY_TOKENS_DESCRIPTION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tokens from supported game traffic appear here after capture."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対応するゲームの通信をキャプチャすると、取得したトークンがここに表示されます。"
+          }
+        }
+      }
+    },
     "HOW_TO_USE_CAPTURE_DESCRIPTION" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -506,6 +602,118 @@
         }
       }
     },
+    "LABEL_COPY_TOKEN": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Access Token"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセストークンをコピー"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_COPY_HINT": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to copy. Hold for options."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タップでコピー、長押しでメニュー"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_COPIED": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コピーしました"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_COPY_ACCESSIBILITY_HINT": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copies the access token."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセストークンをコピーします。"
+          }
+        }
+      }
+    },
+    "LABEL_SHOW_TOKEN": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Token"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "トークンを表示"
+          }
+        }
+      }
+    },
+    "LABEL_HIDE_TOKEN": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Token"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "トークンを隠す"
+          }
+        }
+      }
+    },
+    "LABEL_TOKEN_HIDDEN": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hidden"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "非表示"
+          }
+        }
+      }
+    },
     "LABEL_ACCESS_TOKEN" : {
       "localizations" : {
         "en" : {
@@ -678,6 +886,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "再生成する"
+          }
+        }
+      }
+    },
+    "LABEL_REQUEST_BODY": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request Body"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リクエスト本文"
+          }
+        }
+      }
+    },
+    "LABEL_RESPONSE_BODY": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Response Body"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "レスポンス本文"
           }
         }
       }

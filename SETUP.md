@@ -45,7 +45,7 @@ The old organization/repository secret names are intentionally not read.
 * The `macos-27` runner has Xcode 27 (checked at run time), Ruby 3.4.10 under rbenv, and an ephemeral account.
 * `qtmleap/match` holds App Store profiles for `jp.qleap.intrcptr`, `jp.qleap.intrcptr.packet-tunnel` (match never creates them).
 * `.github/workflows/ios-ci.yaml`, `.github/workflows/ios.yml` must run on `pull_request` with the job names listed above.
-* `Mudmouth` is checked out at the pinned revision `3c1468aaaea5140835982bc8e38c9d3bfc49d2a0`; the build copy refuses any other state.
+* `Mudmouth` is checked out at the pinned revision `be4cc787669fdfebead90aba197a3501ebdd0063`; the build copy refuses any other state.
 
 ## Local checks (Ruby only, no fastlane, Apple or network)
 

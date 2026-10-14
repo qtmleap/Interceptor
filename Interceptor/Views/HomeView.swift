@@ -43,6 +43,12 @@ struct HomeView: View {
             })
         })
         .listStyle(.plain)
+        .overlay {
+            if groups.isEmpty {
+                ContentUnavailableView("EMPTY_REQUESTS_TITLE", systemImage: "tray",
+                                       description: Text("EMPTY_REQUESTS_DESCRIPTION"))
+            }
+        }
         .navigationTitle(Text("TITLE_HOME"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(content: {
@@ -52,6 +58,8 @@ struct HomeView: View {
                 }, label: {
                     Image(systemName: "trash.fill")
                 })
+                .accessibilityLabel(Text("LABEL_CLEAR_REQUESTS"))
+                .disabled(groups.isEmpty)
                 .confirmationDialog(NSLocalizedString("LABEL_CLEAR_REQUESTS", comment: ""), isPresented: $isPresented, titleVisibility: .visible, actions: {
                     Button(role: .destructive, action: {
                         // 全削除

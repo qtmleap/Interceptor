@@ -17,7 +17,9 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(CaptureAuthorization.key, store: CaptureAuthorization.defaults) private var consentVersion = 0
 
-    private var requiresConsent: Bool { consentVersion != CaptureAuthorization.version }
+    private var requiresConsent: Bool {
+        consentVersion != CaptureAuthorization.version
+    }
 
     var body: some View {
         Group {
@@ -45,7 +47,9 @@ struct ContentView: View {
     }
 
     private func stopCaptureIfUnauthorized() {
-        if !CaptureAuthorization.isGranted { client.stopVPNTunnel() }
+        if !CaptureAuthorization.isGranted {
+            client.stopVPNTunnel()
+        }
     }
 
     private var mainTabs: some View {
@@ -65,6 +69,9 @@ struct ContentView: View {
             .tag(0)
             NavigationView(content: {
                 SettingsView()
+                ContentUnavailableView("EMPTY_SETTINGS_TITLE", systemImage: "sidebar.left",
+                                       description: Text("EMPTY_SETTINGS_DESCRIPTION"))
+                    .navigationBarTitleDisplayMode(.inline)
             })
             .navigationBarTitleDisplayMode(.inline)
             .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
@@ -77,6 +84,35 @@ struct ContentView: View {
             }
             .tag(1)
         })
+        .introspect(.tabView, on: .iOS(.v17, .v18, .v26, .v27)) { tabView in
+            // Change only selected tab items; the shared accent still colors primary buttons.
+            let selectedColor = UIColor { traits in
+                traits.userInterfaceStyle == .dark
+                    ? UIColor(red: 0.62, green: 0.79, blue: 1, alpha: 1)
+                    : (UIColor(named: "AccentColor", in: .main, compatibleWith: traits) ?? .systemBlue)
+            }
+            func selectedAppearance(_ original: UITabBarAppearance) -> UITabBarAppearance {
+                let appearance = UITabBarAppearance(barAppearance: original)
+                for layout in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance,
+                               appearance.compactInlineLayoutAppearance]
+                {
+                    layout.selected.iconColor = selectedColor
+                    layout.selected.titleTextAttributes[.foregroundColor] = selectedColor
+                }
+                return appearance
+            }
+            // The iPad floating tab bar inherits the controller view's tint.
+            tabView.view.tintColor = selectedColor
+            // Keep the content's original accent, including selected sidebar rows.
+            for controller in tabView.viewControllers ?? [] {
+                controller.view.tintColor = UIColor(named: "AccentColor") ?? .systemBlue
+            }
+            tabView.tabBar.tintColor = selectedColor
+            tabView.tabBar.standardAppearance = selectedAppearance(tabView.tabBar.standardAppearance)
+            if let edge = tabView.tabBar.scrollEdgeAppearance {
+                tabView.tabBar.scrollEdgeAppearance = selectedAppearance(edge)
+            }
+        }
         .introspect(.tabView, on: .iOS(.v18), customize: { tabView in
             tabView.traitOverrides.horizontalSizeClass = .unspecified
             tabView.tabBar.backgroundColor = .systemBackground

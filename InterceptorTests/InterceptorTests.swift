@@ -3,9 +3,11 @@
 //  InterceptorTests
 //
 
-@testable import Interceptor
 import Foundation
+@testable import Interceptor
 @testable import Mudmouth
+import Runestone
+import UIKit
 import XCTest
 
 @MainActor
@@ -141,8 +143,11 @@ final class InterceptorTests: XCTestCase {
         let proxy = X509Proxy.default
         defer {
             try? proxy.stop()
-            if let original { store.set(original, forKey: CaptureAuthorization.key) }
-            else { store.removeObject(forKey: CaptureAuthorization.key) }
+            if let original {
+                store.set(original, forKey: CaptureAuthorization.key)
+            } else {
+                store.removeObject(forKey: CaptureAuthorization.key)
+            }
         }
         CaptureAuthorization.revoke()
         XCTAssertThrowsError(try proxy.start())
@@ -171,8 +176,11 @@ final class InterceptorTests: XCTestCase {
         let store = CaptureAuthorization.defaults
         let original = store.object(forKey: CaptureAuthorization.key)
         defer {
-            if let original { store.set(original, forKey: CaptureAuthorization.key) }
-            else { store.removeObject(forKey: CaptureAuthorization.key) }
+            if let original {
+                store.set(original, forKey: CaptureAuthorization.key)
+            } else {
+                store.removeObject(forKey: CaptureAuthorization.key)
+            }
         }
         CaptureAuthorization.revoke()
         do { try await MITM.startTunnel(); XCTFail("Missing consent must reject start") }
@@ -184,4 +192,21 @@ final class InterceptorTests: XCTestCase {
         await MITM.stopTunnel()
     }
 
+    func testFontScalesWithContentSizeCategory() {
+        let regular = ScaledCodeTheme(contentSizeCategory: .large)
+        let accessibility = ScaledCodeTheme(contentSizeCategory: .accessibilityExtraExtraExtraLarge)
+        XCTAssertEqual(regular.font.pointSize, 17, accuracy: 0.5)
+        XCTAssertGreaterThan(accessibility.font.pointSize, regular.font.pointSize)
+        XCTAssertLessThanOrEqual(accessibility.font.pointSize, ScaledCodeTheme.maximumFontSize)
+        XCTAssertEqual(accessibility.lineNumberFont.pointSize, accessibility.font.pointSize)
+    }
+
+    func testForwardsDefaultThemeBehavior() {
+        let base = DefaultTheme()
+        let theme = ScaledCodeTheme(contentSizeCategory: .large)
+        XCTAssertEqual(theme.fontTraits(for: "keyword"), .bold)
+        XCTAssertEqual(theme.textColor, base.textColor)
+        XCTAssertEqual(theme.lineNumberColor, base.lineNumberColor)
+        XCTAssertNotNil(theme.highlightedRange(forFoundTextRange: NSRange(location: 0, length: 1), ofStyle: .found))
+    }
 }

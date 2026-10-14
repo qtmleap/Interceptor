@@ -18,14 +18,6 @@ struct ServerListView: View {
                 Text(option.host)
             })
         })
-        .toolbar(content: {
-            ToolbarItem(placement: .navigation, content: {
-                Button(action: {}, label: {
-                    Image(systemName: "plus")
-                })
-                .disabled(true)
-            })
-        })
         .navigationTitle(Text("TITLE_SERVER_LIST"))
         .navigationBarTitleDisplayMode(.inline)
     }
