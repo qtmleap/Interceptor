@@ -848,8 +848,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/qtmleap/QuantumLeap.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.4;
+				kind = revision;
+				revision = 4070b8707b824c3264f2cd1bb672a81aea8318a3;
 			};
 		};
 		10FBBF2B2E522C5E00CC57B0 /* XCRemoteSwiftPackageReference "Runestone" */ = {
