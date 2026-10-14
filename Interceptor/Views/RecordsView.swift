@@ -13,6 +13,7 @@ import SwiftUI
 
 struct RecordsView: View {
     let group: RecordGroup
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         List(content: {
@@ -20,26 +21,34 @@ struct RecordsView: View {
                 NavigationLink(destination: {
                     RecordView(record: record)
                 }, label: {
-                    VStack(alignment: .leading, spacing: 0, content: {
-                        HStack(spacing: 4, content: {
+                    let layout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                        : AnyLayout(HStackLayout(spacing: 4))
+                    VStack(alignment: .leading, spacing: 2, content: {
+                        layout {
                             Circle()
                                 .fill(record.foregroundColor)
                                 .frame(width: 12, height: 12)
+                                .overlay { Circle().strokeBorder(.primary, lineWidth: 1) }
+                                .accessibilityHidden(true)
                             Text(record.method)
-                                .font(.system(size: 14))
+                                .font(.subheadline)
                                 .fontWeight(.bold)
-                                .foregroundStyle(record.foregroundColor)
+                                .foregroundStyle(.primary)
                             Text(record.code, format: .number)
-                                .font(.system(size: 14))
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
                             Text(record.phrase)
-                                .font(.system(size: 14))
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
-                        })
+                        }
                         Text(record.path)
-                            .lineLimit(1)
+                            .font(.body)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                            .truncationMode(.middle)
                     })
-                    .padding(1)
+                    .padding(.vertical, 4)
+                    .accessibilityElement(children: .combine)
                 })
             })
         })

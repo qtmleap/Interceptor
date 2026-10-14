@@ -11,12 +11,12 @@ import SwiftUI
 @_spi(Advanced) import SwiftUIIntrospect
 import TreeSitterJSONRunestone
 
-private struct DisclosureIndicator: View {
+private struct DisclosureIndicator<Label: View>: View {
     @State private var isExpanded: Bool = true
-    let label: () -> Text
+    let label: () -> Label
     let items: [HTTP.Parameter]
 
-    init(label: @escaping () -> Text, items: HTTP.Parameters) {
+    init(label: @escaping () -> Label, items: HTTP.Parameters) {
         self.label = label
         self.items = items.values
     }
@@ -40,43 +40,71 @@ private struct DisclosureIndicator: View {
     }
 }
 
+/// Read-only context: the full path wraps and stays selectable instead of being truncated.
+private struct SummaryRow: View {
+    let title: String
+    let path: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4, content: {
+            Text(title)
+                .font(.headline)
+            Text(path)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        })
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SectionTitle: View {
+    let key: LocalizedStringKey
+
+    init(_ key: LocalizedStringKey) {
+        self.key = key
+    }
+
+    var body: some View {
+        Text(key)
+            .font(.headline)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
 struct RecordView: View {
     let record: Record
     @State private var isExpanded: Bool = true
     @State private var selection: Int = 0
 
-    @ViewBuilder
     var RequestView: some View {
         List(content: {
+            SummaryRow(title: record.method, path: record.path)
+                .listRowSeparator(.hidden)
             DisclosureIndicator(label: {
-                Text("LABEL_RECORD_HEADER")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                SectionTitle("LABEL_RECORD_HEADER")
             }, items: record.request.headers)
                 .listRowSeparator(.hidden)
             if !record.queries.isEmpty {
                 DisclosureIndicator(label: {
-                    Text("LABEL_RECORD_QUERY")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                    SectionTitle("LABEL_RECORD_QUERY")
                 }, items: record.queries)
                     .listRowSeparator(.hidden)
             }
             if !record.cookies.isEmpty {
                 DisclosureIndicator(label: {
-                    Text("LABEL_RECORD_COOKIE")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                    SectionTitle("LABEL_RECORD_COOKIE")
                 }, items: record.cookies)
                     .listRowSeparator(.hidden)
             }
             if let json = record.request.json {
                 NavigationLink(destination: {
                     CodeView(text: json, language: .json)
+                        .navigationTitle("LABEL_REQUEST_BODY")
+                        .navigationBarTitleDisplayMode(.inline)
                 }, label: {
-                    Text("LABEL_RECORD_BODY")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                    SectionTitle("LABEL_RECORD_BODY")
                 })
                 .listRowSeparator(.hidden)
             }
@@ -84,30 +112,27 @@ struct RecordView: View {
         .tag(0)
     }
 
-    @ViewBuilder
     var ResponseView: some View {
         List(content: {
+            SummaryRow(title: "\(record.code) \(record.phrase)", path: record.path)
+                .listRowSeparator(.hidden)
             DisclosureIndicator(label: {
-                Text("LABEL_RECORD_HEADER")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                SectionTitle("LABEL_RECORD_HEADER")
             }, items: record.response.headers)
                 .listRowSeparator(.hidden)
             if !record.response.cookies.isEmpty {
                 DisclosureIndicator(label: {
-                    Text("LABEL_RECORD_SET_COOKIE")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                    SectionTitle("LABEL_RECORD_SET_COOKIE")
                 }, items: record.response.cookies)
                     .listRowSeparator(.hidden)
             }
             if let json = record.response.json {
                 NavigationLink(destination: {
                     CodeView(text: json, language: .json)
+                        .navigationTitle("LABEL_RESPONSE_BODY")
+                        .navigationBarTitleDisplayMode(.inline)
                 }, label: {
-                    Text("LABEL_RECORD_BODY")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                    SectionTitle("LABEL_RECORD_BODY")
                 })
                 .listRowSeparator(.hidden)
             }
@@ -115,7 +140,6 @@ struct RecordView: View {
         .tag(1)
     }
 
-    @ViewBuilder
     var SegmentControl: some View {
         Picker(selection: $selection, content: {
             Text("LABEL_RECORD_REQUEST")
