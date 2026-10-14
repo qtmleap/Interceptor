@@ -12,7 +12,7 @@ permissions:
 
 env:
   # Keep simulator verification and the signing build on the same package commit.
-  MUDMOUTH_REV: 3c1468aaaea5140835982bc8e38c9d3bfc49d2a0
+  MUDMOUTH_REV: ee69dc7676eac212019b6f196e4c3d2efc97ff95
 
 concurrency:
   # Every develop push must reach the deployment queue. PR runs still supersede
@@ -68,6 +68,14 @@ jobs:
         run: |
           xcodebuild -version
           echo "PLL_SOURCE_PACKAGES_PATH=$RUNNER_TEMP/SourcePackages" >> "$GITHUB_ENV"
+          simulator_set="$HOME/Library/Developer/CoreSimulator/Devices"
+          export CI_SIMULATOR_DEVICE_SET="$simulator_set"
+          python3 -c 'import pathlib; [compile(p.read_text(), str(p), "exec") for p in map(pathlib.Path, ["scripts/ci-simulator-cleanup.py", "scripts/ci-simulator-start-worker.py"])]'
+          echo "CI_SIMULATOR_DEVICE_SET=$simulator_set" >> "$GITHUB_ENV"
+          hostname > "$RUNNER_TEMP/simulator-host.txt"
+          printf '%s\n' "$simulator_set" >> "$RUNNER_TEMP/simulator-host.txt"
+          xcrun simctl --set "$simulator_set" list devices --json > "$RUNNER_TEMP/simulators-before.json"
+          pgrep -fl '/Simulator.app/Contents/MacOS/Simulator' > "$RUNNER_TEMP/simulator-processes-before.txt" || true
           xcrun simctl list runtimes --json > "$RUNNER_TEMP/runtimes.json"
           runtime=$(python3 - "$RUNNER_TEMP/runtimes.json" <<'PY'
           import json, sys
@@ -78,11 +86,20 @@ jobs:
           print(max(available, key=lambda r: tuple(map(int, r["version"].split("."))))["identifier"])
           PY
           )
-          device=$(xcrun simctl create "Interceptor CI" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro "$runtime")
+          device=""
+          cleanup_failed_setup() {
+            if [ -n "$device" ]; then
+              SIMULATOR_UUID="$device" python3 scripts/ci-simulator-cleanup.py || true
+            fi
+          }
+          trap cleanup_failed_setup ERR
+          trap 'cleanup_failed_setup; exit 130' INT
+          trap 'cleanup_failed_setup; exit 143' TERM
+          device=$(xcrun simctl --set "$simulator_set" create "Interceptor CI" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro "$runtime")
           echo "SIMULATOR_UUID=$device" >> "$GITHUB_ENV"
-          xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
-          xcrun simctl list devices booted
+          xcrun simctl --set "$simulator_set" boot "$device"
+          xcrun simctl --set "$simulator_set" bootstatus "$device" -b
+          xcrun simctl --set "$simulator_set" list devices booted
 
       - name: Resolve private package dependencies
         env:
@@ -102,7 +119,7 @@ jobs:
       - name: Build and run unit and UI tests
         run: |
           set -o pipefail
-          NSUnbufferedIO=YES xcodebuild test \
+          NSUnbufferedIO=YES python3 scripts/ci-simulator-start-worker.py xcodebuild test \
             -project Interceptor.xcodeproj -scheme Interceptor \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UUID" \
             -destination-timeout 60 \
@@ -129,8 +146,29 @@ jobs:
             done
           ) > >(tee "$RUNNER_TEMP/diagnostics.log") 2>&1 &
           diagnostics_pid=$!
-          trap 'kill "$diagnostics_pid" 2>/dev/null || true' EXIT
+          stop_workers() {
+            python3 scripts/ci-simulator-cleanup.py --stop-worker || true
+            for worker_pid in "$diagnostics_pid" "$build_pid"; do
+              if jobs -pr | grep -Fxq "$worker_pid"; then
+                kill "$worker_pid" 2>/dev/null || true
+                for attempt in {1..10}; do
+                  if ! jobs -pr | grep -Fxq "$worker_pid"; then break; fi
+                  sleep 1
+                done
+                if jobs -pr | grep -Fxq "$worker_pid"; then kill -KILL "$worker_pid" 2>/dev/null || true; fi
+              fi
+              wait "$worker_pid" 2>/dev/null || true
+            done
+          }
+          trap stop_workers EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
           wait "$build_pid"
+
+      - name: Clean up dedicated iPhone simulator
+        if: always()
+        run: |
+          python3 scripts/ci-simulator-cleanup.py
 
       - name: Save test results and build logs
         if: always()
@@ -142,5 +180,9 @@ jobs:
             ${{ runner.temp }}/test.log
             ${{ runner.temp }}/diagnostics.log
             ${{ runner.temp }}/xcodebuild-sample-*.txt
+            ${{ runner.temp }}/simulator-build-group.json
+            ${{ runner.temp }}/simulator-host.txt
+            ${{ runner.temp }}/simulators-before.json
+            ${{ runner.temp }}/simulator-processes-before.txt
           if-no-files-found: ignore
           retention-days: 7

@@ -44,14 +44,15 @@ From the Interceptor directory, clone Mudmouth if it does not already exist:
 
 ```bash
 git clone https://github.com/qtmleap/Mudmouth.git ../Mudmouth
-git -C ../Mudmouth checkout 3c1468aaaea5140835982bc8e38c9d3bfc49d2a0
+git -C ../Mudmouth checkout ee69dc7676eac212019b6f196e4c3d2efc97ff95
 xcodebuild -resolvePackageDependencies -project Interceptor.xcodeproj -scheme Interceptor
 open Interceptor.xcodeproj
 ```
 
 The revision above is the Mudmouth revision selected for the local setup on
-2026-10-06 and matches CI. It removes the unused Introspect 1.x dependency so
-QuantumLeap 1.0.1 can resolve Introspect 27.x. Keep the checkout on its development branch when editing Mudmouth;
+2026-10-14 and matches simulator CI and TestFlight. It adds the focused capture
+setup flow, scrollable instructions, and bounded action buttons, while keeping
+QuantumLeap 1.0.1 compatible with Introspect 27.x. Keep the checkout on its development branch when editing Mudmouth;
 record any dependency revision changes alongside the application changes.
 
 To check simulator compilation without signing:

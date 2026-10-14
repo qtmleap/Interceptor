@@ -1,6 +1,159 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "HOW_TO_USE_CAPTURE_DESCRIPTION" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on the Status switch in Settings, then use an app whose supported traffic you want to inspect. Turn it off when you finish."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定の「接続状態」をオンにして、通信を確認したい対応アプリを使用してください。終了したら「接続状態」をオフにします。"
+          }
+        }
+      }
+    },
+    "HOW_TO_USE_CAPTURE_TITLE" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start and Stop Capture"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャプチャを開始・停止する"
+          }
+        }
+      }
+    },
+    "HOW_TO_USE_HOSTS_DESCRIPTION" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SSL Proxying List in Settings shows the hosts this app can inspect. Apps that use certificate pinning may reject the certificate, so their encrypted content cannot be inspected."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定の「プロキシ対象リスト」で、確認できるホストを表示します。証明書ピンニングを使用するアプリは証明書を拒否するため、暗号化された内容を確認できない場合があります。"
+          }
+        }
+      }
+    },
+    "HOW_TO_USE_HOSTS_TITLE" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supported Traffic"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対応する通信"
+          }
+        }
+      }
+    },
+    "HOW_TO_USE_PREPARE_DESCRIPTION" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Capture Setup in Settings. Follow the steps to install and trust the certificate, then configure the local VPN."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定の「キャプチャの設定」を開き、証明書のインストールと信頼、ローカルVPNの設定を行ってください。"
+          }
+        }
+      }
+    },
+    "HOW_TO_USE_PREPARE_TITLE" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepare Your Device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デバイスを準備する"
+          }
+        }
+      }
+    },
+    "HOW_TO_USE_REVIEW_DESCRIPTION" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Home and select a host to review captured requests. To delete the history, tap the trash icon in Home and choose Clear."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホームでホストを選択すると、キャプチャした通信を確認できます。通信履歴を削除するときは、ホームのごみ箱アイコンをタップし、「消去する」を選択してください。"
+          }
+        }
+      }
+    },
+    "HOW_TO_USE_REVIEW_TITLE" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review Requests"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信履歴を確認する"
+          }
+        }
+      }
+    },
+    "TITLE_HOW_TO_USE" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How to Use"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使い方"
+          }
+        }
+      }
+    },
     "Data Use" : {
       "localizations": {
         "en": {
@@ -838,7 +991,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Connection Status"
+            "value" : "Status"
           }
         },
         "ja" : {

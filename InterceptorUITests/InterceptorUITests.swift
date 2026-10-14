@@ -40,19 +40,115 @@ final class InterceptorUITests: XCTestCase {
         tab(app, named: "Settings").tap()
         for _ in 0..<2 {
             settingsButton(app, named: "How to Use").tap()
-            XCTAssertTrue(app.buttons["Next"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.navigationBars["How to Use"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.staticTexts["Review Requests"].exists)
+            XCTAssertFalse(app.buttons["Next"].exists, "The guide must not start certificate or VPN setup")
+            XCTAssertFalse(app.buttons["Allow Notifications"].exists)
             XCTAssertTrue(app.buttons["Close"].isHittable)
-            attachScreenshot(app, named: "How to Use sheet")
+            attachScreenshot(app, named: "Read-only How to Use")
             app.buttons["Close"].tap()
-            XCTAssertTrue(app.buttons["Next"].waitForNonExistence(timeout: 5))
+            XCTAssertTrue(app.navigationBars["How to Use"].waitForNonExistence(timeout: 5))
             XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
             XCTAssertFalse(app.buttons["Agree"].exists)
         }
+        XCTAssertFalse(app.buttons["Allow Notifications"].exists, "Notification permission belongs inside Capture Setup")
         settingsButton(app, named: "Capture Setup").tap()
         XCTAssertTrue(app.buttons["Next"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Notification Settings"].exists)
+        XCTAssertFalse(app.staticTexts["About This App"].exists)
         app.buttons["Close"].tap()
         XCTAssertTrue(app.buttons["Next"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testCaptureSetupLargeTextLandscape() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        agreeIfNeeded(app)
+        app.terminate()
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        tab(app, named: "Settings").tap()
+        settingsButton(app, named: "Capture Setup").tap()
+        XCTAssertTrue(app.staticTexts["Notification Settings"].waitForExistence(timeout: 5))
+        let scroll = app.scrollViews.containing(.staticText, identifier: "Notification Settings").firstMatch
+        XCTAssertTrue(scroll.waitForExistence(timeout: 5), "Setup instructions and controls must remain scrollable in a short window")
+        let allow = app.buttons["Allow Notifications"]
+        for _ in 0..<6 {
+            if allow.isHittable && app.buttons["Next"].isHittable { break }
+            scroll.swipeUp()
+        }
+        XCTAssertTrue(allow.isHittable)
+        XCTAssertTrue(app.buttons["Next"].isHittable)
+        XCTAssertTrue(app.buttons["Close"].isHittable)
+        attachDeviceScreenshot(named: "Capture Setup large text landscape")
+        // Continue without requesting notification permission.
+        app.buttons["Next"].tap()
+        XCTAssertTrue(app.staticTexts["VPN Configuration Profile"].waitForExistence(timeout: 5))
+        app.buttons["Close"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testCaptureSetupCanFinishAndReopen() throws {
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
+        app.launch()
+        agreeIfNeeded(app)
+        tab(app, named: "Settings").tap()
+        settingsButton(app, named: "Capture Setup").tap()
+        XCTAssertTrue(app.staticTexts["Notification Settings"].waitForExistence(timeout: 5))
+        let instructions = app.scrollViews.containing(.staticText, identifier: "Notification Settings").firstMatch
+        if app.frame.width >= 700 && app.frame.height > 1000 {
+            XCTAssertGreaterThan(instructions.frame.height, app.frame.height * 0.6,
+                                 "A portrait iPad should use the expanded setup sheet, not the short form sheet")
+        }
+        for title in ["Allow Notifications", "Skip for Now", "Next"] {
+            XCTAssertLessThanOrEqual(app.buttons[title].frame.width, 321,
+                                     "Standard-size setup buttons should not stretch across the iPad sheet")
+        }
+        attachScreenshot(app, named: "Capture Setup portrait")
+        app.buttons["Skip for Now"].tap()
+        let confirmation = try XCTUnwrap(app.buttons.matching(identifier: "Skip for Now")
+            .allElementsBoundByIndex.last(where: { $0.isHittable }))
+        confirmation.tap()
+        for title in ["VPN Configuration Profile", "Install Profile", "Trust Certificate",
+                      "Install VPN Configuration", "Enable VPN Configuration"] {
+            XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 5))
+            if title == "Enable VPN Configuration" {
+                XCTAssertTrue(app.buttons["Done"].isHittable)
+                app.buttons["Done"].tap()
+            } else {
+                XCTAssertTrue(app.buttons["Next"].isHittable)
+                app.buttons["Next"].tap()
+            }
+        }
+        XCTAssertTrue(app.buttons["Done"].waitForNonExistence(timeout: 5))
+        settingsButton(app, named: "Capture Setup").tap()
+        XCTAssertTrue(app.staticTexts["Notification Settings"].waitForExistence(timeout: 5))
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let closeAfterRotation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "isHittable == true"), object: app.buttons["Close"])
+        XCTAssertEqual(XCTWaiter.wait(for: [closeAfterRotation], timeout: 5), .completed,
+                       "Close must become usable after the sheet's rotation animation")
+        let rotatedInstructions = app.scrollViews.containing(.staticText, identifier: "Notification Settings").firstMatch
+        for _ in 0..<6 {
+            if app.buttons["Next"].isHittable { break }
+            rotatedInstructions.swipeUp()
+        }
+        XCTAssertTrue(app.buttons["Next"].isHittable, "Rotating an open setup sheet must keep its controls reachable")
+        XCTAssertTrue(app.buttons["Close"].isHittable)
+        attachDeviceScreenshot(named: "Capture Setup after rotation")
+        app.buttons["Close"].tap()
+        XCTAssertTrue(app.buttons["Next"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.switches["Status"].exists)
+        XCTAssertFalse(app.buttons["Allow Notifications"].exists)
     }
 
     @MainActor
@@ -79,8 +175,8 @@ final class InterceptorUITests: XCTestCase {
         assertStartupConsent(app)
         agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        XCTAssertTrue(app.switches["Connection Status"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.switches["Connection Status"].isEnabled)
+        XCTAssertTrue(app.switches["Status"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches["Status"].isEnabled)
         XCTAssertFalse(app.staticTexts["Consent Status"].exists)
         XCTAssertFalse(app.buttons["Read Details"].exists)
         XCTAssertFalse(app.buttons["Review and Agree"].exists)
@@ -245,7 +341,7 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Cancel"].exists)
         XCTAssertFalse(app.buttons["Close"].exists)
         XCTAssertFalse(tab(app, named: "Settings").exists)
-        XCTAssertFalse(app.switches["Connection Status"].exists)
+        XCTAssertFalse(app.switches["Status"].exists)
     }
 
     @MainActor
@@ -323,7 +419,7 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
         agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        let connection = app.switches["Connection Status"]
+        let connection = app.switches["Status"]
         addTeardownBlock { @MainActor in
             app.activate()
             if app.alerts.buttons["OK"].exists { app.alerts.buttons["OK"].tap() }
@@ -372,7 +468,7 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
         agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        let connection = app.switches["Connection Status"]
+        let connection = app.switches["Status"]
         XCTAssertTrue(connection.waitForExistence(timeout: 5))
         XCTAssertTrue(connection.isEnabled)
         let control = try switchControl(app, row: connection)
@@ -460,7 +556,7 @@ final class InterceptorUITests: XCTestCase {
 
         // The simulator permits advancing through the device-only setup steps.
         if app.buttons["Next"].waitForExistence(timeout: 5) {
-            for _ in 0..<8 {
+            for _ in 0..<5 {
                 XCTAssertTrue(app.buttons["Next"].waitForExistence(timeout: 5))
                 app.buttons["Next"].tap()
             }
