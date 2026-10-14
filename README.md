@@ -44,7 +44,7 @@ From the Interceptor directory, clone Mudmouth if it does not already exist:
 
 ```bash
 git clone https://github.com/qtmleap/Mudmouth.git ../Mudmouth
-git -C ../Mudmouth checkout 918c10d2cb5ed9cc40586aad5ee197d17a820768
+git -C ../Mudmouth checkout 51268c65ad4630d47510ee2221885de39e4c868a
 xcodebuild -resolvePackageDependencies -project Interceptor.xcodeproj -scheme Interceptor
 open Interceptor.xcodeproj
 ```
