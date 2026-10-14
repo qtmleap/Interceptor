@@ -69,6 +69,8 @@ jobs:
           xcodebuild -version
           echo "PLL_SOURCE_PACKAGES_PATH=$RUNNER_TEMP/SourcePackages" >> "$GITHUB_ENV"
           simulator_set="$HOME/Library/Developer/CoreSimulator/Devices"
+          export CI_SIMULATOR_DEVICE_SET="$simulator_set"
+          python3 -c 'import pathlib; [compile(p.read_text(), str(p), "exec") for p in map(pathlib.Path, ["scripts/ci-simulator-cleanup.py", "scripts/ci-simulator-start-worker.py"])]'
           echo "CI_SIMULATOR_DEVICE_SET=$simulator_set" >> "$GITHUB_ENV"
           hostname > "$RUNNER_TEMP/simulator-host.txt"
           printf '%s\n' "$simulator_set" >> "$RUNNER_TEMP/simulator-host.txt"
@@ -87,8 +89,7 @@ jobs:
           device=""
           cleanup_failed_setup() {
             if [ -n "$device" ]; then
-              xcrun simctl --set "$simulator_set" shutdown "$device" || true
-              xcrun simctl --set "$simulator_set" delete "$device"
+              SIMULATOR_UUID="$device" python3 scripts/ci-simulator-cleanup.py || true
             fi
           }
           trap cleanup_failed_setup ERR
@@ -118,7 +119,7 @@ jobs:
       - name: Build and run unit and UI tests
         run: |
           set -o pipefail
-          NSUnbufferedIO=YES xcodebuild test \
+          NSUnbufferedIO=YES python3 scripts/ci-simulator-start-worker.py xcodebuild test \
             -project Interceptor.xcodeproj -scheme Interceptor \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UUID" \
             -destination-timeout 60 \
@@ -146,6 +147,7 @@ jobs:
           ) > >(tee "$RUNNER_TEMP/diagnostics.log") 2>&1 &
           diagnostics_pid=$!
           stop_workers() {
+            python3 scripts/ci-simulator-cleanup.py --stop-worker || true
             for worker_pid in "$diagnostics_pid" "$build_pid"; do
               if jobs -pr | grep -Fxq "$worker_pid"; then
                 kill "$worker_pid" 2>/dev/null || true
@@ -166,35 +168,7 @@ jobs:
       - name: Clean up dedicated iPhone simulator
         if: always()
         run: |
-          python3 - <<'PY'
-          import json, os, pathlib, subprocess, time, uuid
-          device = os.environ.get("SIMULATOR_UUID", "")
-          if not device:
-              raise SystemExit(0)
-          if str(uuid.UUID(device)).lower() != device.lower():
-              raise SystemExit("Invalid owned simulator UUID")
-          before = json.loads((pathlib.Path(os.environ["RUNNER_TEMP"]) / "simulators-before.json").read_text())["devices"]
-          if any(d["udid"] == device for devices in before.values() for d in devices):
-              raise SystemExit("Refusing to delete a pre-existing simulator")
-          command = ["xcrun", "simctl", "--set", os.environ["CI_SIMULATOR_DEVICE_SET"]]
-          def devices():
-              result = subprocess.run(command + ["list", "devices", "--json"], check=True, capture_output=True, text=True)
-              return [d for group in json.loads(result.stdout)["devices"].values() for d in group]
-          owned = next((d for d in devices() if d["udid"] == device), None)
-          if owned is not None:
-              if owned["name"] != "Interceptor CI":
-                  raise SystemExit("Owned simulator name does not match this job")
-              subprocess.run(command + ["shutdown", device], check=False)
-              for attempt in range(3):
-                  deleted = subprocess.run(command + ["delete", device], check=False)
-                  if deleted.returncode == 0:
-                      break
-                  time.sleep(1)
-              deleted.check_returncode()
-          if any(d["udid"] == device for d in devices()):
-              raise SystemExit("Owned simulator remains after cleanup")
-          print("Owned simulator cleanup verified:", device)
-          PY
+          python3 scripts/ci-simulator-cleanup.py
 
       - name: Save test results and build logs
         if: always()
@@ -206,6 +180,7 @@ jobs:
             ${{ runner.temp }}/test.log
             ${{ runner.temp }}/diagnostics.log
             ${{ runner.temp }}/xcodebuild-sample-*.txt
+            ${{ runner.temp }}/simulator-build-group.json
             ${{ runner.temp }}/simulator-host.txt
             ${{ runner.temp }}/simulators-before.json
             ${{ runner.temp }}/simulator-processes-before.txt
