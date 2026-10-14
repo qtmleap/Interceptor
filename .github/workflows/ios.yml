@@ -12,7 +12,7 @@ permissions:
 
 env:
   # Keep simulator verification and the signing build on the same package commit.
-  MUDMOUTH_REV: 3c1468aaaea5140835982bc8e38c9d3bfc49d2a0
+  MUDMOUTH_REV: 918c10d2cb5ed9cc40586aad5ee197d17a820768
 
 concurrency:
   # Every develop push must reach the deployment queue. PR runs still supersede
