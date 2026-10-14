@@ -5,7 +5,7 @@ This is an iOS application that uses a self-signed certificate to obtain an acce
 ### Requirements
 
 - iOS 17 or later
-- Xcode 27 with Swift 6.4 or later (required by QuantumLeap 1.0.0)
+- Xcode 27 with Swift 6.4 or later (required by QuantumLeap 1.0.1)
 - fastlane
 
 The simulator build was verified with Xcode 27.0 on 2026-10-04 using
@@ -37,7 +37,7 @@ open Interceptor.xcodeproj
 
 The revision above is the Mudmouth revision selected for the local setup on
 2026-10-06 and matches CI. It removes the unused Introspect 1.x dependency so
-QuantumLeap 1.0.0 can resolve Introspect 27.x. Keep the checkout on its development branch when editing Mudmouth;
+QuantumLeap 1.0.1 can resolve Introspect 27.x. Keep the checkout on its development branch when editing Mudmouth;
 record any dependency revision changes alongside the application changes.
 
 To check simulator compilation without signing:
