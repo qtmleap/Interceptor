@@ -291,7 +291,7 @@ final class InterceptorUITests: XCTestCase {
         )
     }
 
-    /// Verifies the Apple policy disclaimer card before consent and in Settings > Privacy, per locale.
+    /// Verifies the Apple policy disclaimer card before consent and in Settings > Data Use & Consent, per locale.
     @MainActor
     func testAppleDisclaimerShownBeforeConsentAndInPrivacy() {
         XCUIDevice.shared.orientation = .portrait
@@ -331,7 +331,7 @@ final class InterceptorUITests: XCTestCase {
             agree.tap()
             XCTAssertTrue(settings.waitForExistence(timeout: 5))
 
-            // Persistent: still available in Settings > Privacy after consent.
+            // Persistent: still available in Settings > Data Use & Consent after consent.
             settings.tap()
             scrollTo(app, app.buttons[loc.privacy]).tap()
             XCTAssertTrue(app.navigationBars[loc.privacy].waitForExistence(timeout: 5))
