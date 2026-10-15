@@ -210,15 +210,19 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Read Details"].exists)
         XCTAssertFalse(app.buttons["Review and Agree"].exists)
         XCTAssertFalse(app.buttons["Withdraw Consent"].exists)
-        settingsButton(app, named: "Privacy").tap()
-        XCTAssertTrue(app.navigationBars["Privacy"].waitForExistence(timeout: 5))
+        XCTAssertTrue(settingsButton(app, named: "Privacy Policy").isHittable)
+        settingsButton(app, named: "Data Use & Consent").tap()
+        XCTAssertTrue(app.navigationBars["Data Use & Consent"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Purpose"].exists)
         XCTAssertFalse(app.buttons["Agree"].exists)
-        settingsButton(app, named: "Withdraw Consent").tap()
+        let withdrawal = settingsButton(app, named: "Withdraw Consent")
+        XCTAssertGreaterThanOrEqual(withdrawal.frame.height, 44)
+        attachDeviceScreenshot(named: "Consent withdrawal button")
+        withdrawal.tap()
         XCTAssertTrue(app.alerts.buttons["Cancel"].waitForExistence(timeout: 5))
         app.alerts.buttons["Cancel"].tap()
         XCTAssertFalse(app.buttons["Agree"].exists)
-        XCTAssertTrue(app.navigationBars["Privacy"].exists)
+        XCTAssertTrue(app.navigationBars["Data Use & Consent"].exists)
         app.terminate()
         app.launch()
         XCTAssertTrue(tab(app, named: "Settings").waitForExistence(timeout: 5))
@@ -277,12 +281,12 @@ final class InterceptorUITests: XCTestCase {
 
         static let english = DisclaimerLocale(
             args: ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"], isJapanese: false,
-            title: "Apple Policy Disclaimer", settingsTab: "Settings", privacy: "Privacy",
+            title: "Apple Policy Disclaimer", settingsTab: "Settings", privacy: "Data Use & Consent",
             agree: "Agree", withdraw: "Withdraw Consent",
         )
         static let japanese = DisclaimerLocale(
             args: ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP"], isJapanese: true,
-            title: "Appleポリシーに基づく注意事項", settingsTab: "設定", privacy: "プライバシー",
+            title: "Appleポリシーに基づく注意事項", settingsTab: "設定", privacy: "データ利用と同意",
             agree: "同意する", withdraw: "同意を取り消す",
         )
     }
@@ -334,7 +338,11 @@ final class InterceptorUITests: XCTestCase {
             let privacyTitle = scrollTo(app, app.staticTexts[loc.title])
             XCTAssertFalse(app.buttons[loc.agree].exists)
             assertDisclaimerBody(app, title: privacyTitle, loc: loc)
-            attachScreenshot(app, named: "Apple disclaimer in Privacy \(loc.isJapanese ? "ja" : "en")")
+            attachScreenshot(app, named: "Apple disclaimer in Data Use \(loc.isJapanese ? "ja" : "en")")
+            let withdrawal = scrollTo(app, app.buttons[loc.withdraw])
+            XCTAssertTrue(withdrawal.isHittable)
+            XCTAssertGreaterThanOrEqual(withdrawal.frame.height, 44)
+            attachDeviceScreenshot(named: "Consent withdrawal \(loc.isJapanese ? "ja" : "en")")
             app.terminate()
         }
     }
@@ -363,7 +371,7 @@ final class InterceptorUITests: XCTestCase {
             if element.exists && element.isHittable {
                 return element
             }
-            let isPrivacy = app.navigationBars["Privacy"].exists || app.navigationBars["プライバシー"].exists
+            let isPrivacy = app.navigationBars["Data Use & Consent"].exists || app.navigationBars["データ利用と同意"].exists
             let form = isPrivacy && app.scrollViews.firstMatch.exists
                 ? app.scrollViews.firstMatch
                 : (app.collectionViews.firstMatch.exists ? app.collectionViews.firstMatch : app.scrollViews.firstMatch)
@@ -406,7 +414,7 @@ final class InterceptorUITests: XCTestCase {
         // Normalize consent using either the old settings section or its replacement.
         // This also lets the regression fail on the mandatory gate before the UI changes.
         if !app.buttons["Read Details"].exists {
-            settingsButton(app, named: "Privacy").tap()
+            settingsButton(app, named: "Data Use & Consent").tap()
         }
         withdrawConsent(app)
     }
@@ -414,14 +422,14 @@ final class InterceptorUITests: XCTestCase {
     @MainActor
     private func openPrivacy(_ app: XCUIApplication) {
         tab(app, named: "Settings").tap()
-        settingsButton(app, named: "Privacy").tap()
-        XCTAssertTrue(app.navigationBars["Privacy"].waitForExistence(timeout: 5))
+        settingsButton(app, named: "Data Use & Consent").tap()
+        XCTAssertTrue(app.navigationBars["Data Use & Consent"].waitForExistence(timeout: 5))
     }
 
     @MainActor
     private func settingsButton(_ app: XCUIApplication, named name: String) -> XCUIElement {
         let button = app.buttons[name]
-        let form: XCUIElement = if app.navigationBars["Privacy"].exists && app.scrollViews.firstMatch.exists {
+        let form: XCUIElement = if app.navigationBars["Data Use & Consent"].exists && app.scrollViews.firstMatch.exists {
             app.scrollViews.firstMatch
         } else {
             app.collectionViews.firstMatch.exists

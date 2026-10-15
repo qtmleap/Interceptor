@@ -1550,8 +1550,8 @@
     },
     "CONSENT_APPLE_DISCLAIMER" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "In accordance with Apple’s App Review Guidelines, Interceptor does not collect traffic data without your explicit consent. Interceptor does not sell captured data or automatically send or share it with its developer, analytics services, or third parties. Original Nintendo service requests and copying or exporting you initiate are separate activities, explained below in Storage and Sharing." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "AppleのApp Reviewガイドラインに基づき、Interceptorは明示的な同意なく通信データを取得しません。取得したデータを販売したり、開発者・解析サービス・第三者へ自動的に送信・共有したりすることもありません。元の任天堂サービスへの通信や、あなた自身が行うコピー・書き出しは別の操作です。詳しくは「保存先と共有」をご確認ください。" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "In accordance with Apple’s App Review Guidelines, Interceptor does not collect traffic data without your explicit consent. Interceptor does not sell captured data or automatically send or share it with its developer, analytics services, or third parties. Original service requests and copying or exporting you initiate are separate activities, explained below in Storage and Sharing." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "AppleのApp Reviewガイドラインに基づき、Interceptorは明示的な同意なく通信データを取得しません。取得したデータを販売したり、開発者・解析サービス・第三者へ自動的に送信・共有したりすることもありません。元のサービスへの通信や、あなた自身が行うコピー・書き出しは別の操作です。詳しくは「保存先と共有」をご確認ください。" } }
       }
     },
     "CONSENT_PURPOSE" : {
@@ -1559,13 +1559,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interceptor inspects selected Nintendo HTTPS traffic on this device so you can view requests and responses and obtain game authentication tokens. It is not a general internet protection VPN."
+            "value" : "Interceptor inspects HTTPS traffic for configured hosts on this device so you can view requests and responses and inspect supported service authentication tokens. It is not a general internet protection VPN."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Interceptorは、この端末上の指定した任天堂サービスのHTTPS通信を解析し、リクエスト・レスポンスの閲覧やゲームの認証トークン取得に使用します。インターネット全体を保護するVPNではありません。"
+            "value" : "Interceptorは、この端末上で設定されたホストのHTTPS通信を解析し、リクエスト・レスポンスの閲覧や対応サービスの認証トークン確認に使用します。インターネット全体を保護するVPNではありません。"
           }
         }
       }
@@ -1591,13 +1591,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "New records are stored in the local app storage shared with its VPN extension. New tokens and certificate keys use this device’s Keychain with iCloud synchronization disabled. Interceptor does not send captured data to its developer or analytics services. Original requests still reach Nintendo. Copying or exporting data shares it with your chosen destination. Copies synchronized by older versions may remain in iCloud. Local history storage is excluded from backup; other app settings may be backed up by the operating system."
+            "value" : "New records are stored in the local app storage shared with its VPN extension. New tokens and certificate keys use this device’s Keychain with iCloud synchronization disabled. Interceptor does not send captured data to its developer or analytics services. Original requests still reach their destination services. Copying or exporting data shares it with your chosen destination. Copies synchronized by older versions may remain in iCloud. Local history storage is excluded from backup; other app settings may be backed up by the operating system."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新しい記録はアプリとVPN拡張が共有する端末内の領域に保存します。新しいトークンと証明書の鍵はiCloud同期を無効にした、この端末用のKeychainに保存します。取得したデータを開発者や解析サービスへ送信しません。元の通信は任天堂に届きます。コピーや書き出しを行ったデータは、選んだ宛先に共有されます。旧バージョンが同期したコピーはiCloudに残る可能性があります。履歴の保存領域はバックアップ対象から除外しますが、その他の設定はOSによりバックアップされる場合があります。"
+            "value" : "新しい記録はアプリとVPN拡張が共有する端末内の領域に保存します。新しいトークンと証明書の鍵はiCloud同期を無効にした、この端末用のKeychainに保存します。取得したデータを開発者や解析サービスへ送信しません。元の通信は本来のサービスに届きます。コピーや書き出しを行ったデータは、選んだ宛先に共有されます。旧バージョンが同期したコピーはiCloudに残る可能性があります。履歴の保存領域はバックアップ対象から除外しますが、その他の設定はOSによりバックアップされる場合があります。"
           }
         }
       }
@@ -1623,13 +1623,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agree to this notice to access the app. Until you agree, this screen remains open and capture is unavailable. Notifications are optional and contain only a generic message and a local record identifier. You can withdraw consent in Settings → Privacy to stop capture and clear notifications. Withdrawal does not delete existing records, tokens, or installed certificates. Clear on Home deletes history only; uninstalling the app does not guarantee removal of Keychain items or older iCloud copies."
+            "value" : "Agree to this notice to access the app. Until you agree, this screen remains open and capture is unavailable. Notifications are optional and contain only a generic message and a local record identifier. You can withdraw consent in Settings → Data Use & Consent to stop capture and clear notifications. Withdrawal does not delete existing records, tokens, or installed certificates. Clear on Home deletes history only; uninstalling the app does not guarantee removal of Keychain items or older iCloud copies."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "この説明に同意するとアプリを利用できます。同意するまではこの画面を表示し、通信の記録は行いません。通知は任意で、一般的なメッセージと端末内の記録IDだけを含みます。設定の「プライバシー」から同意を撤回すると記録を停止し、通知を消去します。既存の記録・トークン・インストール済み証明書は削除されません。ホームの「消去」は履歴のみを削除します。アプリの削除でもKeychainや旧iCloudコピーが必ず消えるとは限りません。"
+            "value" : "この説明に同意するとアプリを利用できます。同意するまではこの画面を表示し、通信の記録は行いません。通知は任意で、一般的なメッセージと端末内の記録IDだけを含みます。設定の「データ利用と同意」から同意を撤回すると記録を停止し、通知を消去します。既存の記録・トークン・インストール済み証明書は削除されません。ホームの「消去」は履歴のみを削除します。アプリの削除でもKeychainや旧iCloudコピーが必ず消えるとは限りません。"
           }
         }
       }
@@ -1650,10 +1650,10 @@
         }
       }
     },
-    "Privacy" : {
+    "Data Use & Consent" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Privacy" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プライバシー" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Data Use & Consent" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "データ利用と同意" } }
       }
     },
     "Privacy Policy" : {

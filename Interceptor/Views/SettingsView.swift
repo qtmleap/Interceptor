@@ -29,7 +29,7 @@ struct SettingsView: View {
             QuantumLeap.VPNSettingList()
             QuantumLeap.Tools()
             Section {
-                NavigationLink("Privacy") { DataUseDetailsView(showsWithdrawal: true) }
+                NavigationLink("Data Use & Consent") { DataUseDetailsView(showsWithdrawal: true) }
                 Link("Terms of Service", destination: URL(string: "https://qleap.jp/term/eula")!)
                     .foregroundStyle(.primary)
                 Link("Privacy Policy", destination: URL(string: "https://qleap.jp/term/interceptor_privacy_policy")!)
