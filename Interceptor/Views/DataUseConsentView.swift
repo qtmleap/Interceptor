@@ -19,15 +19,19 @@ struct DataUseDetailsView: View {
                 disclosure("Certificate and VPN", "CONSENT_CERTIFICATE", symbol: "key.horizontal")
                 disclosure("Your Choices", "CONSENT_CHOICES", symbol: "slider.horizontal.3")
                 if showsWithdrawal {
-                    Button(role: .destructive) {
-                        confirmWithdrawal = true
-                    } label: {
-                        Text("Withdraw Consent")
-                            .font(.headline)
-                            .frame(minHeight: 44)
+                    HStack {
+                        Spacer(minLength: 0)
+                        Button(role: .destructive) {
+                            confirmWithdrawal = true
+                        } label: {
+                            Text("Withdraw Consent")
+                                .font(.headline)
+                                .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
                     .padding(.top, 8)
                 }
             }

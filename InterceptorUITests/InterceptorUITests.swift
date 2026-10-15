@@ -798,8 +798,11 @@ final class InterceptorUITests: XCTestCase {
 
         settingsButton(app, named: "SSL Proxying List").tap()
         XCTAssertTrue(app.navigationBars["SSL Proxying List"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["api.lp1.av5ja.srv.nintendo.net"].exists)
-        XCTAssertTrue(app.staticTexts["app.splatoon2.nintendo.net"].exists)
+        for host in ["api.lp1.av5ja.srv.nintendo.net", "app.splatoon2.nintendo.net"] {
+            let row = app.buttons["ssl.row." + host]
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
+            XCTAssertEqual(row.label, host)
+        }
         attachScreenshot(app, named: "Proxy Hosts")
         returnFromSettingsDetail(app)
 
