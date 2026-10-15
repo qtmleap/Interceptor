@@ -210,7 +210,6 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Read Details"].exists)
         XCTAssertFalse(app.buttons["Review and Agree"].exists)
         XCTAssertFalse(app.buttons["Withdraw Consent"].exists)
-        XCTAssertTrue(settingsButton(app, named: "Privacy Policy").isHittable)
         settingsButton(app, named: "Data Use & Consent").tap()
         XCTAssertTrue(app.navigationBars["Data Use & Consent"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Purpose"].exists)
@@ -235,6 +234,13 @@ final class InterceptorUITests: XCTestCase {
         assertStartupConsent(app)
         // Leave consent granted so other navigation tests do not depend on ordering.
         agreeIfNeeded(app)
+        // Accept both accessibility roles used by SwiftUI Link across OS versions.
+        let policy = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label == %@ AND (elementType == %d OR elementType == %d)",
+            "Privacy Policy", Int(XCUIElement.ElementType.button.rawValue), Int(XCUIElement.ElementType.link.rawValue),
+        )).firstMatch
+        XCTAssertTrue(scrollTo(app, policy).isHittable)
+        app.terminate()
     }
 
     @MainActor
