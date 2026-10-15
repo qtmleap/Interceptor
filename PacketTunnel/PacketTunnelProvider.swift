@@ -18,8 +18,18 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     /// - Parameter options: <#options description#>
     override func startTunnel(options: [String: NSObject]? = nil) async throws {
         try CaptureAuthorization.requireConsent()
-        try await setTunnelNetworkSettings(settings)
+        // Fail closed before routing anything if the target list is missing or invalid.
+        let hosts = try CaptureHostList.decodeTargets(from: options).map(\.host)
         try await MITM.startTunnel(options: options)
+        do {
+            try CaptureAuthorization.requireConsent()
+            try await setTunnelNetworkSettings(CaptureHostList.tunnelSettings(hosts: hosts))
+            try CaptureAuthorization.requireConsent()
+        } catch {
+            await MITM.stopTunnel()
+            try? await setTunnelNetworkSettings(nil)
+            throw error
+        }
         await MainActor.run {
             consentMonitor = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
                 guard !CaptureAuthorization.isGranted else { return }
@@ -37,30 +47,4 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         await MainActor.run { consentMonitor?.invalidate(); consentMonitor = nil }
         await MITM.stopTunnel()
     }
-
-    /// スプラトゥーン3のトークンを取得するためだけの設定
-    /// NOTE: この設定は、スプラトゥーン3のトークン取得に必要なプロキシ設定を含んでいます
-    /// NOTE: 他のデータも取ってきたい場合にはここを変更する必要がある
-    let settings: NETunnelNetworkSettings = {
-        NSLog("Creating tunnel network settings")
-        let proxySettings: NEProxySettings = .init()
-        proxySettings.httpsServer = NEProxyServer(address: "127.0.0.1", port: 6_836)
-        proxySettings.httpsEnabled = true
-        // ここのドメインでしかプロクシを実行しないようにする(ということはURL自体はあまり関係ない)
-        // 任天堂関連のドメインを列挙
-        // swiftlint:disable:next force_unwrapping
-        proxySettings.matchDomains = [
-            URL(string: "https://api.lp1.av5ja.srv.nintendo.net")!.host!, // Splatoon 3
-            URL(string: "https://app.splatoon2.nintendo.net")!.host!, // Splatoon 2
-            URL(string: "https://api.lp1.87abc152.srv.nintendo.net")!.host!, // Zelda Notes
-            URL(string: "https://web.sd.lp1.acbaa.srv.nintendo.net")!.host!, // NookLink
-            URL(string: "https://app.smashbros.nintendo.net")!.host!, // Smash World
-        ]
-        let ipv4Settings = NEIPv4Settings(addresses: ["198.18.0.1"], subnetMasks: ["255.255.255.0"])
-        let networkSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
-        networkSettings.mtu = 1_500
-        networkSettings.proxySettings = proxySettings
-        networkSettings.ipv4Settings = ipv4Settings
-        return networkSettings
-    }()
 }

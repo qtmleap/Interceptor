@@ -13,19 +13,12 @@ import SwiftUI
 import SwiftUIIntrospect
 
 struct SettingsView: View {
-    @AppStorage(CaptureAuthorization.key, store: CaptureAuthorization.defaults) private var consentVersion = 0
-    @State private var showSetup = false
     @State private var showGuide = false
 
     var body: some View {
         Form(content: {
             QuantumLeap.Support()
                 .environment(\.isFirstLaunch, $showGuide)
-            Section {
-                Button("Capture Setup") { showSetup = true }
-                    .disabled(consentVersion != CaptureAuthorization.version)
-                    .foregroundStyle(.primary)
-            }
             QuantumLeap.VPNSettingList()
             QuantumLeap.Tools()
             Section {
@@ -44,13 +37,10 @@ struct SettingsView: View {
             }
             QuantumLeap.Version()
         })
-        .sheet(isPresented: $showSetup) {
-            FirstLaunchView(flow: .captureSetup)
-                .presentationDetents([.large])
-                .modifier(CaptureSetupSheetSizing())
-        }
         .sheet(isPresented: $showGuide) {
             HowToUseView()
+                .presentationDetents([.large])
+                .modifier(CaptureSetupSheetSizing())
         }
         .navigationTitle(Text("TITLE_SETTINGS"))
         .navigationBarTitleDisplayMode(.inline)

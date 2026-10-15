@@ -8,8 +8,8 @@
 
 import KeychainAccess
 import Mudmouth
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UserNotifications
 
 @MainActor
@@ -17,26 +17,12 @@ public final class Tuberose: ObservableObject {
     @AppStorage("ACTIVATE_ON_FOREGROUND")
     var activateOnForeground: Bool = false
 
-    /// VPN設定
-    /// NOTE: とりあえず最初はスプラ2とスプラ3のみに対応
-    /// NOTE: キャプチャ自体は対応しておく
-    private(set) var options: [ProxyOption] = [
-        .init(host: "api.accounts.nintendo.com", paths: []),
-        .init(host: "api-lp1.znc.srv.nintendo.net", paths: []),
-        .init(host: "api.lp1.usagi.srv.nintendo.net", paths: []),
-        .init(host: "api.lp1.av5ja.srv.nintendo.net", paths: [
-            .init(path: "/api/bullet_tokens"),
-        ]),
-        .init(host: "api.lp1.87abc152.srv.nintendo.net", paths: []),
-        .init(host: "accounts.nintendo.com", paths: []),
-        .init(host: "app.splatoon2.nintendo.net", paths: [
-            .init(path: "/"),
-        ]),
-        .init(host: "app.smashbros.nintendo.net", paths: [
-            .init(path: "/"),
-        ]),
-        .init(host: "web.sd.lp1.acbaa.srv.nintendo.net", paths: []),
-    ]
+    /// Saved hosts to use at the next VPN connection.
+    let store: SSLProxyingListStore
+
+    var options: [ProxyOption] {
+        store.options
+    }
 
     /// アクセストークン一覧
     @Published
@@ -53,14 +39,19 @@ public final class Tuberose: ObservableObject {
         mudmouth.isConnected
     }
 
-    init() {
+    init(store: SSLProxyingListStore? = nil) {
+        let store = store ?? SSLProxyingListStore()
+        self.store = store
         loadStoredTokens()
         NotificationCenter.default.addObserver(self, selector: #selector(didBecomeActiveNotification), name: UIApplication.didBecomeActiveNotification, object: nil)
     }
 
     func startVPNTunnel() async throws {
         try CaptureAuthorization.requireConsent()
-        try await mudmouth.startVPNTunnel(options: options)
+        guard store.loadError == nil else { throw CaptureHostList.HostError.unavailable }
+        // Validate before Mudmouth generates the certificate.
+        let targets = try CaptureHostList.enabledTargets(in: options)
+        try await mudmouth.startVPNTunnel(options: targets)
     }
 
     func stopVPNTunnel() {
@@ -92,7 +83,7 @@ public final class Tuberose: ObservableObject {
         for host in options.map(\.host) {
             let descriptor = FetchDescriptor<Record>(
                 predicate: #Predicate { $0.request.host == host },
-                sortBy: [SortDescriptor(\Record.capturedAt, order: .reverse)]
+                sortBy: [SortDescriptor(\Record.capturedAt, order: .reverse)],
             )
             for record in try context.fetch(descriptor) {
                 // Bad or unrelated responses are ignored; they must not erase saved tokens.
@@ -130,8 +121,11 @@ public final class Tuberose: ObservableObject {
     }
 
     private func loadStoredTokens() {
-        tokens = options.map(\.host).compactMap { host in
-            if let local = try? keychain.getToken(forKey: host) { return local }
+        // Capture configuration edits must not hide tokens that were already saved.
+        tokens = SSLProxyingListStore.defaultOptions.map(\.host).compactMap { host in
+            if let local = try? keychain.getToken(forKey: host) {
+                return local
+            }
             guard let legacy = try? legacyKeychain.getToken(forKey: host) else { return nil }
             // Copy previously synced data without deleting the cloud/other-device copy.
             try? keychain.setToken(legacy, forKey: host)
@@ -150,7 +144,6 @@ public final class Tuberose: ObservableObject {
             })
         }
     }
-
 }
 
 public extension Tuberose {
@@ -170,7 +163,9 @@ extension [String: String] {
         return value.split(separator: ";").reduce(into: [String: String]()) { result, component in
             let parts = component.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            if parts.count == 2, !parts[0].isEmpty { result[parts[0]] = parts[1] }
+            if parts.count == 2, !parts[0].isEmpty {
+                result[parts[0]] = parts[1]
+            }
         }
     }
 
