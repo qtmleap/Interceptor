@@ -96,7 +96,7 @@ xcodebuild test -project Interceptor.xcodeproj -scheme Interceptor -destination 
 ```
 
 Verified on an iPhone 17 Pro simulator with iOS 26.5 and Xcode 27.0 on 2026-10-04.
-The test uses English UI labels. VPN traffic capture and real Nintendo tokens
+The test uses English UI labels. VPN traffic capture and real service tokens
 remain device-only checks.
 
 ### Continuous integration

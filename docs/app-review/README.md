@@ -1,5 +1,7 @@
 # App Review preparation — updated 2026-10-05
 
+Current replacement UI: Settings → Data Use & Consent / 設定 → データ利用と同意 contains the disclosure and the full-width withdrawal button; Privacy Policy remains a separate external link. The dated build notes below describe historical UI and verification.
+
 These files prepare a replacement submission for App Store app 6749347474. Build 29 was uploaded on 2026-10-04, but has not been selected, submitted, or approved. Build 30 adds the revised consent settings UI and was uploaded on 2026-10-05. Apple processing is VALID and internalBuildState is IN_BETA_TESTING; the existing internal Developer group has automatic access to all builds. External testing remains READY_FOR_BETA_SUBMISSION, and no external Beta App Review was submitted. Build 28's rejection and the reply sent on 2026-10-04 do not establish acceptance of the proposed changes.
 
 The description, promotional text, and keywords under `fastlane/metadata/en-US` and `fastlane/metadata/ja` were saved in App Store Connect on 2026-10-04. They have not been released. Their intended behavior must match the final archive. The current Fastfile uploads TestFlight builds, not these metadata files; this directory does not add an automatic publishing step.

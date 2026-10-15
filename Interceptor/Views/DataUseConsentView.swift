@@ -1,7 +1,7 @@
 import Mudmouth
 import SwiftUI
 
-/// Shared disclosure; the Privacy page also provides an explicit withdrawal action.
+/// Shared disclosure; the data-use page also provides an explicit withdrawal action.
 struct DataUseDetailsView: View {
     @EnvironmentObject private var client: Tuberose
     @State private var confirmWithdrawal = false
@@ -12,7 +12,9 @@ struct DataUseDetailsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                if usesCards { introduction }
+                if usesCards {
+                    introduction
+                }
                 disclosure("Apple Policy Disclaimer", "CONSENT_APPLE_DISCLAIMER", symbol: "info.circle")
                 disclosure("Purpose", "CONSENT_PURPOSE", symbol: "network")
                 disclosure("Data Recorded", "CONSENT_DATA", symbol: "doc.text.magnifyingglass", emphasized: true)
@@ -20,7 +22,16 @@ struct DataUseDetailsView: View {
                 disclosure("Certificate and VPN", "CONSENT_CERTIFICATE", symbol: "key.horizontal")
                 disclosure("Your Choices", "CONSENT_CHOICES", symbol: "slider.horizontal.3")
                 if showsWithdrawal {
-                    Button("Withdraw Consent", role: .destructive) { confirmWithdrawal = true }
+                    Button(role: .destructive) {
+                        confirmWithdrawal = true
+                    } label: {
+                        Text("Withdraw Consent")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .padding(.top, 8)
                 }
             }
             .frame(maxWidth: usesCards ? 620 : 640, alignment: .leading)
@@ -29,13 +40,15 @@ struct DataUseDetailsView: View {
             .frame(maxWidth: .infinity)
         }
         .background {
-            if usesCards { Color(uiColor: .systemGroupedBackground).ignoresSafeArea() }
+            if usesCards {
+                Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
+            }
         }
-        .navigationTitle(showsWithdrawal ? LocalizedStringKey("Privacy") : LocalizedStringKey("Data Use"))
+        .navigationTitle(showsWithdrawal ? LocalizedStringKey("Data Use & Consent") : LocalizedStringKey("Data Use"))
         .navigationBarTitleDisplayMode(.inline)
         .alert("Withdraw Consent?", isPresented: $confirmWithdrawal) {
             Button("Withdraw Consent", role: .destructive) { client.withdrawCaptureConsent() }
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text("CONSENT_WITHDRAW_CONFIRMATION")
         }
@@ -62,7 +75,8 @@ struct DataUseDetailsView: View {
     }
 
     private func disclosure(_ title: LocalizedStringKey, _ body: LocalizedStringKey,
-                            symbol: String, emphasized: Bool = false) -> some View {
+                            symbol: String, emphasized: Bool = false) -> some View
+    {
         VStack(alignment: .leading, spacing: usesCards ? 14 : 8) {
             if usesCards {
                 if dynamicTypeSize.isAccessibilitySize {
@@ -105,7 +119,7 @@ struct DataUseDetailsView: View {
 /// Explicit consent flow, presented only for initial or renewed authorization.
 struct DataUseConsentView: View {
     @EnvironmentObject private var client: Tuberose
-    var onAgree: () -> Void = { }
+    var onAgree: () -> Void = {}
 
     var body: some View {
         DataUseDetailsView(usesCards: true)
