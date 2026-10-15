@@ -26,6 +26,7 @@ struct DataUseDetailsView: View {
                         } label: {
                             Text("Withdraw Consent")
                                 .font(.headline)
+                                .padding(.horizontal, 12)
                                 .frame(minHeight: 44)
                         }
                         .buttonStyle(.borderedProminent)
