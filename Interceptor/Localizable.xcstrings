@@ -54,13 +54,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Complete Capture Setup in Settings and turn on Status to start capturing requests."
+            "value" : "Open Settings → How to Use → Begin Capture Setup, finish the steps, then turn on Status to start capturing requests."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設定の「キャプチャの設定」を済ませ、接続状態をオンにすると通信履歴が表示されます。"
+            "value" : "設定 → アプリの使い方 → キャプチャの設定を開始 の手順を済ませ、接続状態をオンにすると通信履歴が表示されます。"
           }
         }
       }
@@ -137,13 +137,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SSL Proxying List in Settings shows the hosts this app can inspect. Apps that use certificate pinning may reject the certificate, so their encrypted content cannot be inspected."
+            "value" : "The SSL Proxying List in Settings shows the hosts this app can inspect. You can add, edit, sort, and delete hosts; changes apply after you reconnect. Apps that use certificate pinning may reject the certificate, so their encrypted content cannot be inspected."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設定の「プロキシ対象リスト」で、確認できるホストを表示します。証明書ピンニングを使用するアプリは証明書を拒否するため、暗号化された内容を確認できない場合があります。"
+            "value" : "設定の「プロキシ対象リスト」には、確認できるホストが表示されます。ホストの追加、編集、並べ替え、削除ができ、変更は再接続後に反映されます。証明書ピンニングを使用するアプリは証明書を拒否するため、暗号化された内容を確認できない場合があります。"
           }
         }
       }
@@ -171,13 +171,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Capture Setup in Settings. Follow the steps to install and trust the certificate, then configure the local VPN."
+            "value" : "Choose Begin Capture Setup below to install and trust the certificate, then configure the local VPN. You choose each action separately as you follow the steps."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設定の「キャプチャの設定」を開き、証明書のインストールと信頼、ローカルVPNの設定を行ってください。"
+            "value" : "下の「キャプチャの設定を開始」から、証明書のインストールと信頼、ローカルVPNの設定を順に進められます。各操作は手順に沿って個別に行います。"
           }
         }
       }
@@ -245,23 +245,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使い方"
-          }
-        }
-      }
-    },
-    "Data Use" : {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Data Use"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "データ利用"
+            "value" : "アプリの使い方"
           }
         }
       }
@@ -1402,18 +1386,18 @@
         }
       }
     },
-    "Capture Setup" : {
+    "Begin Capture Setup" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Capture Setup"
+            "value" : "Begin Capture Setup"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "キャプチャの設定"
+            "value" : "キャプチャの設定を開始"
           }
         }
       }
@@ -1530,16 +1514,10 @@
         }
       }
     },
-    "About Data Use" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "About Data Use" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "データ利用について" } }
-      }
-    },
     "CONSENT_INTRODUCTION" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Before using the app, please review how your data is handled." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "利用前に、データの扱いをご確認ください。" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Review how Interceptor handles captured traffic and how you can control it." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Interceptorが取得した通信をどう扱うか、またその管理方法をご確認ください。" } }
       }
     },
     "Apple Policy Disclaimer" : {
@@ -1607,13 +1585,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Setup installs a local certificate and a VPN configuration. Trusting the certificate allows this app to decrypt selected HTTPS traffic. Agreeing here does not install either item or start capture. You choose those actions separately in Capture Setup. You can remove the certificate and VPN configuration in iOS Settings."
+            "value" : "Setup installs a local certificate and a VPN configuration. Trusting the certificate allows this app to decrypt selected HTTPS traffic. Agreeing here does not install either item or start capture. You choose those actions separately in Settings → How to Use → Begin Capture Setup. You can remove the certificate and VPN configuration in iOS Settings."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設定ではローカル証明書とVPN構成をインストールします。証明書を信頼すると、このアプリが指定したHTTPS通信を復号できるようになります。この画面での同意だけでは、インストールも記録の開始も行いません。「キャプチャの設定」でそれぞれ操作してください。証明書とVPN構成はiOSの設定から削除できます。"
+            "value" : "設定ではローカル証明書とVPN構成をインストールします。証明書を信頼すると、このアプリが指定したHTTPS通信を復号できるようになります。この画面での同意だけでは、インストールも記録の開始も行いません。設定 → アプリの使い方 →「キャプチャの設定を開始」でそれぞれ操作してください。証明書とVPN構成はiOSの設定から削除できます。"
           }
         }
       }
@@ -1684,6 +1662,358 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開発者"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        }
+      }
+    },
+    "Sort" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sort"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "並べ替え"
+          }
+        }
+      }
+    },
+    "Host" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホスト"
+          }
+        }
+      }
+    },
+    "Add Host" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Host"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホストを追加"
+          }
+        }
+      }
+    },
+    "Edit Host" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Host"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホストを編集"
+          }
+        }
+      }
+    },
+    "Host Name (A–Z)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host Name (A–Z)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホスト名（A→Z）"
+          }
+        }
+      }
+    },
+    "Host Name (Z–A)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host Name (Z–A)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホスト名（Z→A）"
+          }
+        }
+      }
+    },
+    "Reset List" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset List"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リストをリセット"
+          }
+        }
+      }
+    },
+    "Reset List?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset List?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リストをリセットしますか？"
+          }
+        }
+      }
+    },
+    "SSL_LIST_RESET_CONFIRMATION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The saved list can't be read. Resetting replaces it with the default hosts. Saved tokens and capture history are kept."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存されたリストを読み込めません。リセットすると初期のホストに置き換えます。保存済みのトークンと通信履歴は削除されません。"
+          }
+        }
+      }
+    },
+    "SSL_LIST_ERROR_CORRUPT" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The saved list can't be read, so editing and capture are turned off until it is reset."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存されたリストを読み込めないため、リセットするまで編集とキャプチャは使用できません。"
+          }
+        }
+      }
+    },
+    "SSL_LIST_ERROR_VERSION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The saved list was made by a different version of the app, so editing and capture are turned off until it is reset."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存されたリストは別のバージョンのアプリで作成されたため、リセットするまで編集とキャプチャは使用できません。"
+          }
+        }
+      }
+    },
+    "SSL_LIST_EMPTY" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hosts. Tap + to add one. Capture needs at least one host."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホストがありません。＋をタップして追加してください。キャプチャには1つ以上のホストが必要です。"
+          }
+        }
+      }
+    },
+    "SSL_LIST_FOOTER" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes apply after stopping and starting the VPN. Only HTTPS (port 443) traffic to these exact hosts is captured."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更はVPNを停止して再度開始すると反映されます。これらのホストへのHTTPS（ポート443）通信のみがキャプチャされます。"
+          }
+        }
+      }
+    },
+    "SSL_HOST_HELP" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a host name only, such as example.com. No scheme, path, port or wildcard."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "example.comのようにホスト名のみを入力してください。スキーム、パス、ポート、ワイルドカードは使用できません。"
+          }
+        }
+      }
+    },
+    "SSL_HOST_ERROR_INVALID" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a valid host name only, such as example.com. No scheme, path, port, wildcard or IP address."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "example.comのような有効なホスト名のみを入力してください。スキーム、パス、ポート、ワイルドカード、IPアドレスは使用できません。"
+          }
+        }
+      }
+    },
+    "SSL_HOST_ERROR_DUPLICATE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This host is already in the list."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このホストはすでにリストにあります。"
+          }
+        }
+      }
+    },
+    "SSL_HOST_ERROR_UNAVAILABLE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The list can't be edited until it is reset."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リセットするまでリストは編集できません。"
+          }
+        }
+      }
+    },
+    "SSL_HOST_ERROR_NOT_FOUND" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This host no longer exists. Close the editor and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このホストは削除されています。編集画面を閉じて、もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "SSL_LIST_ERROR_INVALID_TARGETS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The proxy host configuration is invalid. Review SSL Proxying List before connecting."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロキシ対象の設定が無効です。接続する前にプロキシ対象リストを確認してください。"
+          }
+        }
+      }
+    },
+    "SSL_LIST_ERROR_NO_ENABLED_HOSTS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add at least one host to SSL Proxying List before starting capture."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録を開始する前に、プロキシ対象リストにホストを追加してください。"
+          }
+        }
+      }
+    },
+    "Hosts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hosts"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホスト"
           }
         }
       }

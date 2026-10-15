@@ -38,6 +38,7 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
         agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
+        XCTAssertFalse(app.buttons["Capture Setup"].exists, "Setup must share the How to Use entry")
         for _ in 0 ..< 2 {
             settingsButton(app, named: "How to Use").tap()
             XCTAssertTrue(app.navigationBars["How to Use"].waitForExistence(timeout: 5))
@@ -52,7 +53,7 @@ final class InterceptorUITests: XCTestCase {
             XCTAssertFalse(app.buttons["Agree"].exists)
         }
         XCTAssertFalse(app.buttons["Allow Notifications"].exists, "Notification permission belongs inside Capture Setup")
-        settingsButton(app, named: "Capture Setup").tap()
+        startCaptureSetup(app)
         // Next is not guaranteed on the first page: it only appears once permission is decided.
         _ = waitForNotificationStage(app)
         XCTAssertTrue(app.staticTexts["Notification Settings"].exists)
@@ -62,6 +63,11 @@ final class InterceptorUITests: XCTestCase {
         app.buttons["Close"].tap()
         XCTAssertTrue(app.staticTexts["Notification Settings"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+        settingsButton(app, named: "How to Use").tap()
+        XCTAssertTrue(app.navigationBars["How to Use"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.collectionViews["guide.overview"].exists, "Reopening after setup must return to the overview")
+        XCTAssertFalse(app.staticTexts["Notification Settings"].exists)
+        app.buttons["Close"].tap()
     }
 
     @MainActor
@@ -81,7 +87,7 @@ final class InterceptorUITests: XCTestCase {
             XCTAssertGreaterThan(app.frame.height, app.frame.width, "iPhone supports a portrait viewport")
         }
         tab(app, named: "Settings").tap()
-        settingsButton(app, named: "Capture Setup").tap()
+        startCaptureSetup(app)
         XCTAssertTrue(app.staticTexts["Notification Settings"].waitForExistence(timeout: 5))
         let scroll = app.scrollViews.containing(.staticText, identifier: "Notification Settings").firstMatch
         XCTAssertTrue(scroll.waitForExistence(timeout: 5), "Setup instructions and controls must remain scrollable in a short window")
@@ -110,7 +116,7 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
         agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        settingsButton(app, named: "Capture Setup").tap()
+        startCaptureSetup(app)
         XCTAssertTrue(app.staticTexts["Notification Settings"].waitForExistence(timeout: 5))
         let instructions = app.scrollViews.containing(.staticText, identifier: "Notification Settings").firstMatch
         if app.frame.width >= 700 && app.frame.height > 1000 {
@@ -150,7 +156,7 @@ final class InterceptorUITests: XCTestCase {
             }
         }
         XCTAssertTrue(app.navigationBars.buttons["Done"].waitForNonExistence(timeout: 5))
-        settingsButton(app, named: "Capture Setup").tap()
+        startCaptureSetup(app)
         XCTAssertTrue(app.staticTexts["Notification Settings"].waitForExistence(timeout: 5))
         XCUIDevice.shared.orientation = .landscapeLeft
         let closeAfterRotation = XCTNSPredicateExpectation(
@@ -326,12 +332,13 @@ final class InterceptorUITests: XCTestCase {
 
             // Before consent: gate blocks main UI, and the disclaimer is visible without scrolling.
             XCTAssertTrue(agree.waitForExistence(timeout: 5), "Agree gate must appear (\(loc.title))")
+            XCTAssertTrue(app.navigationBars[loc.privacy].exists, "Initial and Settings consent must share the same title")
             XCTAssertFalse(tab(app, named: loc.settingsTab).exists, "main UI must be blocked before Agree")
             let title = app.staticTexts[loc.title]
             XCTAssertTrue(title.waitForExistence(timeout: 5), "disclaimer title must render before consent")
             XCTAssertTrue(title.isHittable, "title must be visible without scrolling")
             XCTAssertTrue(app.windows.firstMatch.frame.contains(title.frame))
-            assertDisclaimerBody(app, title: title, loc: loc)
+            let initialBody = assertDisclaimerBody(app, title: title, loc: loc)
             attachScreenshot(app, named: "Apple disclaimer before consent \(loc.isJapanese ? "ja" : "en")")
 
             agree.tap()
@@ -343,7 +350,8 @@ final class InterceptorUITests: XCTestCase {
             XCTAssertTrue(app.navigationBars[loc.privacy].waitForExistence(timeout: 5))
             let privacyTitle = scrollTo(app, app.staticTexts[loc.title])
             XCTAssertFalse(app.buttons[loc.agree].exists)
-            assertDisclaimerBody(app, title: privacyTitle, loc: loc)
+            XCTAssertEqual(assertDisclaimerBody(app, title: privacyTitle, loc: loc), initialBody,
+                           "Initial and Settings consent must display the same disclosure")
             attachScreenshot(app, named: "Apple disclaimer in Data Use \(loc.isJapanese ? "ja" : "en")")
             let withdrawal = scrollTo(app, app.buttons[loc.withdraw])
             XCTAssertTrue(withdrawal.isHittable)
@@ -355,19 +363,21 @@ final class InterceptorUITests: XCTestCase {
 
     /// The rendered body below the title must be real localized text, not empty or a raw key.
     @MainActor
-    private func assertDisclaimerBody(_ app: XCUIApplication, title: XCUIElement, loc: DisclaimerLocale) {
+    @discardableResult
+    private func assertDisclaimerBody(_ app: XCUIApplication, title: XCUIElement, loc: DisclaimerLocale) -> String {
         let titleFrame = title.frame
-        let body = app.staticTexts.allElementsBoundByIndex
+        let body = app.scrollViews["consent.disclosure"].staticTexts.allElementsBoundByIndex
             .filter { $0.frame.minY >= titleFrame.maxY - 1 && !$0.label.isEmpty && $0.label != loc.title }
             .min { $0.frame.minY < $1.frame.minY }
         guard let text = body?.label else {
             XCTFail("disclaimer must render a body below its title (\(loc.title))")
-            return
+            return ""
         }
         XCTAssertGreaterThanOrEqual(text.count, 20, "body must be substantive: \(text)")
         XCTAssertNil(text.range(of: "^[A-Z0-9_.]+$", options: .regularExpression), "raw key shown: \(text)")
         let hasJapanese = text.range(of: "[\\u3040-\\u30FF\\u4E00-\\u9FFF]", options: .regularExpression) != nil
         XCTAssertEqual(hasJapanese, loc.isJapanese, "body must be in the launch locale: \(text)")
+        return text
     }
 
     @MainActor
@@ -433,6 +443,23 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
+    private func startCaptureSetup(_ app: XCUIApplication) {
+        settingsButton(app, named: "How to Use").tap()
+        XCTAssertTrue(app.navigationBars["How to Use"].waitForExistence(timeout: 5))
+        let begin = app.buttons["guide.beginSetup"]
+        let guide = app.collectionViews["guide.overview"]
+        XCTAssertTrue(guide.waitForExistence(timeout: 5))
+        for _ in 0 ..< 6 {
+            if begin.exists && begin.isHittable { break }
+            guide.swipeUp()
+        }
+        XCTAssertTrue(begin.exists)
+        XCTAssertTrue(begin.isHittable)
+        attachDeviceScreenshot(named: "Unified guide before setup")
+        begin.tap()
+    }
+
+    @MainActor
     private func settingsButton(_ app: XCUIApplication, named name: String) -> XCUIElement {
         let button = app.buttons[name]
         let form: XCUIElement = if app.navigationBars["Data Use & Consent"].exists && app.scrollViews.firstMatch.exists {
@@ -486,7 +513,7 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
         agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        settingsButton(app, named: "Capture Setup").tap()
+        startCaptureSetup(app)
         guard waitForNotificationStage(app) == .undecided else {
             throw XCTSkip("Notification permission is already decided; run on a fresh simulator to exercise this branch.")
         }
@@ -722,7 +749,7 @@ final class InterceptorUITests: XCTestCase {
 
         agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        settingsButton(app, named: "Capture Setup").tap()
+        startCaptureSetup(app)
 
         // The simulator permits advancing through the device-only setup steps.
         XCTAssertTrue(app.staticTexts["Step 1 of 6"].waitForExistence(timeout: 5))
@@ -739,7 +766,7 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Step 3 of 6"].waitForExistence(timeout: 5))
         app.buttons["Close"].tap()
         XCTAssertTrue(app.staticTexts["Step 3 of 6"].waitForNonExistence(timeout: 5))
-        settingsButton(app, named: "Capture Setup").tap()
+        startCaptureSetup(app)
         XCTAssertTrue(app.staticTexts["Step 1 of 6"].waitForExistence(timeout: 5))
         advancePastNotifications(app)
         for _ in 0 ..< 4 {
