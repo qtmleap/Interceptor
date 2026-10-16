@@ -1,0 +1,20 @@
+--- a/Sources/CQuickJS/Vendor/quickjs.c
++++ b/Sources/CQuickJS/Vendor/quickjs.c
+@@ -509,7 +509,7 @@
+ 
+ /* must be large enough to have a negligible runtime cost and small
+    enough to call the interrupt callback often. */
+-#define JS_INTERRUPT_COUNTER_INIT 10000
++#define JS_INTERRUPT_COUNTER_INIT 64
+ 
+ struct JSContext {
+     JSGCObjectHeader header; /* must come first */
+@@ -11263,7 +11263,7 @@
+ 
+ /* bigint support */
+ 
+-#define JS_BIGINT_MAX_SIZE ((1024 * 1024) / JS_LIMB_BITS) /* in limbs */
++#define JS_BIGINT_MAX_SIZE (8192 / JS_LIMB_BITS) /* in limbs */
+ 
+ /* it is currently assumed that JS_SHORT_BIG_INT_BITS = JS_LIMB_BITS */
+ #if JS_SHORT_BIG_INT_BITS == 32

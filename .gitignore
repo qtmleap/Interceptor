@@ -180,3 +180,11 @@ GoogleService-Info.plist
 
 # Release automation test artifacts
 __pycache__/
+
+# Committed next-major plugin foundation (other generated Packages stay ignored).
+!Packages/
+Packages/*
+!Packages/InterceptorAutomation/
+!Packages/InterceptorAutomation/**
+Packages/InterceptorAutomation/.build/
+Packages/InterceptorAutomation/.swiftpm/

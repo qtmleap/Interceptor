@@ -21,6 +21,12 @@
 		10F701C42E491546006ECDD2 /* PacketTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 10F701B92E491546006ECDD2 /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		10F701CB2E491567006ECDD2 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 10F701CA2E491567006ECDD2 /* Mudmouth */; };
 		10FBBF2D2E522C5E00CC57B0 /* Runestone in Frameworks */ = {isa = PBXBuildFile; productRef = 10FBBF2C2E522C5E00CC57B0 /* Runestone */; };
+		A16C00000000000000000010 /* AutomationCore in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000002 /* AutomationCore */; };
+		A16C00000000000000000011 /* AutomationCore in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000002 /* AutomationCore */; };
+		A16C00000000000000000012 /* AutomationRepository in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000003 /* AutomationRepository */; };
+		A16C00000000000000000013 /* AutomationRepository in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000003 /* AutomationRepository */; };
+		A16C00000000000000000014 /* AutomationRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000004 /* AutomationRuntime */; };
+		A16C00000000000000000015 /* AutomationRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000004 /* AutomationRuntime */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -129,6 +135,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A16C00000000000000000010 /* AutomationCore in Frameworks */,
+				A16C00000000000000000012 /* AutomationRepository in Frameworks */,
+				A16C00000000000000000014 /* AutomationRuntime in Frameworks */,
 				10925F5D2E4CFA25003611AA /* QuantumLeap in Frameworks */,
 				10B520E52E52A344006C2045 /* TreeSitterJavaScript in Frameworks */,
 				104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */,
@@ -147,6 +156,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A16C00000000000000000011 /* AutomationCore in Frameworks */,
+				A16C00000000000000000013 /* AutomationRepository in Frameworks */,
+				A16C00000000000000000015 /* AutomationRuntime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -222,6 +234,9 @@
 			);
 			name = Interceptor;
 			packageProductDependencies = (
+				A16C00000000000000000002 /* AutomationCore */,
+				A16C00000000000000000003 /* AutomationRepository */,
+				A16C00000000000000000004 /* AutomationRuntime */,
 				104F3BAE2E49131900A2D6F1 /* Mudmouth */,
 				104F3BB12E49135800A2D6F1 /* Mudmouth */,
 				10925F5C2E4CFA25003611AA /* QuantumLeap */,
@@ -256,6 +271,9 @@
 			);
 			name = InterceptorTests;
 			packageProductDependencies = (
+				A16C00000000000000000002 /* AutomationCore */,
+				A16C00000000000000000003 /* AutomationRepository */,
+				A16C00000000000000000004 /* AutomationRuntime */,
 			);
 			productName = InterceptorTests;
 			productReference = 104F3B8E2E49099300A2D6F1 /* InterceptorTests.xctest */;
@@ -345,6 +363,7 @@
 			mainGroup = 104F3B782E49099100A2D6F1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A16C00000000000000000001 /* XCLocalSwiftPackageReference "Packages/InterceptorAutomation" */,
 				104F3BB02E49135800A2D6F1 /* XCLocalSwiftPackageReference "../Mudmouth" */,
 				10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */,
 				10FBBF2B2E522C5E00CC57B0 /* XCRemoteSwiftPackageReference "Runestone" */,
@@ -834,6 +853,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../Mudmouth;
 		};
+		A16C00000000000000000001 /* XCLocalSwiftPackageReference "Packages/InterceptorAutomation" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/InterceptorAutomation;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -922,6 +945,9 @@
 			package = 10FBBF2B2E522C5E00CC57B0 /* XCRemoteSwiftPackageReference "Runestone" */;
 			productName = Runestone;
 		};
+		A16C00000000000000000002 /* AutomationCore */ = {isa = XCSwiftPackageProductDependency; package = A16C00000000000000000001 /* XCLocalSwiftPackageReference "Packages/InterceptorAutomation" */; productName = AutomationCore; };
+		A16C00000000000000000003 /* AutomationRepository */ = {isa = XCSwiftPackageProductDependency; package = A16C00000000000000000001 /* XCLocalSwiftPackageReference "Packages/InterceptorAutomation" */; productName = AutomationRepository; };
+		A16C00000000000000000004 /* AutomationRuntime */ = {isa = XCSwiftPackageProductDependency; package = A16C00000000000000000001 /* XCLocalSwiftPackageReference "Packages/InterceptorAutomation" */; productName = AutomationRuntime; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 104F3B792E49099100A2D6F1 /* Project object */;
