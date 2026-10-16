@@ -29,7 +29,7 @@ final class InterceptorUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
         agreeIfNeeded(app)
-        let status = app.switches["Status"].value as? String
+        let status = revealStatusSwitch(app).value as? String
         openPrivacy(app)
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5), "Settings disclosure must be a dismissible sheet")
         XCTAssertFalse(app.buttons["Agree"].exists)
@@ -43,7 +43,8 @@ final class InterceptorUITests: XCTestCase {
         app.buttons["Close"].tap()
         XCTAssertTrue(app.buttons["Close"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.navigationBars["Settings"].exists)
-        XCTAssertEqual(app.switches["Status"].value as? String, status)
+        XCTAssertEqual(revealStatusSwitch(app).value as? String, status)
+        attachDeviceScreenshot(named: "Settings status after closing disclosure")
         app.terminate()
         app.launch()
         XCTAssertTrue(tab(app, named: "Settings").waitForExistence(timeout: 5))
@@ -532,6 +533,23 @@ final class InterceptorUITests: XCTestCase {
         }
         XCTFail("Must be able to scroll to \(element)")
         return element
+    }
+
+    @MainActor
+    private func revealStatusSwitch(_ app: XCUIApplication) -> XCUIElement {
+        let status = app.switches["Status"]
+        let form = app.collectionViews.firstMatch.exists
+            ? app.collectionViews.firstMatch : app.scrollViews.firstMatch
+        // Closing the sheet preserves the Settings scroll position; read the visible named control.
+        for _ in 0 ..< 10 {
+            if status.exists && status.isHittable {
+                return status
+            }
+            form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.2))
+                .press(forDuration: 0.05, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.75)))
+        }
+        XCTFail("Settings must allow scrolling back to Status")
+        return status
     }
 
     @MainActor
