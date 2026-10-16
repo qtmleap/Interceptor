@@ -9,20 +9,24 @@
 import LicenseList
 import Mudmouth
 import QuantumLeap
+import SafariServices
+import StoreKit
 import SwiftUI
 import SwiftUIIntrospect
 
 struct SettingsView: View {
-    @State private var showGuide = false
+    @Environment(\.requestReview) private var requestReview
+    @State private var showCaptureSetup = false
+    @State private var showDataUse = false
 
     var body: some View {
         Form(content: {
-            QuantumLeap.Support()
-                .environment(\.isFirstLaunch, $showGuide)
+            supportSection
             QuantumLeap.VPNSettingList()
             QuantumLeap.Tools()
             Section {
-                NavigationLink("Data Use & Consent") { DataUseDetailsView(showsWithdrawal: true) }
+                Button("Data Use & Consent") { showDataUse = true }
+                    .foregroundStyle(.primary)
                 Link("Terms of Service", destination: URL(string: "https://qleap.jp/term/eula")!)
                     .foregroundStyle(.primary)
                 Link("Privacy Policy", destination: URL(string: "https://qleap.jp/term/interceptor_privacy_policy")!)
@@ -37,13 +41,123 @@ struct SettingsView: View {
             }
             QuantumLeap.Version()
         })
-        .sheet(isPresented: $showGuide) {
-            HowToUseView()
+        .sheet(isPresented: $showCaptureSetup) {
+            FirstLaunchView(flow: .captureSetup)
+                .tint(Color(uiColor: .systemBlue))
                 .presentationDetents([.large])
                 .modifier(CaptureSetupSheetSizing())
         }
+        .sheet(isPresented: $showDataUse) {
+            NavigationStack {
+                DataUseDetailsView(showsWithdrawal: true)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { showDataUse = false }
+                    }
+                }
+            }
+            .presentationDetents([.large])
+            .modifier(CaptureSetupSheetSizing())
+        }
         .navigationTitle(Text("TITLE_SETTINGS"))
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var supportSection: some View {
+        Section {
+            Button {
+                requestReview()
+            } label: {
+                Label(systemName: "pencil", color: .green, title: { Text("Rate This App") })
+            }
+            .foregroundStyle(.primary)
+            Button {
+                guard CaptureAuthorization.isGranted else { return }
+                showCaptureSetup = true
+            } label: {
+                Label(systemName: "lightbulb.fill", color: .yellow, title: { Text("Capture Setup") })
+            }
+            .foregroundStyle(.primary)
+            .accessibilityIdentifier("settings.captureSetup")
+            NavigationLink {
+                ContactView()
+            } label: {
+                Label(systemName: "questionmark", color: .brown, title: { Text("Contact Us") })
+            }
+        } header: {
+            Text("Support")
+        }
+    }
+}
+
+private struct ContactView: View {
+    private struct Page: Identifiable {
+        let url: URL
+        var id: URL { url }
+    }
+
+    @State private var page: Page?
+
+    var body: some View {
+        Form {
+            Section {
+                link("https://qleap.jp/support/bug_report", "ant.fill", "Report a Bug")
+                link("https://qleap.jp/support/feature_request", "plus.bubble.fill", "Feature Request")
+                link("https://qleap.jp/support/suggestion", "sparkles", "Suggestion")
+            }
+        }
+        .navigationTitle(Text("Contact Us"))
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $page) { page in
+            ContactSafariView(url: page.url)
+        }
+    }
+
+    private func link(_ url: String, _ symbol: String, _ title: LocalizedStringKey) -> some View {
+        Button {
+            page = Page(url: URL(string: url)!)
+        } label: {
+            HStack {
+                Label(systemName: symbol, color: .red, title: { Text(title) })
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.tertiary)
+                    .font(.footnote.weight(.semibold))
+                    .accessibilityHidden(true)
+            }
+        }
+        .foregroundStyle(.primary)
+        .accessibilityAddTraits(.isLink)
+    }
+}
+
+private struct ContactSafariView: UIViewControllerRepresentable {
+    @Environment(\.dismiss) private var dismiss
+    let url: URL
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator { dismiss() }
+    }
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let controller = SFSafariViewController(url: url)
+        controller.delegate = context.coordinator
+        controller.dismissButtonStyle = .done
+        controller.preferredBarTintColor = .systemBackground
+        controller.preferredControlTintColor = .tintColor
+        return controller
+    }
+
+    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
+
+    final class Coordinator: NSObject, SFSafariViewControllerDelegate {
+        private let onFinish: () -> Void
+
+        init(onFinish: @escaping () -> Void) { self.onFinish = onFinish }
+
+        func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
+            onFinish()
+        }
     }
 }
 

@@ -28,6 +28,10 @@ private struct SSLProxyingListView: View {
     @ObservedObject var store: SSLProxyingListStore
     @State private var draft: Draft?
     @State private var confirmReset = false
+    // Single owner: the list, rows, Edit button and toolbar all share this binding.
+    @State private var editMode: EditMode = .inactive
+
+    private var isEditing: Bool { editMode.isEditing }
 
     var body: some View {
         List {
@@ -47,20 +51,26 @@ private struct SSLProxyingListView: View {
             }
             Section {
                 ForEach(store.options) { option in
-                    Button(action: { draft = .init(original: option.host) }, label: {
-                        Text(option.host)
-                            .foregroundStyle(Color.primary)
-                    })
-                    .accessibilityIdentifier("ssl.row.\(option.host)")
+                    row(option)
+                        .deleteDisabled(!isEditing)
+                        .moveDisabled(!isEditing)
                 }
-                .onMove(perform: store.move)
-                .onDelete(perform: store.delete)
+                .onMove { source, destination in
+                    guard isEditing else { return }
+                    store.move(from: source, to: destination)
+                }
+                .onDelete { offsets in
+                    guard isEditing else { return }
+                    store.delete(at: offsets)
+                }
             } header: {
                 HStack {
                     Text("Hosts")
                         .accessibilityAddTraits(.isHeader)
                     Spacer()
-                    sortMenu
+                    if isEditing {
+                        sortMenu
+                    }
                 }
                 .textCase(nil)
             } footer: {
@@ -73,15 +83,21 @@ private struct SSLProxyingListView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 EditButton()
                     .accessibilityIdentifier("ssl.edit")
-                Button(action: { draft = .init() }, label: {
-                    Label("Add Host", systemImage: "plus")
-                })
-                .disabled(store.loadError != nil)
-                .accessibilityIdentifier("ssl.add")
+                if isEditing {
+                    Button(action: {
+                        guard isEditing else { return }
+                        draft = .init()
+                    }, label: {
+                        Label("Add Host", systemImage: "plus")
+                    })
+                    .disabled(store.loadError != nil)
+                    .accessibilityIdentifier("ssl.add")
+                }
             }
         }
         .sheet(item: $draft) { draft in
             HostEditorView(store: store, original: draft.original)
+                .environment(\.editMode, .constant(.inactive))
         }
         .alert("Reset List?", isPresented: $confirmReset) {
             Button("Reset List", role: .destructive) { store.reset() }
@@ -90,12 +106,40 @@ private struct SSLProxyingListView: View {
             Text("SSL_LIST_RESET_CONFIRMATION")
         }
         .tint(Color(uiColor: .systemBlue))
+        // Outermost, so the toolbar's EditButton and the list resolve the same binding.
+        .environment(\.editMode, $editMode)
+        // Return to viewing mode when leaving the list.
+        .onDisappear { editMode = .inactive }
+    }
+
+    @ViewBuilder
+    private func row(_ option: ProxyOption) -> some View {
+        if isEditing {
+            Button(action: {
+                guard isEditing else { return }
+                draft = .init(original: option.host)
+            }, label: {
+                Text(option.host)
+                    .foregroundStyle(Color.primary)
+            })
+            .accessibilityIdentifier("ssl.row.\(option.host)")
+        } else {
+            Text(option.host)
+                .foregroundStyle(Color.primary)
+                .accessibilityIdentifier("ssl.row.\(option.host)")
+        }
     }
 
     private var sortMenu: some View {
         Menu {
-            Button("Host Name (A–Z)") { store.sort(ascending: true) }
-            Button("Host Name (Z–A)") { store.sort(ascending: false) }
+            Button("Host Name (A–Z)") {
+                guard isEditing else { return }
+                store.sort(ascending: true)
+            }
+            Button("Host Name (Z–A)") {
+                guard isEditing else { return }
+                store.sort(ascending: false)
+            }
         } label: {
             Label("Sort", systemImage: "arrow.up.arrow.down")
                 .frame(minWidth: 44, minHeight: 44)

@@ -49,7 +49,9 @@ struct DataUseDetailsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .tint(.indigo)
         .alert("Withdraw Consent?", isPresented: $confirmWithdrawal) {
-            Button("Withdraw Consent", role: .destructive) { client.withdrawCaptureConsent() }
+            Button("Withdraw Consent", role: .destructive) {
+                client.withdrawCaptureConsent()
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("CONSENT_WITHDRAW_CONFIRMATION")
