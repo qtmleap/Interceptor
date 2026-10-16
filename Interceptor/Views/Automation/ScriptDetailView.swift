@@ -59,7 +59,6 @@ struct ScriptDetailView: View {
                     Task { await session.saveAsLocalEdit() }
                 }
                 .disabled(!session.canSave)
-                .frame(minWidth: 44, minHeight: 44)
                 .accessibilityIdentifier("script.save")
             }
             ToolbarItemGroup(placement: .keyboard) {

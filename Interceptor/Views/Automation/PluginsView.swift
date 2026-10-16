@@ -76,7 +76,7 @@ struct PluginsView: View {
                     Button("AUTO_ADD_REPOSITORY") { showAddRepository = true }
                         .accessibilityIdentifier("plugins.addRepository")
                 } label: {
-                    Label("Add", systemImage: "plus").frame(minWidth: 44, minHeight: 44)
+                    Label("Add", systemImage: "plus")
                 }
                 .disabled(controller.storeError != nil)
                 .accessibilityIdentifier("plugins.add")

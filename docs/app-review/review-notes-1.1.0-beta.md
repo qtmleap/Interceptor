@@ -23,7 +23,7 @@ Test runs
 
 Quick test (built-in example; no account, certificate or VPN needed beyond the app's initial consent)
 1. Open Settings > Plugins.
-2. Tap Create Example Script, then select the new script.
+2. Tap +, choose Create Example Script, then select the new script.
 3. Edit the source and tap Save.
 4. Choose Request or Response, optionally edit the synthetic event and config, then tap Run Synthetic Test.
 5. Check the validated result and, if any action is returned, the "Not sent" label. Try Cancel during a run.
@@ -56,7 +56,7 @@ Interceptor 1.1.0(TestFlightベータ)- テスト内容
 
 手順(組み込みサンプル。初回の同意以外にアカウント・証明書・VPNは不要)
 1. 設定 > プラグインを開く。
-2. 「サンプルスクリプトを作成」をタップし、できたスクリプトを選ぶ。
+2. +を押して「サンプルスクリプトを作成」を選び、できたスクリプトを開く。
 3. ソースを編集して「保存」をタップ。
 4. リクエストかレスポンスを選び、「合成データでテスト」をタップ。
 5. 結果と、アクションがあれば「未送信」を確認。実行中のキャンセルも試す。
