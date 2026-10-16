@@ -1593,6 +1593,12 @@
         }
       }
     },
+    "Disagree" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Disagree" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "同意しない" } }
+      }
+    },
     "Developers" : {
       "localizations" : {
         "en" : {
