@@ -93,7 +93,7 @@ final class InterceptorUITests: XCTestCase {
                 XCTAssertGreaterThanOrEqual(withdrawal.frame.width, textWidth + 16,
                                             "The action must fit its full label with horizontal padding")
                 XCTAssertLessThanOrEqual(withdrawal.frame.height, 44.5, "The action must remain one standard toolbar row")
-                XCTAssertGreaterThanOrEqual(withdrawal.frame.height, 44)
+                XCTAssertEqual(withdrawal.frame.height, app.buttons[loc.isJapanese ? "閉じる" : "Close"].frame.height, accuracy: 0.5)
                 XCTAssertGreaterThanOrEqual(withdrawal.frame.minX, title.frame.maxX + 8, "The title and action must not overlap")
                 withdrawal.tap()
                 let cancel = app.alerts.buttons[loc.isJapanese ? "キャンセル" : "Cancel"]
@@ -350,7 +350,7 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Agree"].exists)
         let withdrawal = withdrawalButton(app)
         XCTAssertGreaterThanOrEqual(withdrawal.frame.width, 44)
-        XCTAssertGreaterThanOrEqual(withdrawal.frame.height, 44)
+        XCTAssertEqual(withdrawal.frame.height, app.buttons["Close"].frame.height, accuracy: 0.5)
         attachDeviceScreenshot(named: "Consent withdrawal button")
         // Confirm the measured target works near both vertical edges, beyond checking its size.
         let halfHeight = withdrawal.frame.height / 2 - 1
@@ -491,7 +491,7 @@ final class InterceptorUITests: XCTestCase {
             let withdrawal = withdrawalButton(app)
             XCTAssertTrue(withdrawal.isHittable)
             XCTAssertGreaterThanOrEqual(withdrawal.frame.width, 44)
-            XCTAssertGreaterThanOrEqual(withdrawal.frame.height, 44)
+            XCTAssertEqual(withdrawal.frame.height, app.buttons[loc.isJapanese ? "閉じる" : "Close"].frame.height, accuracy: 0.5)
             attachDeviceScreenshot(named: "Consent withdrawal \(loc.isJapanese ? "ja" : "en")")
             app.terminate()
         }
