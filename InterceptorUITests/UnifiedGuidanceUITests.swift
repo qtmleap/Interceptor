@@ -18,6 +18,7 @@ internal final class UnifiedGuidanceUITests: XCTestCase {
         settings.tap()
         withdrawConsent(app)
         XCTAssertTrue(agree.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["閉じる"].waitForNonExistence(timeout: 5), "The mandatory gate has no Close")
         app.terminate()
 
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
@@ -59,7 +60,8 @@ internal final class UnifiedGuidanceUITests: XCTestCase {
     @MainActor
     private func withdrawConsent(_ app: XCUIApplication) {
         reach(app.buttons["データ利用と同意"], in: app.collectionViews.firstMatch).tap()
-        reach(app.buttons["同意を取り消す"], in: app.scrollViews.firstMatch).tap()
+        XCTAssertTrue(app.buttons["閉じる"].waitForExistence(timeout: 5), "Settings disclosure must be a closable sheet")
+        reach(app.buttons["同意を取り消す"], in: app.scrollViews["consent.disclosure"]).tap()
         let confirm = app.alerts.buttons["同意を取り消す"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()

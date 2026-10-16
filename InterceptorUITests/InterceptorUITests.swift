@@ -23,6 +23,43 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsDataUseSheetCloseCancelAndWithdraw() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        defer { app.terminate() }
+        agreeIfNeeded(app)
+        let status = app.switches["Status"].value as? String
+        openPrivacy(app)
+        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5), "Settings disclosure must be a dismissible sheet")
+        XCTAssertFalse(app.buttons["Agree"].exists)
+        settingsButton(app, named: "Withdraw Consent").tap()
+        XCTAssertTrue(app.alerts.buttons["Cancel"].waitForExistence(timeout: 5))
+        app.alerts.buttons["Cancel"].tap()
+        XCTAssertTrue(app.buttons["Close"].isHittable)
+        XCTAssertFalse(app.buttons["Agree"].exists)
+        attachDeviceScreenshot(named: "Data Use sheet after cancelling withdrawal")
+        app.buttons["Close"].tap()
+        XCTAssertTrue(app.buttons["Close"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Settings"].exists)
+        XCTAssertEqual(app.switches["Status"].value as? String, status)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(tab(app, named: "Settings").waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Agree"].exists, "Closing the disclosure must retain consent")
+        openPrivacy(app)
+        withdrawConsent(app)
+        assertStartupConsent(app)
+        XCTAssertTrue(app.buttons["Close"].waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.navigationBars.matching(identifier: "Data Use & Consent").count, 1)
+        XCTAssertEqual(app.buttons.matching(identifier: "Agree").count, 1)
+        agreeIfNeeded(app)
+        openPrivacy(app)
+        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
+        app.buttons["Close"].tap()
+    }
+
+    @MainActor
     func testExample() {
         // UI tests must launch the application that they test.
         let app = XCUIApplication()
@@ -278,7 +315,7 @@ final class InterceptorUITests: XCTestCase {
         openPrivacy(app)
         XCTAssertTrue(app.staticTexts["Purpose"].exists)
         XCTAssertFalse(app.buttons["Agree"].exists)
-        XCTAssertFalse(app.buttons["Close"].exists)
+        XCTAssertTrue(app.buttons["Close"].isHittable, "Settings disclosure is a dismissible sheet")
         attachDeviceScreenshot(named: UIDevice.current.userInterfaceIdiom == .pad ? "Privacy large text landscape" : "Privacy large text portrait")
     }
 
@@ -388,8 +425,8 @@ final class InterceptorUITests: XCTestCase {
                 return element
             }
             let isPrivacy = app.navigationBars["Data Use & Consent"].exists || app.navigationBars["データ利用と同意"].exists
-            let form = isPrivacy && app.scrollViews.firstMatch.exists
-                ? app.scrollViews.firstMatch
+            let form = isPrivacy && app.scrollViews["consent.disclosure"].exists
+                ? app.scrollViews["consent.disclosure"]
                 : (app.collectionViews.firstMatch.exists ? app.collectionViews.firstMatch : app.scrollViews.firstMatch)
             form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.75))
                 .press(forDuration: 0.05, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.2)))
@@ -462,8 +499,8 @@ final class InterceptorUITests: XCTestCase {
     @MainActor
     private func settingsButton(_ app: XCUIApplication, named name: String) -> XCUIElement {
         let button = app.buttons[name]
-        let form: XCUIElement = if app.navigationBars["Data Use & Consent"].exists && app.scrollViews.firstMatch.exists {
-            app.scrollViews.firstMatch
+        let form: XCUIElement = if app.navigationBars["Data Use & Consent"].exists && app.scrollViews["consent.disclosure"].exists {
+            app.scrollViews["consent.disclosure"]
         } else {
             app.collectionViews.firstMatch.exists
                 ? app.collectionViews.firstMatch : app.scrollViews.firstMatch
@@ -723,14 +760,24 @@ final class InterceptorUITests: XCTestCase {
         attachScreenshot(app, named: "Physical mandatory consent after withdrawal")
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         settings.launch()
-        let vpnSettings = settings.buttons["com.apple.settings.vpn"]
-        XCTAssertTrue(vpnSettings.waitForExistence(timeout: 5))
-        vpnSettings.tap()
-        let systemStatus = settings.switches.matching(NSPredicate(format: "label BEGINSWITH 'VPN Status'")).firstMatch
+        let sidebarStatus = settings.switches["com.apple.settings.vpn"]
+        let systemStatus: XCUIElement
+        if sidebarStatus.waitForExistence(timeout: 3) {
+            // iPadOS 27 exposes the VPN state directly as a sidebar switch. Read it without toggling it.
+            systemStatus = sidebarStatus
+        } else {
+            let vpnSettings = settings.buttons["com.apple.settings.vpn"]
+            XCTAssertTrue(vpnSettings.waitForExistence(timeout: 5))
+            vpnSettings.tap()
+            systemStatus = settings.switches.matching(NSPredicate(format: "label BEGINSWITH 'VPN Status'")).firstMatch
+        }
         XCTAssertTrue(systemStatus.waitForExistence(timeout: 5))
         let systemStopped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '0'"), object: systemStatus)
         XCTAssertEqual(XCTWaiter.wait(for: [systemStopped], timeout: 15), .completed, "iPadOS must report that the VPN stopped after consent withdrawal.")
-        attachScreenshot(settings, named: "Physical system VPN disconnected")
+        let vpnState = XCTAttachment(screenshot: systemStatus.screenshot())
+        vpnState.name = "Physical system VPN disconnected"
+        vpnState.lifetime = .keepAlways
+        add(vpnState)
         #endif
     }
 
@@ -799,7 +846,7 @@ final class InterceptorUITests: XCTestCase {
         settingsButton(app, named: "SSL Proxying List").tap()
         XCTAssertTrue(app.navigationBars["SSL Proxying List"].waitForExistence(timeout: 5))
         for host in ["api.lp1.av5ja.srv.nintendo.net", "app.splatoon2.nintendo.net"] {
-            let row = app.buttons["ssl.row." + host]
+            let row = app.descendants(matching: .any).matching(identifier: "ssl.row." + host).firstMatch
             XCTAssertTrue(row.waitForExistence(timeout: 5))
             XCTAssertEqual(row.label, host)
         }

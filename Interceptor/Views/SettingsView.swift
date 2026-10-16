@@ -13,7 +13,11 @@ import SwiftUI
 import SwiftUIIntrospect
 
 struct SettingsView: View {
+    @EnvironmentObject private var client: Tuberose
     @State private var showGuide = false
+    @State private var showDataUse = false
+    /// Set on confirmation; withdrawal runs in onDismiss so the consent gate cannot race the sheet dismissal.
+    @State private var withdrawAfterDismiss = false
 
     var body: some View {
         Form(content: {
@@ -22,7 +26,8 @@ struct SettingsView: View {
             QuantumLeap.VPNSettingList()
             QuantumLeap.Tools()
             Section {
-                NavigationLink("Data Use & Consent") { DataUseDetailsView(showsWithdrawal: true) }
+                Button("Data Use & Consent") { showDataUse = true }
+                    .foregroundStyle(.primary)
                 Link("Terms of Service", destination: URL(string: "https://qleap.jp/term/eula")!)
                     .foregroundStyle(.primary)
                 Link("Privacy Policy", destination: URL(string: "https://qleap.jp/term/interceptor_privacy_policy")!)
@@ -41,6 +46,25 @@ struct SettingsView: View {
             HowToUseView()
                 .presentationDetents([.large])
                 .modifier(CaptureSetupSheetSizing())
+        }
+        .sheet(isPresented: $showDataUse, onDismiss: {
+            guard withdrawAfterDismiss else { return }
+            withdrawAfterDismiss = false
+            client.withdrawCaptureConsent()
+        }) {
+            NavigationStack {
+                DataUseDetailsView(showsWithdrawal: true) {
+                    withdrawAfterDismiss = true
+                    showDataUse = false
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { showDataUse = false }
+                    }
+                }
+            }
+            .presentationDetents([.large])
+            .modifier(CaptureSetupSheetSizing())
         }
         .navigationTitle(Text("TITLE_SETTINGS"))
         .navigationBarTitleDisplayMode(.inline)

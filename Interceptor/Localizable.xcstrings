@@ -1863,13 +1863,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No hosts. Tap + to add one. Capture needs at least one host."
+            "value" : "No hosts. Tap Edit, then + to add one. Capture needs at least one host."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ホストがありません。＋をタップして追加してください。キャプチャには1つ以上のホストが必要です。"
+            "value" : "ホストがありません。「編集」をタップし、＋で追加してください。キャプチャには1つ以上のホストが必要です。"
           }
         }
       }
