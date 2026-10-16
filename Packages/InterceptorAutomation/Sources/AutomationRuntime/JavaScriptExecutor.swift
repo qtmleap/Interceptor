@@ -1,4 +1,5 @@
 import CQuickJS
+import AutomationCore
 import Foundation
 
 /// Which declarative hook of a plugin source is invoked.
@@ -136,6 +137,13 @@ public final class JavaScriptExecutor: @unchecked Sendable {
     }
 
     private static func execute(job: Job, source: [UInt8], hook: String, event: Data, config: Data) throws -> Data {
+        // Run strict parsing on the worker queue, before JS can discard duplicate keys.
+        do {
+            guard case .object = try JSONValue(parsing: event),
+                  case .object = try JSONValue(parsing: config) else {
+                throw JavaScriptExecutionError.invalidInput
+            }
+        } catch { throw JavaScriptExecutionError.invalidInput }
         var limits = QJSLimits(
             deadline_ms: JavaScriptLimits.deadlineMilliseconds,
             heap_bytes: JavaScriptLimits.heapBytes,
@@ -164,7 +172,10 @@ public final class JavaScriptExecutor: @unchecked Sendable {
             guard let bytes = result.data, result.length <= JavaScriptLimits.maxResultBytes else {
                 throw JavaScriptExecutionError.invalidResult
             }
-            return Data(bytes: bytes, count: result.length)
+            let data = Data(bytes: bytes, count: result.length)
+            do { _ = try JSONValue(parsing: data) }
+            catch { throw JavaScriptExecutionError.invalidResult }
+            return data
         case Int32(QJS_TIMEOUT): throw JavaScriptExecutionError.timeout
         case Int32(QJS_CANCELLED): throw JavaScriptExecutionError.cancelled
         case Int32(QJS_MEMORY_OR_STACK): throw JavaScriptExecutionError.memoryOrStack

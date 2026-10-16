@@ -9,7 +9,50 @@
  
  struct JSContext {
      JSGCObjectHeader header; /* must come first */
-@@ -11263,7 +11263,7 @@
+@@ -9118,6 +9118,10 @@
+     JSAtom prop;
+     int present;
+ 
++    if (unlikely(js_poll_interrupts(ctx))) {
++        *pval = JS_UNDEFINED;
++        return -1;
++    }
+     if (likely((uint64_t)idx <= JS_ATOM_MAX_INT)) {
+         /* fast path */
+         present = JS_HasProperty(ctx, obj, __JS_AtomFromUInt32(idx));
+@@ -9147,6 +9151,9 @@
+ {
+     JSAtom prop;
+     JSValue val;
++
++    if (unlikely(js_poll_interrupts(ctx)))
++        return JS_EXCEPTION;
+ 
+     if ((uint64_t)idx <= INT32_MAX) {
+         /* fast path for fast arrays */
+@@ -10081,6 +10088,11 @@
+ {
+     JSAtom prop;
+     int res;
++
++    if (unlikely(js_poll_interrupts(ctx))) {
++        JS_FreeValue(ctx, val);
++        return -1;
++    }
+ 
+     if ((uint64_t)idx <= INT32_MAX) {
+         /* fast path for fast arrays */
+@@ -10944,6 +10956,9 @@
+     JSAtom prop;
+     int res;
+ 
++    if (unlikely(js_poll_interrupts(ctx)))
++        return -1;
++
+     if ((uint64_t)idx <= JS_ATOM_MAX_INT) {
+         /* fast path for fast arrays */
+         return JS_DeleteProperty(ctx, obj, __JS_AtomFromUInt32(idx), flags);
+@@ -11263,7 +11278,7 @@
  
  /* bigint support */
  
@@ -18,3 +61,39 @@
  
  /* it is currently assumed that JS_SHORT_BIG_INT_BITS = JS_LIMB_BITS */
  #if JS_SHORT_BIG_INT_BITS == 32
+@@ -42283,6 +42298,8 @@
+         }
+         if (js_get_fast_array(ctx, obj, &arrp, &count)) {
+             for (; n < count; n++) {
++                if (unlikely(js_poll_interrupts(ctx)))
++                    goto exception;
+                 if (js_strict_eq2(ctx, JS_DupValue(ctx, argv[0]),
+                                   JS_DupValue(ctx, arrp[n]),
+                                   JS_EQ_SAME_VALUE_ZERO)) {
+@@ -42332,6 +42349,8 @@
+         }
+         if (js_get_fast_array(ctx, obj, &arrp, &count)) {
+             for (; n < count; n++) {
++                if (unlikely(js_poll_interrupts(ctx)))
++                    goto exception;
+                 if (js_strict_eq2(ctx, JS_DupValue(ctx, argv[0]),
+                                   JS_DupValue(ctx, arrp[n]), JS_EQ_STRICT)) {
+                     res = n;
+@@ -42536,7 +42555,7 @@
+                 string_buffer_concat(b, p, 0, p->len);
+             }
+         }
+-        el = JS_GetPropertyUint32(ctx, obj, i);
++        el = JS_GetPropertyInt64(ctx, obj, i);
+         if (JS_IsException(el))
+             goto fail;
+         if (!JS_IsNull(el) && !JS_IsUndefined(el)) {
+@@ -43143,6 +43162,8 @@
+ 
+     if (psc->exception)
+         return 0;
++    if (unlikely(js_poll_interrupts(ctx)))
++        goto exception;
+ 
+     if (psc->has_method) {
+         /* custom sort function is specified as returning 0 for identical

@@ -1,4 +1,5 @@
 import XCTest
+import AutomationCore
 @testable import AutomationRuntime
 
 /// Exercises the real runtime only. Pathological scripts rely on the runtime's own 50 ms deadline;
@@ -76,6 +77,95 @@ final class JavaScriptExecutorTests: XCTestCase, @unchecked Sendable {
         await expectError(.scriptError, handler("throw new Error('boom');"))
         await expectError(.scriptError, "this is not javascript (")
         await expectError(.scriptError, handler("throw {toString(){ for(;;){} }};"))
+    }
+
+    func testLargeFiniteNumbersMatchCoreJSONContract() async throws {
+        for expression in ["2**53-1", "-(2**53-1)", "2**53", "-(2**53)", "99999999999999984", "1e100", "Number.MIN_VALUE", "Number.MAX_VALUE", "-0"] {
+            let data = try await run(handler("return {actions:[\(action("{value:\(expression)}"))]};"))
+            _ = try JSONValue(parsing: data)
+            let result = try actions(data)
+            let json = try XCTUnwrap(result.first?["json"] as? [String: Any])
+            XCTAssertNotNil(json["value"] as? Double)
+        }
+    }
+
+    func testCanonicalEquivalentOutputKeysAreRejectedAtRuntimeBoundary() async {
+        await expectError(.invalidResult,
+                          handler("return {actions:[\(action("{'\\u00e9':1,'e\\u0301':2}"))]};"))
+        await expectError(.invalidResult,
+                          handler("return {actions:[\(action("{nested:{'\\u00e9':1,'e\\u0301':2}}"))]};"))
+    }
+
+    func testInputUsesSameStrictObjectContractAsCore() async throws {
+        for bytes in [Data(#"{"\u00e9":1,"e\u0301":2}"#.utf8), Data("[]".utf8), Data("null".utf8)] {
+            do {
+                _ = try await run(handler("return {actions:[]};"), event: bytes)
+                XCTFail("invalid event object accepted")
+            } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .invalidInput) }
+        }
+        do {
+            _ = try await run(handler("return {actions:[]};"), config: Data(#"{"nested":{"\u00e9":1,"e\u0301":2}}"#.utf8))
+            XCTFail("duplicate config keys accepted")
+        } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .invalidInput) }
+    }
+
+    func testLexicalHandlersWorkForBothHooks() async throws {
+        for declaration in ["const", "let", "var"] {
+            for hook in JavaScriptHook.allCases {
+                let result = try await actions(run("\(declaration) \(hook.functionName) = (event, config) => ({actions:[]});", hook: hook))
+                XCTAssertTrue(result.isEmpty)
+            }
+        }
+        let collision = try await actions(run("globalThis.onRequest=()=>{throw 1}; const onRequest=()=>({actions:[]});"))
+        XCTAssertTrue(collision.isEmpty)
+        await expectError(.scriptError, "const onRequest=3;")
+        await expectError(.scriptError, "Object.defineProperty(globalThis,'onRequest',{get(){throw 1}});")
+        await expectError(.timeout, "Object.defineProperty(globalThis,'onRequest',{get(){while(true){}}});")
+    }
+
+    func testSparseAndArrayLikeNativeAlgorithmsObeyDeadline() async throws {
+        let expressions = [
+            "new Array(4294967295).indexOf(1)",
+            "new Array(4294967295).lastIndexOf(1)",
+            "new Array(4294967295).includes(1)",
+            "new Array(4294967295).join('')",
+            "new Array(4294967295).forEach(()=>{})",
+            "new Array(4294967295).some(()=>true)",
+            "new Array(4294967295).every(()=>false)",
+            "new Array(4294967295).reduce((a,v)=>a,0)",
+            "new Array(4294967295).reverse()",
+            "new Array(4294967295).copyWithin(0,1)",
+            "new Array(4294967295).slice(0)",
+            "new Array(4294967295).flat()",
+            "new Array(4294967295).find(()=>false)",
+            "new Array(4294967295).findLast(()=>false)",
+            "new Array(4294967295).fill(1)",
+            "Array.prototype.splice.call({length:9007199254740991},0,9007199254740991)",
+            "Array.from({length:4294967295})",
+            "(()=>{let s='x'.repeat(1000000);return new Array(100000).fill(s).sort()})()",
+            "(()=>{let s='x'.repeat(1000000);let t=s.slice(0,-1)+'y';return new Array(100000).fill(s).indexOf(t)})()",
+            "(()=>{let s='x'.repeat(1000000);let t=s.slice(0,-1)+'y';return new Array(100000).fill(s).includes(t)})()",
+            "Array.prototype.indexOf.call({length:9007199254740991},1)",
+            "Array.prototype.includes.call({length:9007199254740991},1)",
+            "Array.prototype.join.call({length:9007199254740991},'')",
+            "Array.prototype.reverse.call({length:9007199254740991})",
+            "Array.prototype.sort.call({length:4294967295})",
+        ]
+        let executor = JavaScriptExecutor()
+        for expression in expressions {
+            let start = ContinuousClock.now
+            do {
+                _ = try await run(handler("\(expression); return {actions:[]};"), executor: executor)
+                XCTFail("unbounded native loop completed unexpectedly: \(expression)")
+            } catch {
+                let error = error as? JavaScriptExecutionError
+                XCTAssertTrue(error == .timeout || error == .memoryOrStack,
+                              "\(expression): \(String(describing: error))")
+            }
+            XCTAssertLessThan(start.duration(to: .now), .milliseconds(500), expression)
+            let recovered = try await actions(run(handler("return {actions:[]};"), executor: executor))
+            XCTAssertTrue(recovered.isEmpty)
+        }
     }
 
     // MARK: deadlines
@@ -327,19 +417,19 @@ final class JavaScriptExecutorTests: XCTestCase, @unchecked Sendable {
 
     func testExplicitCancellationAndRecovery() async throws {
         let executor = JavaScriptExecutor()
-        let long = "for(;;){}"
-        let task = Task { try await self.run(long, executor: executor) }
-        try await Task.sleep(for: .milliseconds(5))
-        executor.cancel()
-        do {
-            _ = try await task.value
-            XCTFail("expected cancellation")
-        } catch {
-            // 5 ms is well inside the 50 ms deadline.
-            XCTAssertEqual(error as? JavaScriptExecutionError, .cancelled)
+        for source in ["for(;;){}", handler("new Array(4294967295).indexOf(1);")] {
+            let task = Task { try await self.run(source, executor: executor) }
+            try await Task.sleep(for: .milliseconds(5))
+            executor.cancel()
+            do {
+                _ = try await task.value
+                XCTFail("expected cancellation")
+            } catch {
+                XCTAssertEqual(error as? JavaScriptExecutionError, .cancelled)
+            }
+            let ok = try await actions(run(handler("return {actions:[]};"), executor: executor))
+            XCTAssertTrue(ok.isEmpty)
         }
-        let ok = try await actions(run(handler("return {actions:[]};"), executor: executor))
-        XCTAssertTrue(ok.isEmpty)
     }
 
     func testIdleCancelDoesNotPoisonNextRun() async throws {

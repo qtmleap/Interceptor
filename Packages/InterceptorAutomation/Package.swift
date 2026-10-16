@@ -14,13 +14,13 @@ let package = Package(
             exclude: ["Vendor/LICENSE", "Vendor/VERSION"],
             sources: ["bridge.c", "Vendor/quickjs.c", "Vendor/dtoa.c", "Vendor/libregexp.c", "Vendor/libunicode.c", "Vendor/cutils.c"],
             publicHeadersPath: "include",
-            cSettings: [.define("_GNU_SOURCE"), .define("CONFIG_VERSION", to: "\"2026-06-04\""), .headerSearchPath("Vendor")],
+            cSettings: [.define("_GNU_SOURCE"), .define("CONFIG_VERSION", to: "\"2026-06-04\""), .headerSearchPath("Vendor"), .unsafeFlags(["-fwrapv", "-funsigned-char"])],
             linkerSettings: [.linkedLibrary("m")]
         ),
-        .target(name: "AutomationRuntime", dependencies: ["CQuickJS"]),
+        .target(name: "AutomationRuntime", dependencies: ["CQuickJS", "AutomationCore"]),
         .target(name: "AutomationRepository", dependencies: ["AutomationCore"]),
         .testTarget(name: "AutomationRepositoryTests", dependencies: ["AutomationRepository", "AutomationCore"]),
-        .testTarget(name: "AutomationRuntimeTests", dependencies: ["AutomationRuntime"]),
+        .testTarget(name: "AutomationRuntimeTests", dependencies: ["AutomationRuntime", "AutomationCore"]),
         .testTarget(name: "AutomationCoreTests", dependencies: ["AutomationCore"]),
     ],
     cLanguageStandard: .gnu11

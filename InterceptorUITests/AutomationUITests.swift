@@ -33,7 +33,33 @@ final class AutomationUITests: XCTestCase {
             XCTAssertTrue(editor.waitForExistence(timeout: 5))
             XCTAssertFalse(app.buttons["script.save"].isEnabled, "no edit yet")
             editor.tap()
-            editor.typeKey("a", modifierFlags: .command)
+            // A fresh simulator can show the system keyboard's first-use introduction.
+            let keyboardIntroduction = app.otherElements["UIContinuousPathIntroductionView"]
+            if keyboardIntroduction.waitForExistence(timeout: 2) {
+                keyboardIntroduction.buttons.firstMatch.tap()
+                XCTAssertTrue(keyboardIntroduction.waitForNonExistence(timeout: 3))
+                editor.tap()
+            }
+            editor.doubleTap()
+            let selectAll = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label == %@", japanese ? "すべてを選択" : "Select All")).firstMatch
+            if japanese && !selectAll.waitForExistence(timeout: 1) {
+                // The Japanese edit menu paginates on a narrow iPhone.
+                for _ in 0..<4 {
+                    if selectAll.exists { break }
+                    let previous = app.buttons["戻る"]
+                    guard previous.exists && previous.isEnabled else { break }
+                    previous.tap()
+                }
+                for _ in 0..<4 {
+                    if selectAll.exists { break }
+                    let next = app.buttons["進む"]
+                    guard next.exists && next.isEnabled else { break }
+                    next.tap()
+                }
+            }
+            XCTAssertTrue(selectAll.waitForExistence(timeout: 3), app.debugDescription)
+            selectAll.tap()
             let replacement = "// local edit\nfunction onRequest(event, config) { return {actions: []}; }\n"
             editor.typeText(replacement)
             XCTAssertEqual(editor.value as? String, replacement)

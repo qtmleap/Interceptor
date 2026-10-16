@@ -19,6 +19,7 @@ struct PluginSourceEditor: UIViewRepresentable {
         view.lineSelectionDisplayType = .disabled
         view.backgroundColor = .systemBackground
         view.autocorrectionType = .no
+        view.spellCheckingType = .no
         view.autocapitalizationType = .none
         view.smartQuotesType = .no
         view.smartDashesType = .no

@@ -113,6 +113,24 @@ final class AutomationControllerTests: XCTestCase {
         XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
     }
 
+    func testAppLinkedEngineInterruptsSparseNativeWorkAndRecovers() async throws {
+        let executor = JavaScriptExecutor()
+        for expression in ["new Array(4294967295).indexOf(1)", "Array.prototype.join.call({length:9007199254740991},'')",
+                           "(()=>{let s='x'.repeat(1000000);return new Array(100000).fill(s).sort()})()",
+                           "(()=>{let s='x'.repeat(1000000);let t=s.slice(0,-1)+'y';return new Array(100000).fill(s).indexOf(t)})()"] {
+            let start = ContinuousClock.now
+            do {
+                _ = try await executor.run(source: "function onRequest(){\(expression);return {actions:[]};}",
+                                           hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+                XCTFail("expected sparse native deadline")
+            } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .timeout) }
+            XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
+            let recovered = try await executor.run(source: "const onRequest=()=>({actions:[]});",
+                                                   hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+            XCTAssertTrue(try ValidatedAction.parse(recovered).isEmpty)
+        }
+    }
+
     // MARK: Add repository
 
     func testPreviewDoesNotPersistAndCancelDiscardsLateResult() async throws {

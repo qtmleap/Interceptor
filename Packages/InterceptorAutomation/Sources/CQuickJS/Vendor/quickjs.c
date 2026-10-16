@@ -9118,6 +9118,10 @@ static int JS_TryGetPropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx,
     JSAtom prop;
     int present;
 
+    if (unlikely(js_poll_interrupts(ctx))) {
+        *pval = JS_UNDEFINED;
+        return -1;
+    }
     if (likely((uint64_t)idx <= JS_ATOM_MAX_INT)) {
         /* fast path */
         present = JS_HasProperty(ctx, obj, __JS_AtomFromUInt32(idx));
@@ -9147,6 +9151,9 @@ static JSValue JS_GetPropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx
 {
     JSAtom prop;
     JSValue val;
+
+    if (unlikely(js_poll_interrupts(ctx)))
+        return JS_EXCEPTION;
 
     if ((uint64_t)idx <= INT32_MAX) {
         /* fast path for fast arrays */
@@ -10082,6 +10089,11 @@ int JS_SetPropertyInt64(JSContext *ctx, JSValueConst this_obj,
     JSAtom prop;
     int res;
 
+    if (unlikely(js_poll_interrupts(ctx))) {
+        JS_FreeValue(ctx, val);
+        return -1;
+    }
+
     if ((uint64_t)idx <= INT32_MAX) {
         /* fast path for fast arrays */
         return JS_SetPropertyValue(ctx, this_obj, JS_NewInt32(ctx, idx), val,
@@ -10943,6 +10955,9 @@ int JS_DeletePropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx, int fl
 {
     JSAtom prop;
     int res;
+
+    if (unlikely(js_poll_interrupts(ctx)))
+        return -1;
 
     if ((uint64_t)idx <= JS_ATOM_MAX_INT) {
         /* fast path for fast arrays */
@@ -42283,6 +42298,8 @@ static JSValue js_array_includes(JSContext *ctx, JSValueConst this_val,
         }
         if (js_get_fast_array(ctx, obj, &arrp, &count)) {
             for (; n < count; n++) {
+                if (unlikely(js_poll_interrupts(ctx)))
+                    goto exception;
                 if (js_strict_eq2(ctx, JS_DupValue(ctx, argv[0]),
                                   JS_DupValue(ctx, arrp[n]),
                                   JS_EQ_SAME_VALUE_ZERO)) {
@@ -42332,6 +42349,8 @@ static JSValue js_array_indexOf(JSContext *ctx, JSValueConst this_val,
         }
         if (js_get_fast_array(ctx, obj, &arrp, &count)) {
             for (; n < count; n++) {
+                if (unlikely(js_poll_interrupts(ctx)))
+                    goto exception;
                 if (js_strict_eq2(ctx, JS_DupValue(ctx, argv[0]),
                                   JS_DupValue(ctx, arrp[n]), JS_EQ_STRICT)) {
                     res = n;
@@ -42536,7 +42555,7 @@ static JSValue js_array_join(JSContext *ctx, JSValueConst this_val,
                 string_buffer_concat(b, p, 0, p->len);
             }
         }
-        el = JS_GetPropertyUint32(ctx, obj, i);
+        el = JS_GetPropertyInt64(ctx, obj, i);
         if (JS_IsException(el))
             goto fail;
         if (!JS_IsNull(el) && !JS_IsUndefined(el)) {
@@ -43143,6 +43162,8 @@ static int js_array_cmp_generic(const void *a, const void *b, void *opaque) {
 
     if (psc->exception)
         return 0;
+    if (unlikely(js_poll_interrupts(ctx)))
+        goto exception;
 
     if (psc->has_method) {
         /* custom sort function is specified as returning 0 for identical

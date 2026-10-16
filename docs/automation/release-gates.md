@@ -6,7 +6,7 @@ The full next-major roadmap still requires HTTP lifecycle hooks, per-revision da
 
 ## Runtime acceptance
 
-QuickJS 2026-06-04 is pinned to the official source archive and exact vendored bytes, including the recorded two-line native-work limits patch. scripts/verify-quickjs-vendor.py checks bytes and the explicit core-only compile list. Runtime unit tests cover evaluation, denial of host capabilities, output schema, quotas, cancellation and recovery. The 8 MiB setting limits the VM allocator, not process RSS. 50 ms is a cooperative evaluation/validation budget, not a hard wall-time or process-isolation guarantee; runtime destruction is not forcibly interruptible, so total reclamation latency must also be measured. Mac measurements cannot establish the minimum-iOS-device gate.
+QuickJS 2026-06-04 is pinned to the official source archive and exact vendored bytes, including the recorded audited native-work limits patch. scripts/verify-quickjs-vendor.py checks bytes and the explicit core-only compile list. Runtime unit tests cover evaluation, denial of host capabilities, output schema, quotas, cancellation and recovery. The 8 MiB setting limits the VM allocator, not process RSS. 50 ms is a cooperative evaluation/validation budget, not a hard wall-time or process-isolation guarantee; runtime destruction is not forcibly interruptible, so total reclamation latency must also be measured. Mac measurements cannot establish the minimum-iOS-device gate.
 
 ## Apple publication gate
 

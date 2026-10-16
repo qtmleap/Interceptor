@@ -534,6 +534,12 @@ static int emit_double(V *v, double d) {
         if (strtod(buf, NULL) == d) break;
     }
     for (char *q = buf; *q; q++) if (*q == ',') *q = '.';
+    // Keep finite JS Numbers outside Core's safe integer range in its double grammar.
+    // This preserves the value already represented by JS, without claiming extra precision.
+    if (fabs(d) > 9007199254740991.0 && !strchr(buf, '.') &&
+        !strchr(buf, 'e') && !strchr(buf, 'E')) {
+        strcat(buf, ".0");
+    }
     b_str(&v->out, buf);
     return 1;
 }
@@ -803,7 +809,8 @@ QJSResult qjs_run(QJSCancelToken *token, const QJSLimits *limits,
     st.token = token;
     st.deadline_ns = now_ns() + (uint64_t)(limits ? limits->deadline_ms : 0) * 1000000ull;
 
-    if (!limits || !hook || limits->deadline_ms == 0 || limits->heap_bytes == 0 || limits->stack_bytes == 0 ||
+    if (!limits || !hook || (strcmp(hook, "onRequest") && strcmp(hook, "onResponse")) ||
+        limits->deadline_ms == 0 || limits->heap_bytes == 0 || limits->stack_bytes == 0 ||
         limits->max_result_bytes == 0 || limits->max_result_depth == 0) {
         return res;
     }
@@ -872,9 +879,8 @@ QJSResult qjs_run(QJSCancelToken *token, const QJSLimits *limits,
     }
 
     {
-        JSValue global = JS_GetGlobalObject(ctx);
-        fn = JS_GetPropertyStr(ctx, global, hook);
-        JS_FreeValue(ctx, global);
+        // Fixed, validated identifiers resolve global lexical const/let bindings as well.
+        fn = JS_Eval(ctx, hook, strlen(hook), "<hook>", JS_EVAL_TYPE_GLOBAL);
         if (JS_IsException(fn)) { status = classify_exception(ctx, &st, QJS_SCRIPT_ERROR); goto cleanup; }
         if (!JS_IsFunction(ctx, fn)) { status = st.stop ? st.stop : QJS_SCRIPT_ERROR; goto cleanup; }
     }
