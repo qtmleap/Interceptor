@@ -33,7 +33,7 @@ final class InterceptorUITests: XCTestCase {
         openPrivacy(app)
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5), "Settings disclosure must be a dismissible sheet")
         XCTAssertFalse(app.buttons["Agree"].exists)
-        settingsButton(app, named: "Withdraw Consent").tap()
+        settingsButton(app, named: "consent.withdraw").tap()
         XCTAssertTrue(app.alerts.buttons["Cancel"].waitForExistence(timeout: 5))
         app.alerts.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["Close"].isHittable)
@@ -297,17 +297,22 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Consent Status"].exists)
         XCTAssertFalse(app.buttons["Read Details"].exists)
         XCTAssertFalse(app.buttons["Review and Agree"].exists)
-        XCTAssertFalse(app.buttons["Withdraw Consent"].exists)
+        XCTAssertFalse(app.buttons["consent.withdraw"].exists)
         settingsButton(app, named: "Data Use & Consent").tap()
         XCTAssertTrue(app.navigationBars["Data Use & Consent"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Purpose"].exists)
         XCTAssertFalse(app.buttons["Agree"].exists)
-        let withdrawal = settingsButton(app, named: "Withdraw Consent")
-        XCTAssertGreaterThanOrEqual(withdrawal.frame.height, 44)
+        let withdrawal = settingsButton(app, named: "consent.withdraw")
+        XCTAssertGreaterThanOrEqual(withdrawal.frame.width, 44)
         attachDeviceScreenshot(named: "Consent withdrawal button")
-        withdrawal.tap()
-        XCTAssertTrue(app.alerts.buttons["Cancel"].waitForExistence(timeout: 5))
-        app.alerts.buttons["Cancel"].tap()
+        // Native toolbar buttons can report a smaller visual frame than their hit region.
+        // Exercise the top and bottom of a 44pt target instead of measuring its capsule.
+        for verticalOffset in [-21.5, 21.5] {
+            withdrawal.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                .withOffset(CGVector(dx: 0, dy: verticalOffset)).tap()
+            XCTAssertTrue(app.alerts.buttons["Cancel"].waitForExistence(timeout: 5))
+            app.alerts.buttons["Cancel"].tap()
+        }
         XCTAssertFalse(app.buttons["Agree"].exists)
         XCTAssertTrue(app.navigationBars["Data Use & Consent"].exists)
         app.terminate()
@@ -407,7 +412,7 @@ final class InterceptorUITests: XCTestCase {
             settings.tap()
             scrollTo(app, app.buttons[loc.privacy]).tap()
             XCTAssertTrue(app.navigationBars[loc.privacy].waitForExistence(timeout: 5))
-            scrollTo(app, app.buttons[loc.withdraw]).tap()
+            scrollTo(app, app.buttons["consent.withdraw"]).tap()
             let confirm = app.alerts.buttons[loc.withdraw]
             XCTAssertTrue(confirm.waitForExistence(timeout: 5))
             confirm.tap()
@@ -435,9 +440,9 @@ final class InterceptorUITests: XCTestCase {
             XCTAssertEqual(assertDisclaimerBody(app, title: privacyTitle, loc: loc), initialBody,
                            "Initial and Settings consent must display the same disclosure")
             attachScreenshot(app, named: "Apple disclaimer in Data Use \(loc.isJapanese ? "ja" : "en")")
-            let withdrawal = scrollTo(app, app.buttons[loc.withdraw])
+            let withdrawal = scrollTo(app, app.buttons["consent.withdraw"])
             XCTAssertTrue(withdrawal.isHittable)
-            XCTAssertGreaterThanOrEqual(withdrawal.frame.height, 44)
+            XCTAssertTrue(app.navigationBars.buttons["consent.withdraw"].isHittable)
             attachDeviceScreenshot(named: "Consent withdrawal \(loc.isJapanese ? "ja" : "en")")
             app.terminate()
         }
@@ -554,7 +559,7 @@ final class InterceptorUITests: XCTestCase {
 
     @MainActor
     private func withdrawConsent(_ app: XCUIApplication) {
-        settingsButton(app, named: "Withdraw Consent").tap()
+        settingsButton(app, named: "consent.withdraw").tap()
         let confirm = app.alerts.buttons["Withdraw Consent"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()

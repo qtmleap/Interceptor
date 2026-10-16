@@ -58,7 +58,7 @@ internal final class UnifiedGuidanceUITests: XCTestCase {
     private func withdrawConsent(_ app: XCUIApplication) {
         reach(app.buttons["データ利用と同意"], in: app.collectionViews.firstMatch).tap()
         XCTAssertTrue(app.buttons["閉じる"].waitForExistence(timeout: 5), "Settings disclosure must be a closable sheet")
-        reach(app.buttons["同意を取り消す"], in: app.scrollViews["consent.disclosure"]).tap()
+        reach(app.buttons["consent.withdraw"], in: app.scrollViews["consent.disclosure"]).tap()
         let confirm = app.alerts.buttons["同意を取り消す"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
