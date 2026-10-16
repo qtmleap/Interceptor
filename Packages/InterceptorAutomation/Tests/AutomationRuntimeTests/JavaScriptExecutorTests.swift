@@ -168,6 +168,66 @@ final class JavaScriptExecutorTests: XCTestCase, @unchecked Sendable {
         }
     }
 
+    func testNativeStringSearchesObeyDeadlineAndRecover() async throws {
+        let fixtures = [
+            "let n='a'.repeat(1000000)+'b',h='a'.repeat(2000000);",
+            "let h='\\u0100'.repeat(1000000),n='\\u0100'.repeat(500000)+'\\u0101';",
+            "let h='\\u0100'+'a'.repeat(1000000),n='a'.repeat(500000)+'b';",
+            "let h='a'.repeat(1000000),n='a'.repeat(500000)+'\\u0100';",
+        ]
+        let executor = JavaScriptExecutor()
+        for fixture in fixtures {
+            for operation in ["indexOf(n)", "lastIndexOf(n)", "includes(n)",
+                              "replace(n,'x')", "replaceAll(n,'x')", "split(n)"] {
+                let start = ContinuousClock.now
+                do {
+                    _ = try await run(handler("\(fixture) h.\(operation); return {actions:[]};"), executor: executor)
+                    XCTFail("native string search completed unexpectedly: \(operation)")
+                } catch {
+                    // OOM is not evidence that the search loop was interrupted.
+                    XCTAssertEqual(error as? JavaScriptExecutionError, .timeout, "\(fixture) \(operation)")
+                }
+                XCTAssertLessThan(start.duration(to: .now), .milliseconds(500), operation)
+                let recovered = try await actions(run(handler("if ('abc'.indexOf('b')!==1) throw 1; return {actions:[]};"), executor: executor))
+                XCTAssertTrue(recovered.isEmpty)
+            }
+        }
+        await expectError(.timeout, handler("try { let n='a'.repeat(1000000)+'b',h='a'.repeat(2000000); h.replace(n,'x'); } catch(e) {} return {actions:[]};"))
+    }
+
+    func testShortNeedleSearchAndPollingThresholdSemantics() async throws {
+        let executor = JavaScriptExecutor()
+        for operation in ["indexOf('b')===-1", "lastIndexOf('b')===-1", "includes('b')===false"] {
+            let result = try await actions(run(handler("let h='a'.repeat(200000); if (!(h.\(operation))) throw 1; return {actions:[]};"), executor: executor))
+            XCTAssertTrue(result.isEmpty)
+        }
+        for length in [1024, 1025] {
+            let result = try await actions(run(handler("let h='a'.repeat(2048)+'b',n='a'.repeat(\(length)-1)+'b'; if(h.indexOf(n)!==2049-\(length) || h.lastIndexOf(n)!==2049-\(length) || !h.includes(n) || h.replace(n,'x')!==h.replaceAll(n,'x') || h.split(n).length!==2) throw 1; return {actions:[]};"), executor: executor))
+            XCTAssertTrue(result.isEmpty)
+        }
+    }
+
+    func testNativeStringSearchSemantics() async throws {
+        let checks = #"""
+        const eq=(a,b)=>{if(JSON.stringify(a)!==JSON.stringify(b))throw new Error('string semantics')};
+        eq(['ababa'.indexOf('aba',1),'ababa'.lastIndexOf('aba',1),
+            'abc'.indexOf('',99),'abc'.lastIndexOf('',-1),
+            'abc'.includes('b',2),'abc'.startsWith('b',1),'abc'.endsWith('b',2)], [2,0,3,0,false,true,true]);
+        eq(['\u0100a\u0100'.indexOf('a'),'a\u0100a'.lastIndexOf('\u0100'),'abc'.includes('\u0100')], [1,1,false]);
+        eq(['ababa'.replaceAll('aba','x'),'abc'.replace('b',"[$$][$&][$`][$']"),
+            'ab'.replaceAll('', '-'),'aba'.replaceAll('a',(m,i)=>String(i))], ['xba','a[$][b][a][c]c','-a-b-','0b2']);
+        eq(['abc'.split('',0),'abc'.split('',1),'a--b--'.split('--'),
+            '\ud83d\ude00'.split('').map(c=>c.charCodeAt(0))], [[],['a'],['a','b',''],[55357,56832]]);
+        eq('abc'.replace({[Symbol.replace](s,r){return s+r}},'!'), 'abc!');
+        eq('abc'.split({[Symbol.split](s,n){return [s,n]}},2), ['abc',2]);
+        eq('abc'.indexOf({toString(){return 'b'}}),1);
+        let threw=false;try{'abc'.includes({toString(){throw 1}})}catch(e){threw=true}eq(threw,true);
+        return {actions:[]};
+        """#
+        let result = try await actions(run(handler(checks)))
+        XCTAssertTrue(result.isEmpty)
+    }
+
     // MARK: deadlines
 
     func testTopLevelInfiniteLoopTimesOut() async {
@@ -417,7 +477,9 @@ final class JavaScriptExecutorTests: XCTestCase, @unchecked Sendable {
 
     func testExplicitCancellationAndRecovery() async throws {
         let executor = JavaScriptExecutor()
-        for source in ["for(;;){}", handler("new Array(4294967295).indexOf(1);")] {
+        for source in ["for(;;){}", handler("new Array(4294967295).indexOf(1);"),
+                       handler("try{let n='a'.repeat(1000000)+'b',h='a'.repeat(2000000);h.replace(n,'x')}catch(e){} return {actions:[]};"),
+                       handler("'abc'.replaceAll('',()=>{while(true){}});return {actions:[]};")] {
             let task = Task { try await self.run(source, executor: executor) }
             try await Task.sleep(for: .milliseconds(5))
             executor.cancel()

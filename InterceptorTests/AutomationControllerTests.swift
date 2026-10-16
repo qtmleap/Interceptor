@@ -131,6 +131,22 @@ final class AutomationControllerTests: XCTestCase {
         }
     }
 
+    func testAppLinkedEngineInterruptsStringSearchAndRecovers() async throws {
+        let executor = JavaScriptExecutor()
+        for operation in ["indexOf(n)", "lastIndexOf(n)", "includes(n)", "replace(n,'x')", "replaceAll(n,'x')", "split(n)"] {
+            let start = ContinuousClock.now
+            do {
+                _ = try await executor.run(source: "function onRequest(){let n='a'.repeat(1000000)+'b',h='a'.repeat(2000000);h.\(operation);return {actions:[]};}",
+                                           hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+                XCTFail("expected string search deadline: \(operation)")
+            } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .timeout, operation) }
+            XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
+            let recovered = try await executor.run(source: "function onRequest(){if('abc'.indexOf('b')!==1)throw 1;return {actions:[]};}",
+                                                   hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+            XCTAssertTrue(try ValidatedAction.parse(recovered).isEmpty)
+        }
+    }
+
     // MARK: Add repository
 
     func testPreviewDoesNotPersistAndCancelDiscardsLateResult() async throws {

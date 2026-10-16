@@ -75,7 +75,8 @@ try:
               '{\n'
               '    JSAtom prop;\n'
               '    int res;\n',
-      'replace': 'int JS_DeletePropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx, int flags)\n'
+      'replace': 'int JS_DeletePropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx, int '
+                 'flags)\n'
                  '{\n'
                  '    JSAtom prop;\n'
                  '    int res;\n'
@@ -113,6 +114,74 @@ try:
                  '        goto exception;\n'
                  '\n'
                  '    if (psc->has_method) {',
+      'expectedCount': 1},
+     {'find': 'static int string_indexof(JSString *p1, JSString *p2, int from)\n'
+              '{\n'
+              '    /* assuming 0 <= from <= p1->len */\n'
+              '    int c, i, j, len1 = p1->len, len2 = p2->len;\n'
+              '    if (len2 == 0)\n'
+              '        return from;\n'
+              '    for (i = from, c = string_get(p2, 0); i + len2 <= len1; i = j + 1) {\n'
+              '        j = string_indexof_char(p1, c, i);\n'
+              '        if (j < 0 || j + len2 > len1)\n'
+              '            break;\n'
+              '        if (!string_cmp',
+      'replace': '/* return the index, -1 if absent or -2 if interrupted (exception pending) */\n'
+                 'static int string_indexof(JSContext *ctx, JSString *p1, JSString *p2, int from)\n'
+                 '{\n'
+                 '    /* assuming 0 <= from <= p1->len */\n'
+                 '    int c, i, j, len1 = p1->len, len2 = p2->len;\n'
+                 '    if (js_poll_interrupts(ctx))\n'
+                 '        return -2;\n'
+                 '    if (len2 == 0)\n'
+                 '        return from;\n'
+                 '    for (i = from, c = string_get(p2, 0); i + len2 <= len1; i = j + 1) {\n'
+                 '        j = string_indexof_char(p1, c, i);\n'
+                 '        if (j < 0 || j + len2 > len1)\n'
+                 '            break;\n'
+                 '        if (unlikely(len2 > 1024 ? __js_poll_interrupts(ctx) : '
+                 'js_poll_interrupts(ctx)))\n'
+                 '            return -2;\n'
+                 '        if (!string_cmp',
+      'expectedCount': 1},
+     {'find': '        for (i = start;; i += inc) {\n'
+              '            if (!string_cmp(p, p1, i, 0, v_len)) {\n'
+              '                ret = i;',
+      'replace': '        for (i = start;; i += inc) {\n'
+                 '            if (unlikely(v_len > 1024 ? __js_poll_interrupts(ctx) : '
+                 'js_poll_interrupts(ctx)))\n'
+                 '                goto fail;\n'
+                 '            if (!string_cmp(p, p1, i, 0, v_len)) {\n'
+                 '                ret = i;',
+      'expectedCount': 1},
+     {'find': '        for (i = start;; i++) {\n'
+              '            if (!string_cmp(p, p1, i, 0, v_len)) {\n'
+              '                ret = 1;',
+      'replace': '        for (i = start;; i++) {\n'
+                 '            if (unlikely(v_len > 1024 ? __js_poll_interrupts(ctx) : '
+                 'js_poll_interrupts(ctx)))\n'
+                 '                goto fail;\n'
+                 '            if (!string_cmp(p, p1, i, 0, v_len)) {\n'
+                 '                ret = 1;',
+      'expectedCount': 1},
+     {'find': '    for(;;) {\n        if (unlikely(searchp->len == 0)) {\n            if (is_first)',
+      'replace': '    for(;;) {\n'
+                 '        if (js_poll_interrupts(ctx))\n'
+                 '            goto exception;\n'
+                 '        if (unlikely(searchp->len == 0)) {\n'
+                 '            if (is_first)',
+      'expectedCount': 1},
+     {'find': '            pos = string_indexof(sp, searchp, endOfLastMatch);\n        }',
+      'replace': '            pos = string_indexof(ctx, sp, searchp, endOfLastMatch);\n'
+                 '            if (pos == -2)\n'
+                 '                goto exception;\n'
+                 '        }',
+      'expectedCount': 1},
+     {'find': '        e = string_indexof(sp, rp, q);\n        if (e < 0)',
+      'replace': '        e = string_indexof(ctx, sp, rp, q);\n'
+                 '        if (e == -2)\n'
+                 '            goto exception;\n'
+                 '        if (e < 0)',
       'expectedCount': 1}]
     if patch["substitutions"] != expected_substitutions:
         raise ValueError("Unexpected native-work limits")

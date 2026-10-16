@@ -45364,16 +45364,21 @@ static int string_indexof_char(JSString *p, int c, int from)
     return -1;
 }
 
-static int string_indexof(JSString *p1, JSString *p2, int from)
+/* return the index, -1 if absent or -2 if interrupted (exception pending) */
+static int string_indexof(JSContext *ctx, JSString *p1, JSString *p2, int from)
 {
     /* assuming 0 <= from <= p1->len */
     int c, i, j, len1 = p1->len, len2 = p2->len;
+    if (js_poll_interrupts(ctx))
+        return -2;
     if (len2 == 0)
         return from;
     for (i = from, c = string_get(p2, 0); i + len2 <= len1; i = j + 1) {
         j = string_indexof_char(p1, c, i);
         if (j < 0 || j + len2 > len1)
             break;
+        if (unlikely(len2 > 1024 ? __js_poll_interrupts(ctx) : js_poll_interrupts(ctx)))
+            return -2;
         if (!string_cmp(p1, p2, j + 1, 1, len2 - 1))
             return j;
     }
@@ -45513,6 +45518,8 @@ static JSValue js_string_indexOf(JSContext *ctx, JSValueConst this_val,
     ret = -1;
     if (len >= v_len && inc * (stop - start) >= 0) {
         for (i = start;; i += inc) {
+            if (unlikely(v_len > 1024 ? __js_poll_interrupts(ctx) : js_poll_interrupts(ctx)))
+                goto fail;
             if (!string_cmp(p, p1, i, 0, v_len)) {
                 ret = i;
                 break;
@@ -45579,6 +45586,8 @@ static JSValue js_string_includes(JSContext *ctx, JSValueConst this_val,
     }
     if (start >= 0 && start <= stop) {
         for (i = start;; i++) {
+            if (unlikely(v_len > 1024 ? __js_poll_interrupts(ctx) : js_poll_interrupts(ctx)))
+                goto fail;
             if (!string_cmp(p, p1, i, 0, v_len)) {
                 ret = 1;
                 break;
@@ -45854,6 +45863,8 @@ static JSValue js_string_replace(JSContext *ctx, JSValueConst this_val,
     endOfLastMatch = 0;
     is_first = TRUE;
     for(;;) {
+        if (js_poll_interrupts(ctx))
+            goto exception;
         if (unlikely(searchp->len == 0)) {
             if (is_first)
                 pos = 0;
@@ -45862,7 +45873,9 @@ static JSValue js_string_replace(JSContext *ctx, JSValueConst this_val,
             else
                 pos = endOfLastMatch + 1;
         } else {
-            pos = string_indexof(sp, searchp, endOfLastMatch);
+            pos = string_indexof(ctx, sp, searchp, endOfLastMatch);
+            if (pos == -2)
+                goto exception;
         }
         if (pos < 0) {
             if (is_first) {
@@ -45972,7 +45985,9 @@ static JSValue js_string_split(JSContext *ctx, JSValueConst this_val,
         goto done;
     }
     for (q = p; (q += !r) <= s - r - !r; q = p = e + r) {
-        e = string_indexof(sp, rp, q);
+        e = string_indexof(ctx, sp, rp, q);
+        if (e == -2)
+            goto exception;
         if (e < 0)
             break;
         T = js_sub_string(ctx, sp, p, e);
