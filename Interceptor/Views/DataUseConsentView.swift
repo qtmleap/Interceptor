@@ -60,7 +60,7 @@ struct DataUseDetailsView: View {
             confirmWithdrawal = true
         } label: {
             Text("Disagree")
-                .foregroundStyle(.red)
+                .foregroundStyle(.primary)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 44)
                 .background(.red.opacity(0.12), in: Capsule())
