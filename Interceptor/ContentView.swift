@@ -24,8 +24,9 @@ struct ContentView: View {
     var body: some View {
         Group {
             if requiresConsent {
-                // Keep history, settings and their presentations unavailable until agreement.
-                Color(.systemBackground).ignoresSafeArea()
+                NavigationStack {
+                    DataUseConsentView { isFirstLaunch.wrappedValue = false }
+                }
             } else {
                 mainTabs
             }
@@ -37,12 +38,6 @@ struct ContentView: View {
                 consentVersion = CaptureAuthorization.defaults.integer(forKey: CaptureAuthorization.key)
                 stopCaptureIfUnauthorized()
             }
-        }
-        .fullScreenCover(isPresented: Binding(get: { requiresConsent }, set: { _ in })) {
-            NavigationStack {
-                DataUseConsentView { isFirstLaunch.wrappedValue = false }
-            }
-            .interactiveDismissDisabled()
         }
     }
 

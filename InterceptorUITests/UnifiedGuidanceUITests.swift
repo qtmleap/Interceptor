@@ -29,8 +29,8 @@ internal final class UnifiedGuidanceUITests: XCTestCase {
         agree.tap()
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
-        openGuide(app)
-        attach("Japanese guide portrait at accessibility text")
+        openSetup(app)
+        attach("Japanese direct setup portrait")
 
         if UIDevice.current.userInterfaceIdiom == .pad {
             XCUIDevice.shared.orientation = .landscapeLeft
@@ -40,20 +40,17 @@ internal final class UnifiedGuidanceUITests: XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [close], timeout: 5), .completed)
             XCTAssertGreaterThan(app.frame.width, app.frame.height)
             XCTAssertTrue(app.buttons["閉じる"].isHittable)
-            attach("Japanese guide after iPad rotation")
+            attach("Japanese direct setup after iPad rotation")
         }
 
-        let begin = app.buttons["guide.beginSetup"]
-        let form = app.collectionViews["guide.overview"]
-        reach(begin, in: form).tap()
         XCTAssertTrue(app.staticTexts["通知設定"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.navigationBars["アプリの使い方"].exists)
         XCTAssertTrue(app.buttons["閉じる"].isHittable)
         attach("Japanese setup from unified guide")
         app.buttons["閉じる"].tap()
         XCTAssertTrue(app.staticTexts["通知設定"].waitForNonExistence(timeout: 5))
-        openGuide(app)
-        XCTAssertFalse(app.staticTexts["通知設定"].exists, "Reopening starts with the overview")
+        openSetup(app)
+        XCTAssertTrue(app.staticTexts["通知設定"].exists, "Reopening starts with the first setup step")
         app.buttons["閉じる"].tap()
     }
 
@@ -68,16 +65,17 @@ internal final class UnifiedGuidanceUITests: XCTestCase {
     }
 
     @MainActor
-    private func openGuide(_ app: XCUIApplication) {
-        let row = app.buttons["アプリの使い方"]
+    private func openSetup(_ app: XCUIApplication) {
+        XCTAssertFalse(app.buttons["アプリの使い方"].exists)
+        let row = app.buttons["キャプチャ設定"]
         reach(row, in: app.collectionViews.firstMatch).tap()
         XCTAssertTrue(
-            app.navigationBars["アプリの使い方"].waitForExistence(timeout: 5),
-            "Japanese entry and screen must use the same title",
+            app.staticTexts["通知設定"].waitForExistence(timeout: 5),
+            "The Japanese setup entry must open the first setup step directly",
         )
-        XCTAssertTrue(app.collectionViews["guide.overview"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["次へ"].exists)
-        XCTAssertFalse(app.staticTexts["通知設定"].exists)
+        XCTAssertFalse(app.collectionViews["guide.overview"].exists)
+        XCTAssertFalse(app.buttons["guide.beginSetup"].exists)
+        XCTAssertTrue(app.buttons["閉じる"].isHittable)
     }
 
     @MainActor

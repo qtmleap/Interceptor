@@ -60,6 +60,50 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
+    func testWithdrawalSurvivesImmediateTermination() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        defer { app.terminate() }
+        agreeIfNeeded(app)
+        openPrivacy(app)
+        withdrawConsent(app)
+        // Do not wait for sheet dismissal or the mandatory gate before ending the process.
+        app.terminate()
+        app.launch()
+        assertStartupConsent(app)
+        agreeIfNeeded(app)
+    }
+
+    @MainActor
+    func testConsentWithdrawalCanReagreeInBothOrientations() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        defer {
+            XCUIDevice.shared.orientation = .portrait
+            app.terminate()
+        }
+        let orientations: [UIDeviceOrientation] = UIDevice.current.userInterfaceIdiom == .pad
+            ? [.portrait, .landscapeLeft] : [.portrait]
+        for orientation in orientations {
+            XCUIDevice.shared.orientation = orientation
+            app.launch()
+            agreeIfNeeded(app)
+            openPrivacy(app)
+            withdrawConsent(app)
+            assertStartupConsent(app)
+            XCTAssertTrue(app.buttons["Agree"].isHittable, "Removing the Settings sheet must leave consent interactive")
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                XCTAssertEqual(app.frame.width > app.frame.height, orientation == .landscapeLeft)
+            }
+            attachDeviceScreenshot(named: "Consent root after withdrawal \(orientation.rawValue)")
+            agreeIfNeeded(app)
+            XCTAssertTrue(app.switches["Status"].waitForExistence(timeout: 5))
+            app.terminate()
+        }
+    }
+
+    @MainActor
     func testExample() {
         // UI tests must launch the application that they test.
         let app = XCUIApplication()
@@ -69,42 +113,43 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
-    func testHowToUseCanCloseAndReopen() {
+    func testCaptureSetupCanCloseAndReopen() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
+        defer { app.terminate() }
         agreeIfNeeded(app)
         tab(app, named: "Settings").tap()
-        XCTAssertFalse(app.buttons["Capture Setup"].exists, "Setup must share the How to Use entry")
+        XCTAssertFalse(app.buttons["How to Use"].exists, "Setup must have a single direct entry")
+        let status = app.switches["Status"].value as? String
+        let autoConnect = app.switches["Auto Connect"].value as? String
         for _ in 0 ..< 2 {
-            settingsButton(app, named: "How to Use").tap()
-            XCTAssertTrue(app.navigationBars["How to Use"].waitForExistence(timeout: 5))
-            XCTAssertTrue(app.staticTexts["Review Requests"].exists)
-            XCTAssertFalse(app.buttons["Next"].exists, "The guide must not start certificate or VPN setup")
-            XCTAssertFalse(app.buttons["Allow Notifications"].exists)
+            startCaptureSetup(app)
+            _ = waitForNotificationStage(app)
+            XCTAssertTrue(app.staticTexts["Step 1 of 6"].exists)
+            XCTAssertFalse(app.buttons["Back"].exists)
+            XCTAssertFalse(app.collectionViews["guide.overview"].exists)
+            XCTAssertFalse(app.buttons["guide.beginSetup"].exists)
             XCTAssertTrue(app.buttons["Close"].isHittable)
-            attachScreenshot(app, named: "Read-only How to Use")
+            attachScreenshot(app, named: "Direct Capture Setup")
+            advancePastNotifications(app)
             app.buttons["Close"].tap()
-            XCTAssertTrue(app.navigationBars["How to Use"].waitForNonExistence(timeout: 5))
+            XCTAssertTrue(app.staticTexts["Notification Settings"].waitForNonExistence(timeout: 5))
             XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
             XCTAssertFalse(app.buttons["Agree"].exists)
+            XCTAssertEqual(app.switches["Status"].value as? String, status)
+            XCTAssertEqual(app.switches["Auto Connect"].value as? String, autoConnect)
         }
-        XCTAssertFalse(app.buttons["Allow Notifications"].exists, "Notification permission belongs inside Capture Setup")
         startCaptureSetup(app)
-        // Next is not guaranteed on the first page: it only appears once permission is decided.
-        _ = waitForNotificationStage(app)
-        XCTAssertTrue(app.staticTexts["Notification Settings"].exists)
-        XCTAssertFalse(app.staticTexts["About This App"].exists)
-        XCTAssertFalse(app.buttons["Back"].exists, "The first setup page has Close, not Back")
-        XCTAssertTrue(app.buttons["Close"].isHittable)
+        XCTAssertFalse(app.staticTexts["VPN Configuration Profile"].exists, "Reopening must reset a partially completed setup")
         app.buttons["Close"].tap()
         XCTAssertTrue(app.staticTexts["Notification Settings"].waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
-        settingsButton(app, named: "How to Use").tap()
-        XCTAssertTrue(app.navigationBars["How to Use"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.collectionViews["guide.overview"].exists, "Reopening after setup must return to the overview")
-        XCTAssertFalse(app.staticTexts["Notification Settings"].exists)
-        app.buttons["Close"].tap()
+        XCTAssertTrue(app.buttons["Rate This App"].exists)
+        settingsButton(app, named: "Contact Us").tap()
+        XCTAssertTrue(app.navigationBars["Contact Us"].waitForExistence(timeout: 5))
+        for title in ["Report a Bug", "Feature Request", "Suggestion"] {
+            XCTAssertTrue(app.buttons[title].exists || app.links[title].exists)
+        }
     }
 
     @MainActor
@@ -481,19 +526,8 @@ final class InterceptorUITests: XCTestCase {
 
     @MainActor
     private func startCaptureSetup(_ app: XCUIApplication) {
-        settingsButton(app, named: "How to Use").tap()
-        XCTAssertTrue(app.navigationBars["How to Use"].waitForExistence(timeout: 5))
-        let begin = app.buttons["guide.beginSetup"]
-        let guide = app.collectionViews["guide.overview"]
-        XCTAssertTrue(guide.waitForExistence(timeout: 5))
-        for _ in 0 ..< 6 {
-            if begin.exists && begin.isHittable { break }
-            guide.swipeUp()
-        }
-        XCTAssertTrue(begin.exists)
-        XCTAssertTrue(begin.isHittable)
-        attachDeviceScreenshot(named: "Unified guide before setup")
-        begin.tap()
+        settingsButton(app, named: "Capture Setup").tap()
+        XCTAssertTrue(app.staticTexts["Notification Settings"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -756,8 +790,8 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [restarted], timeout: 20), .completed)
         openPrivacy(app)
         withdrawConsent(app)
-        assertStartupConsent(app)
-        attachScreenshot(app, named: "Physical mandatory consent after withdrawal")
+        // The provider must stop even if the app exits before its sheet finishes dismissing.
+        app.terminate()
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         settings.launch()
         let sidebarStatus = settings.switches["com.apple.settings.vpn"]
@@ -778,6 +812,9 @@ final class InterceptorUITests: XCTestCase {
         vpnState.name = "Physical system VPN disconnected"
         vpnState.lifetime = .keepAlways
         add(vpnState)
+        app.launch()
+        assertStartupConsent(app)
+        attachScreenshot(app, named: "Physical mandatory consent after withdrawal and relaunch")
         #endif
     }
 

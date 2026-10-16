@@ -7,8 +7,6 @@ struct DataUseDetailsView: View {
     @State private var confirmWithdrawal = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var showsWithdrawal = false
-    /// When set, the host performs the withdrawal (e.g. after dismissing its sheet); otherwise it happens directly.
-    var onWithdraw: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -52,7 +50,7 @@ struct DataUseDetailsView: View {
         .tint(.indigo)
         .alert("Withdraw Consent?", isPresented: $confirmWithdrawal) {
             Button("Withdraw Consent", role: .destructive) {
-                if let onWithdraw { onWithdraw() } else { client.withdrawCaptureConsent() }
+                client.withdrawCaptureConsent()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
