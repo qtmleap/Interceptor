@@ -18,23 +18,6 @@ struct DataUseDetailsView: View {
                 disclosure("Storage and Sharing", "CONSENT_STORAGE", symbol: "internaldrive")
                 disclosure("Certificate and VPN", "CONSENT_CERTIFICATE", symbol: "key.horizontal")
                 disclosure("Your Choices", "CONSENT_CHOICES", symbol: "slider.horizontal.3")
-                if showsWithdrawal {
-                    HStack {
-                        Spacer(minLength: 0)
-                        Button(role: .destructive) {
-                            confirmWithdrawal = true
-                        } label: {
-                            Text("Withdraw Consent")
-                                .font(.headline)
-                                .padding(.horizontal, 12)
-                                .frame(minHeight: 44)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.top, 8)
-                }
             }
             .frame(maxWidth: 620, alignment: .leading)
             .padding(.horizontal, 24)
@@ -47,13 +30,32 @@ struct DataUseDetailsView: View {
         }
         .navigationTitle("Data Use & Consent")
         .navigationBarTitleDisplayMode(.inline)
-        .tint(.indigo)
+        .toolbar {
+            if showsWithdrawal {
+                ToolbarItem(placement: .topBarTrailing) {
+                    withdrawalButton
+                }
+            }
+        }
         .alert("Withdraw Consent?", isPresented: $confirmWithdrawal) {
-            Button("Withdraw Consent", role: .destructive) { client.withdrawCaptureConsent() }
+            Button("Withdraw Consent", role: .destructive) {
+                client.withdrawCaptureConsent()
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("CONSENT_WITHDRAW_CONFIRMATION")
         }
+    }
+
+    private var withdrawalButton: some View {
+        Button {
+            confirmWithdrawal = true
+        } label: {
+            Text("Disagree")
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .accessibilityIdentifier("consent.withdraw")
     }
 
     private var introduction: some View {
@@ -115,6 +117,7 @@ struct DataUseConsentView: View {
 
     var body: some View {
         DataUseDetailsView()
+            .tint(.indigo)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Agree") {

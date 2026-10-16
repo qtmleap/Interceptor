@@ -22,6 +22,9 @@ try:
         path = vendor / name
         if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
             raise ValueError("QuickJS checksum mismatch: " + name)
+    app_notice = Path(__file__).resolve().parents[1] / "Interceptor/Views/Automation/QuickJS-LICENSE.txt"
+    if app_notice.is_symlink() or app_notice.read_bytes() != (vendor / "LICENSE").read_bytes():
+        raise ValueError("The app's QuickJS notice differs from the pinned upstream license")
     patches = record.get("patches", [])
     if len(patches) != 1 or patches[0]["id"] != "bound-native-work":
         raise ValueError("Expected the audited native-work limits patch")

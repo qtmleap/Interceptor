@@ -18,6 +18,7 @@ internal final class UnifiedGuidanceUITests: XCTestCase {
         settings.tap()
         withdrawConsent(app)
         XCTAssertTrue(agree.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["閉じる"].waitForNonExistence(timeout: 5), "The mandatory gate has no Close")
         app.terminate()
 
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
@@ -28,8 +29,8 @@ internal final class UnifiedGuidanceUITests: XCTestCase {
         agree.tap()
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
-        openGuide(app)
-        attach("Japanese guide portrait at accessibility text")
+        openSetup(app)
+        attach("Japanese direct setup portrait")
 
         if UIDevice.current.userInterfaceIdiom == .pad {
             XCUIDevice.shared.orientation = .landscapeLeft
@@ -39,43 +40,45 @@ internal final class UnifiedGuidanceUITests: XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [close], timeout: 5), .completed)
             XCTAssertGreaterThan(app.frame.width, app.frame.height)
             XCTAssertTrue(app.buttons["閉じる"].isHittable)
-            attach("Japanese guide after iPad rotation")
+            attach("Japanese direct setup after iPad rotation")
         }
 
-        let begin = app.buttons["guide.beginSetup"]
-        let form = app.collectionViews["guide.overview"]
-        reach(begin, in: form).tap()
         XCTAssertTrue(app.staticTexts["通知設定"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.navigationBars["アプリの使い方"].exists)
         XCTAssertTrue(app.buttons["閉じる"].isHittable)
         attach("Japanese setup from unified guide")
         app.buttons["閉じる"].tap()
         XCTAssertTrue(app.staticTexts["通知設定"].waitForNonExistence(timeout: 5))
-        openGuide(app)
-        XCTAssertFalse(app.staticTexts["通知設定"].exists, "Reopening starts with the overview")
+        openSetup(app)
+        XCTAssertTrue(app.staticTexts["通知設定"].exists, "Reopening starts with the first setup step")
         app.buttons["閉じる"].tap()
     }
 
     @MainActor
     private func withdrawConsent(_ app: XCUIApplication) {
         reach(app.buttons["データ利用と同意"], in: app.collectionViews.firstMatch).tap()
-        reach(app.buttons["同意を取り消す"], in: app.scrollViews.firstMatch).tap()
+        XCTAssertTrue(app.buttons["閉じる"].waitForExistence(timeout: 5), "Settings disclosure must be a closable sheet")
+        let disagree = app.navigationBars.buttons["consent.withdraw"]
+        XCTAssertTrue(disagree.waitForExistence(timeout: 5))
+        XCTAssertTrue(disagree.isHittable)
+        disagree.tap()
         let confirm = app.alerts.buttons["同意を取り消す"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
     }
 
     @MainActor
-    private func openGuide(_ app: XCUIApplication) {
-        let row = app.buttons["アプリの使い方"]
+    private func openSetup(_ app: XCUIApplication) {
+        XCTAssertFalse(app.buttons["アプリの使い方"].exists)
+        let row = app.buttons["キャプチャ設定"]
         reach(row, in: app.collectionViews.firstMatch).tap()
         XCTAssertTrue(
-            app.navigationBars["アプリの使い方"].waitForExistence(timeout: 5),
-            "Japanese entry and screen must use the same title",
+            app.staticTexts["通知設定"].waitForExistence(timeout: 5),
+            "The Japanese setup entry must open the first setup step directly",
         )
-        XCTAssertTrue(app.collectionViews["guide.overview"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["次へ"].exists)
-        XCTAssertFalse(app.staticTexts["通知設定"].exists)
+        XCTAssertFalse(app.collectionViews["guide.overview"].exists)
+        XCTAssertFalse(app.buttons["guide.beginSetup"].exists)
+        XCTAssertTrue(app.buttons["閉じる"].isHittable)
     }
 
     @MainActor

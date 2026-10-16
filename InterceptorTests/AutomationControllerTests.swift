@@ -7,6 +7,13 @@ import XCTest
 
 @MainActor
 final class AutomationControllerTests: XCTestCase {
+    func testAppBundleContainsPinnedQuickJSLicense() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "QuickJS-LICENSE", withExtension: "txt"))
+        let digest = SHA256.hash(data: try Data(contentsOf: url))
+            .map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(digest, "598fd7fc928e4350abce36e337ba5a1346923c5c692f5be92c3d8e29ddd7c18d")
+    }
+
     private var storeURL = AutomationFixtures.tempStoreURL()
     private var runner = FakeScriptRunner()
 

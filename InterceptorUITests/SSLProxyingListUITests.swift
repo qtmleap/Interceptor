@@ -2,6 +2,45 @@ import XCTest
 
 final class SSLProxyingListUITests: XCTestCase {
     @MainActor
+    func testHostMutationsRequireEditMode() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["INTERCEPTOR_TEST_PROXY_SUITE"] = "Interceptor.UITests.\(UUID().uuidString)"
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        defer { app.terminate() }
+        openList(app)
+        XCTAssertFalse(app.buttons["ssl.add"].exists, "Add belongs to edit mode")
+        XCTAssertFalse(app.buttons["ssl.sort"].exists, "Sort belongs to edit mode")
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "ssl.row.")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.tap()
+        XCTAssertFalse(app.textFields["ssl.host"].waitForExistence(timeout: 1), "Normal rows must be read-only")
+        row.swipeLeft()
+        XCTAssertFalse(app.buttons["Delete"].exists, "Normal rows must not offer deletion")
+
+        app.buttons["ssl.edit"].tap()
+        XCTAssertTrue(app.buttons["ssl.add"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["ssl.sort"].exists)
+        row.tap()
+        XCTAssertTrue(app.textFields["ssl.host"].waitForExistence(timeout: 5))
+        app.buttons["ssl.cancel"].tap()
+        app.buttons["ssl.edit"].tap()
+        XCTAssertFalse(app.buttons["ssl.add"].exists)
+        XCTAssertFalse(app.buttons["ssl.sort"].exists)
+        row.tap()
+        XCTAssertFalse(app.textFields["ssl.host"].waitForExistence(timeout: 1))
+
+        app.terminate()
+        app.launch()
+        openList(app)
+        XCTAssertFalse(app.buttons["ssl.add"].exists, "Relaunch must begin in viewing mode")
+        XCTAssertFalse(app.buttons["ssl.sort"].exists)
+        attach(app, "SSL list read-only after relaunch")
+    }
+
+    @MainActor
     func testHostListCanAddEditSortDeleteAndPersist() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -10,7 +49,8 @@ final class SSLProxyingListUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
         openList(app)
-        XCTAssertTrue(app.buttons["ssl.add"].waitForExistence(timeout: 5), "The list must provide a + action")
+        app.buttons["ssl.edit"].tap()
+        XCTAssertTrue(app.buttons["ssl.add"].waitForExistence(timeout: 5), "Edit mode must provide a + action")
 
         app.buttons["ssl.add"].tap()
         XCTAssertTrue(app.textFields["ssl.host"].waitForExistence(timeout: 5))
@@ -18,7 +58,7 @@ final class SSLProxyingListUITests: XCTestCase {
         app.textFields["ssl.host"].typeText("https://invalid.example/path")
         XCTAssertFalse(app.buttons["ssl.save"].isEnabled)
         app.buttons["Cancel"].tap()
-        XCTAssertFalse(app.buttons["ssl.row.invalid.example"].exists)
+        XCTAssertFalse(sslRow(app, "invalid.example").exists)
 
         addHost("ZEBRA.EXAMPLE.COM.", app: app)
         renameHost("zebra.example.com", to: "alpha.example.com", app: app)
@@ -26,8 +66,8 @@ final class SSLProxyingListUITests: XCTestCase {
 
         app.buttons["ssl.sort"].tap()
         app.buttons["Host Name (Z–A)"].tap()
-        let zulu = app.buttons["ssl.row.zulu.example.com"]
-        let alpha = app.buttons["ssl.row.alpha.example.com"]
+        let zulu = sslRow(app, "zulu.example.com")
+        let alpha = sslRow(app, "alpha.example.com")
         XCTAssertTrue(zulu.waitForExistence(timeout: 5))
         XCTAssertLessThan(zulu.frame.minY, alpha.frame.minY)
         attach(app, "SSL list sorted Z to A")
@@ -46,14 +86,11 @@ final class SSLProxyingListUITests: XCTestCase {
         add(hierarchy)
         reorderAndVerifyPersistence(app, moving: zulu, after: alpha)
 
+        app.buttons["ssl.edit"].tap()
         for host in ["zulu.example.com", "alpha.example.com"] {
-            let row = app.buttons["ssl.row." + host]
+            let row = sslRow(app, host)
             scrollTo(row, app: app)
-            row.swipeLeft()
-            let delete = app.buttons["Delete"].firstMatch
-            XCTAssertTrue(delete.waitForExistence(timeout: 3))
-            delete.tap()
-            XCTAssertTrue(row.waitForNonExistence(timeout: 5))
+            deleteRow(row, app: app)
         }
         app.terminate()
         app.launch()
@@ -77,6 +114,7 @@ final class SSLProxyingListUITests: XCTestCase {
             ]
             app.launch()
             openList(app, japanese: japanese)
+            app.buttons["ssl.edit"].tap()
             XCTAssertTrue(app.buttons["ssl.sort"].isHittable)
             attach(app, "SSL list accessibility text \(japanese ? "ja" : "en")")
             app.buttons["ssl.add"].tap()
@@ -92,6 +130,50 @@ final class SSLProxyingListUITests: XCTestCase {
             XCTAssertTrue(field.waitForNonExistence(timeout: 5))
             app.terminate()
         }
+    }
+
+    @MainActor
+    func testEmptyListStillAllowsEditThenAdd() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["INTERCEPTOR_TEST_PROXY_SUITE"] = "Interceptor.UITests.\(UUID().uuidString)"
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        defer { app.terminate() }
+        openList(app)
+        app.buttons["ssl.edit"].tap()
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "ssl.row."))
+        while rows.count > 0 {
+            deleteRow(rows.firstMatch, app: app)
+        }
+        let empty = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "No hosts")).firstMatch
+        XCTAssertTrue(empty.waitForExistence(timeout: 5))
+        app.buttons["ssl.edit"].tap()
+        XCTAssertFalse(app.buttons["ssl.add"].exists)
+        app.buttons["ssl.edit"].tap()
+        XCTAssertTrue(app.buttons["ssl.add"].waitForExistence(timeout: 5), "An empty list must still allow Edit, then +")
+        addHost("recovered.example.com", app: app)
+        XCTAssertTrue(sslRow(app, "recovered.example.com").waitForExistence(timeout: 5))
+    }
+
+    /// Rows are Text outside editing and Buttons while editing, so query by identifier only.
+    @MainActor
+    private func sslRow(_ app: XCUIApplication, _ host: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "ssl.row." + host).firstMatch
+    }
+
+    @MainActor
+    private func deleteRow(_ row: XCUIElement, app: XCUIApplication) {
+        let identifier = row.identifier
+        // UIKit combines the minus control with the row in the accessibility tree.
+        // Tap its leading control rather than the host label, which opens the editor.
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5))
+            .withOffset(CGVector(dx: 28, dy: 0)).tap()
+        let delete = app.buttons["Delete"].firstMatch
+        XCTAssertTrue(delete.waitForExistence(timeout: 3))
+        delete.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: identifier)
+            .firstMatch.waitForNonExistence(timeout: 5))
     }
 
     @MainActor
@@ -133,7 +215,7 @@ final class SSLProxyingListUITests: XCTestCase {
 
     @MainActor
     private func renameHost(_ oldHost: String, to newHost: String, app: XCUIApplication) {
-        let original = app.buttons["ssl.row." + oldHost]
+        let original = sslRow(app, oldHost)
         scrollTo(original, app: app)
         original.tap()
         let field = app.textFields["ssl.host"]
@@ -149,7 +231,7 @@ final class SSLProxyingListUITests: XCTestCase {
         }
         app.buttons["ssl.save"].tap()
         XCTAssertFalse(original.exists)
-        XCTAssertTrue(app.buttons["ssl.row." + newHost].waitForExistence(timeout: 5))
+        XCTAssertTrue(sslRow(app, newHost).waitForExistence(timeout: 5))
     }
 
     @MainActor

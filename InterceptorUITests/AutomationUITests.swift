@@ -101,7 +101,7 @@ final class AutomationUITests: XCTestCase {
         XCTAssertFalse(app.buttons["repo.addUnverified"].exists, "nothing can be added before a preview")
         url.tap()
         url.typeText("http://insecure.example.com/")
-        app.buttons["repo.preview"].tap()
+        tapAfterLayoutSettles(app.buttons["repo.preview"])
         XCTAssertTrue(app.staticTexts["repo.error"].waitForExistence(timeout: 5))
         attach(app, "Add repository invalid URL")
         app.buttons["repo.cancel"].tap()
@@ -134,7 +134,7 @@ final class AutomationUITests: XCTestCase {
         XCTAssertTrue(url.waitForExistence(timeout: 5))
         url.tap()
         url.typeText("https://localhost:39443/repository.json")
-        app.buttons["repo.preview"].tap()
+        tapAfterLayoutSettles(app.buttons["repo.preview"])
         let add = app.buttons["repo.addUnverified"]
         XCTAssertTrue(add.waitForExistence(timeout: 15))
         reach(add, in: app.collectionViews["repo.addForm"])
@@ -158,6 +158,29 @@ final class AutomationUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["repo.imported"].waitForExistence(timeout: 5)
                       || app.staticTexts["Imported (disabled)"].waitForExistence(timeout: 3))
         attach(app, "Repository package imported disabled")
+    }
+
+    /// iPad keyboard presentation can move the form sheet after UIKit reports the app idle.
+    /// Use current geometry rather than a cached accessibility activation point.
+    @MainActor
+    private func tapAfterLayoutSettles(_ button: XCUIElement) {
+        var previous = CGRect.null
+        var unchangedSince = Date()
+        let stable = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let frame = button.frame
+            if frame != previous {
+                previous = frame
+                unchangedSince = Date()
+                return false
+            }
+            return button.isHittable && button.isEnabled && Date().timeIntervalSince(unchangedSince) >= 0.5
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [stable], timeout: 8), .completed)
+        let geometry = XCTAttachment(string: "Stable button frame: \(button.frame)")
+        geometry.name = "Preview tap geometry"
+        geometry.lifetime = .keepAlways
+        add(geometry)
+        button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     @MainActor

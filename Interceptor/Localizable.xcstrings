@@ -54,13 +54,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Settings → How to Use → Begin Capture Setup, finish the steps, then turn on Status to start capturing requests."
+            "value" : "Open Settings → Capture Setup, finish the steps, then turn on Status to start capturing requests."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設定 → アプリの使い方 → キャプチャの設定を開始 の手順を済ませ、接続状態をオンにすると通信履歴が表示されます。"
+            "value" : "設定 →「キャプチャ設定」の手順を済ませ、接続状態をオンにすると通信履歴が表示されます。"
           }
         }
       }
@@ -93,159 +93,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "対応するゲームの通信をキャプチャすると、取得したトークンがここに表示されます。"
-          }
-        }
-      }
-    },
-    "HOW_TO_USE_CAPTURE_DESCRIPTION" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn on the Status switch in Settings, then use an app whose supported traffic you want to inspect. Turn it off when you finish."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "設定の「接続状態」をオンにして、通信を確認したい対応アプリを使用してください。終了したら「接続状態」をオフにします。"
-          }
-        }
-      }
-    },
-    "HOW_TO_USE_CAPTURE_TITLE" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start and Stop Capture"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "キャプチャを開始・停止する"
-          }
-        }
-      }
-    },
-    "HOW_TO_USE_HOSTS_DESCRIPTION" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The SSL Proxying List in Settings shows the hosts this app can inspect. You can add, edit, sort, and delete hosts; changes apply after you reconnect. Apps that use certificate pinning may reject the certificate, so their encrypted content cannot be inspected."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "設定の「プロキシ対象リスト」には、確認できるホストが表示されます。ホストの追加、編集、並べ替え、削除ができ、変更は再接続後に反映されます。証明書ピンニングを使用するアプリは証明書を拒否するため、暗号化された内容を確認できない場合があります。"
-          }
-        }
-      }
-    },
-    "HOW_TO_USE_HOSTS_TITLE" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supported Traffic"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "対応する通信"
-          }
-        }
-      }
-    },
-    "HOW_TO_USE_PREPARE_DESCRIPTION" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose Begin Capture Setup below to install and trust the certificate, then configure the local VPN. You choose each action separately as you follow the steps."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下の「キャプチャの設定を開始」から、証明書のインストールと信頼、ローカルVPNの設定を順に進められます。各操作は手順に沿って個別に行います。"
-          }
-        }
-      }
-    },
-    "HOW_TO_USE_PREPARE_TITLE" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prepare Your Device"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "デバイスを準備する"
-          }
-        }
-      }
-    },
-    "HOW_TO_USE_REVIEW_DESCRIPTION" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Home and select a host to review captured requests. To delete the history, tap the trash icon in Home and choose Clear."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ホームでホストを選択すると、キャプチャした通信を確認できます。通信履歴を削除するときは、ホームのごみ箱アイコンをタップし、「消去する」を選択してください。"
-          }
-        }
-      }
-    },
-    "HOW_TO_USE_REVIEW_TITLE" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Review Requests"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通信履歴を確認する"
-          }
-        }
-      }
-    },
-    "TITLE_HOW_TO_USE" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "How to Use"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アプリの使い方"
           }
         }
       }
@@ -1386,18 +1233,114 @@
         }
       }
     },
-    "Begin Capture Setup" : {
+    "Capture Setup" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Begin Capture Setup"
+            "value" : "Capture Setup"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "キャプチャの設定を開始"
+            "value" : "キャプチャ設定"
+          }
+        }
+      }
+    },
+    "Support" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サポート"
+          }
+        }
+      }
+    },
+    "Rate This App" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rate This App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを評価する"
+          }
+        }
+      }
+    },
+    "Contact Us" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact Us"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お問い合わせ"
+          }
+        }
+      }
+    },
+    "Report a Bug" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report a Bug"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バグ報告"
+          }
+        }
+      }
+    },
+    "Feature Request" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feature Request"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "機能追加のリクエスト"
+          }
+        }
+      }
+    },
+    "Suggestion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggestion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要望"
           }
         }
       }
@@ -1585,13 +1528,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Setup installs a local certificate and a VPN configuration. Trusting the certificate allows this app to decrypt selected HTTPS traffic. Agreeing here does not install either item or start capture. You choose those actions separately in Settings → How to Use → Begin Capture Setup. You can remove the certificate and VPN configuration in iOS Settings."
+            "value" : "Setup installs a local certificate and a VPN configuration. Trusting the certificate allows this app to decrypt selected HTTPS traffic. Agreeing here does not install either item or start capture. You choose those actions separately in Settings → Capture Setup. You can remove the certificate and VPN configuration in iOS Settings."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設定ではローカル証明書とVPN構成をインストールします。証明書を信頼すると、このアプリが指定したHTTPS通信を復号できるようになります。この画面での同意だけでは、インストールも記録の開始も行いません。設定 → アプリの使い方 →「キャプチャの設定を開始」でそれぞれ操作してください。証明書とVPN構成はiOSの設定から削除できます。"
+            "value" : "設定ではローカル証明書とVPN構成をインストールします。証明書を信頼すると、このアプリが指定したHTTPS通信を復号できるようになります。この画面での同意だけでは、インストールも記録の開始も行いません。設定 →「キャプチャ設定」でそれぞれ操作してください。証明書とVPN構成はiOSの設定から削除できます。"
           }
         }
       }
@@ -1648,6 +1591,12 @@
             "value" : "プライバシーポリシー"
           }
         }
+      }
+    },
+    "Disagree" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Disagree" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "同意しない" } }
       }
     },
     "Developers" : {
@@ -1863,13 +1812,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No hosts. Tap + to add one. Capture needs at least one host."
+            "value" : "No hosts. Tap Edit, then + to add one. Capture needs at least one host."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ホストがありません。＋をタップして追加してください。キャプチャには1つ以上のホストが必要です。"
+            "value" : "ホストがありません。「編集」をタップし、＋で追加してください。キャプチャには1つ以上のホストが必要です。"
           }
         }
       }
@@ -1879,13 +1828,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Changes apply after stopping and starting the VPN. Only HTTPS (port 443) traffic to these exact hosts is captured."
+            "value" : "Changes apply after stopping and starting the VPN. Only HTTPS (port 443) traffic to these exact hosts is captured. Apps that use certificate pinning may reject the certificate, so their content cannot be inspected."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "変更はVPNを停止して再度開始すると反映されます。これらのホストへのHTTPS（ポート443）通信のみがキャプチャされます。"
+            "value" : "変更はVPNを停止して再度開始すると反映されます。これらのホストへのHTTPS（ポート443）通信のみがキャプチャされます。証明書ピンニングを使用するアプリは証明書を拒否するため、内容を確認できない場合があります。"
           }
         }
       }
