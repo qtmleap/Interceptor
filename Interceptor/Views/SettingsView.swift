@@ -25,6 +25,10 @@ struct SettingsView: View {
             QuantumLeap.VPNSettingList()
             QuantumLeap.Tools()
             Section {
+                NavigationLink("AUTO_PLUGINS") { PluginsView() }
+                    .accessibilityIdentifier("settings.plugins")
+            }
+            Section {
                 Button("Data Use & Consent") { showDataUse = true }
                     .foregroundStyle(.primary)
                 Link("Terms of Service", destination: URL(string: "https://qleap.jp/term/eula")!)
@@ -34,7 +38,8 @@ struct SettingsView: View {
                 Link("Developers", destination: URL(string: "https://qleap.jp")!)
                     .foregroundStyle(.primary)
                 NavigationLink("Licenses") {
-                    LicenseListView().licenseViewStyle(InlineRepositoryLicenseViewStyle())
+                    LicenseListView().licenseListViewStyle(PluginLicenseListStyle())
+                        .licenseViewStyle(InlineRepositoryLicenseViewStyle())
                         .navigationTitle("Licenses")
                         .navigationBarTitleDisplayMode(.inline)
                 }

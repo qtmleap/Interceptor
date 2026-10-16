@@ -1,0 +1,3 @@
+# Preserve pinned upstream bytes and exact unified-patch context.
+Packages/InterceptorAutomation/Sources/CQuickJS/Vendor/** -whitespace
+Packages/InterceptorAutomation/Patches/*.patch -whitespace

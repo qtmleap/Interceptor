@@ -1,0 +1,122 @@
+{
+  "version": "2026-06-04",
+  "url": "https://bellard.org/quickjs/quickjs-2026-06-04.tar.xz",
+  "archiveSHA256": "b376e839b322978313d929fd20663b11ba58b75df5a46c126dd19ea2fa70ad2a",
+  "files": {
+    "quickjs.c": "628e20cd92f1eefbfd72714f62dfedd863a8ee885aba0f29b115014e683ffe4d",
+    "quickjs.h": "2165f47772af9faee1798999a599fa9de850d1bf0259502dade1c25d4a588316",
+    "quickjs-atom.h": "342194359417664e652f54e7d682ee2ef91dd982e91f74decbde992a2c848236",
+    "quickjs-opcode.h": "a9c60a8c9366820733d9d2acbb805f48b2e9e2778df526e6bcb845fdb6b47834",
+    "dtoa.c": "af5abd68fa9806d1a19bdd5f2daef00d5fd0990ae56311382dfed4700343f074",
+    "dtoa.h": "462070f7678a894b9f3612422f280f4dce412eb360a5cc585a513f407fc23114",
+    "libregexp.c": "fdfcf86167029ab2c39c35730d4ae6875b7bbeb9406a0fcc886de4e9b1f5e2ac",
+    "libregexp.h": "f5c5ef1899f224dcc718422a22c789ef9d8b5b837b622818fcfaf681ae793446",
+    "libregexp-opcode.h": "2a98d646089f3a72f25480116297c5fdb5b28fd9f815447273951f4ade4a115e",
+    "libunicode.c": "26203ae888c0582e7d0e2113f13db0c9b39dc7b0b3836d68fa308c54f7a0898c",
+    "libunicode.h": "ce310152bc80d7415dcb657e23abd9a40bf83e393c0d05d325dae384bb01d259",
+    "libunicode-table.h": "cf782bc7a07549e976f606bd3cb8555858482b279574554dcb8d46412986006c",
+    "list.h": "181c6b25d9d0e4853315d36a6e6fab3b2c3554271693d898a439384ba0f67c2b",
+    "cutils.c": "b73a403a59da30726257ddbdf5e399298941c1def997782ee0d4d33f796a80a2",
+    "cutils.h": "d2da6d06a75b9e6c116c82b7a41df6bcc170c8b1779f374fa953ecf688eda647",
+    "VERSION": "234057c4079458cba9862d4bbb6f8a059ac2e4a194947673da0ad38ca16a37fd",
+    "LICENSE": "598fd7fc928e4350abce36e337ba5a1346923c5c692f5be92c3d8e29ddd7c18d"
+  },
+  "compiledSources": [
+    "quickjs.c",
+    "dtoa.c",
+    "libregexp.c",
+    "libunicode.c",
+    "cutils.c"
+  ],
+  "patches": [
+    {
+      "id": "bound-native-work",
+      "file": "quickjs.c",
+      "patchFile": "Patches/0001-bound-native-work.patch",
+      "patchSHA256": "f2812e3ba7980fd49bb5fc4bd99cf7211b2f155afc3ed07eb87aee7c34b1aeea",
+      "originalSHA256": "a00762d2eee42316cecbc9c15efc4549b715ec500461845cd91b2a6c38190d08",
+      "substitutions": [
+        {
+          "find": "#define JS_BIGINT_MAX_SIZE ((1024 * 1024) / JS_LIMB_BITS) /* in limbs */",
+          "replace": "#define JS_BIGINT_MAX_SIZE (8192 / JS_LIMB_BITS) /* in limbs */",
+          "expectedCount": 1
+        },
+        {
+          "find": "#define JS_INTERRUPT_COUNTER_INIT 10000",
+          "replace": "#define JS_INTERRUPT_COUNTER_INIT 64",
+          "expectedCount": 1
+        },
+        {
+          "find": "    int present;\n\n    if (likely((uint64_t)idx <= JS_ATOM_MAX_INT)) {",
+          "replace": "    int present;\n\n    if (unlikely(js_poll_interrupts(ctx))) {\n        *pval = JS_UNDEFINED;\n        return -1;\n    }\n    if (likely((uint64_t)idx <= JS_ATOM_MAX_INT)) {",
+          "expectedCount": 1
+        },
+        {
+          "find": "static JSValue JS_GetPropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx)\n{\n    JSAtom prop;\n    JSValue val;\n",
+          "replace": "static JSValue JS_GetPropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx)\n{\n    JSAtom prop;\n    JSValue val;\n\n    if (unlikely(js_poll_interrupts(ctx)))\n        return JS_EXCEPTION;\n",
+          "expectedCount": 1
+        },
+        {
+          "find": "int JS_SetPropertyInt64(JSContext *ctx, JSValueConst this_obj,\n                        int64_t idx, JSValue val)\n{\n    JSAtom prop;\n    int res;\n",
+          "replace": "int JS_SetPropertyInt64(JSContext *ctx, JSValueConst this_obj,\n                        int64_t idx, JSValue val)\n{\n    JSAtom prop;\n    int res;\n\n    if (unlikely(js_poll_interrupts(ctx))) {\n        JS_FreeValue(ctx, val);\n        return -1;\n    }\n",
+          "expectedCount": 1
+        },
+        {
+          "find": "int JS_DeletePropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx, int flags)\n{\n    JSAtom prop;\n    int res;\n",
+          "replace": "int JS_DeletePropertyInt64(JSContext *ctx, JSValueConst obj, int64_t idx, int flags)\n{\n    JSAtom prop;\n    int res;\n\n    if (unlikely(js_poll_interrupts(ctx)))\n        return -1;\n",
+          "expectedCount": 1
+        },
+        {
+          "find": "        el = JS_GetPropertyUint32(ctx, obj, i);\n",
+          "replace": "        el = JS_GetPropertyInt64(ctx, obj, i);\n",
+          "expectedCount": 1
+        },
+        {
+          "find": "            for (; n < count; n++) {\n                if (js_strict_eq2(ctx, JS_DupValue(ctx, argv[0]),\n                                  JS_DupValue(ctx, arrp[n]),\n                                  JS_EQ_SAME_VALUE_ZERO)) {",
+          "replace": "            for (; n < count; n++) {\n                if (unlikely(js_poll_interrupts(ctx)))\n                    goto exception;\n                if (js_strict_eq2(ctx, JS_DupValue(ctx, argv[0]),\n                                  JS_DupValue(ctx, arrp[n]),\n                                  JS_EQ_SAME_VALUE_ZERO)) {",
+          "expectedCount": 1
+        },
+        {
+          "find": "            for (; n < count; n++) {\n                if (js_strict_eq2(ctx, JS_DupValue(ctx, argv[0]),\n                                  JS_DupValue(ctx, arrp[n]), JS_EQ_STRICT)) {",
+          "replace": "            for (; n < count; n++) {\n                if (unlikely(js_poll_interrupts(ctx)))\n                    goto exception;\n                if (js_strict_eq2(ctx, JS_DupValue(ctx, argv[0]),\n                                  JS_DupValue(ctx, arrp[n]), JS_EQ_STRICT)) {",
+          "expectedCount": 1
+        },
+        {
+          "find": "    if (psc->exception)\n        return 0;\n\n    if (psc->has_method) {",
+          "replace": "    if (psc->exception)\n        return 0;\n    if (unlikely(js_poll_interrupts(ctx)))\n        goto exception;\n\n    if (psc->has_method) {",
+          "expectedCount": 1
+        },
+        {
+          "find": "static int string_indexof(JSString *p1, JSString *p2, int from)\n{\n    /* assuming 0 <= from <= p1->len */\n    int c, i, j, len1 = p1->len, len2 = p2->len;\n    if (len2 == 0)\n        return from;\n    for (i = from, c = string_get(p2, 0); i + len2 <= len1; i = j + 1) {\n        j = string_indexof_char(p1, c, i);\n        if (j < 0 || j + len2 > len1)\n            break;\n        if (!string_cmp",
+          "replace": "/* return the index, -1 if absent or -2 if interrupted (exception pending) */\nstatic int string_indexof(JSContext *ctx, JSString *p1, JSString *p2, int from)\n{\n    /* assuming 0 <= from <= p1->len */\n    int c, i, j, len1 = p1->len, len2 = p2->len;\n    if (js_poll_interrupts(ctx))\n        return -2;\n    if (len2 == 0)\n        return from;\n    for (i = from, c = string_get(p2, 0); i + len2 <= len1; i = j + 1) {\n        j = string_indexof_char(p1, c, i);\n        if (j < 0 || j + len2 > len1)\n            break;\n        if (unlikely(len2 > 1024 ? __js_poll_interrupts(ctx) : js_poll_interrupts(ctx)))\n            return -2;\n        if (!string_cmp",
+          "expectedCount": 1
+        },
+        {
+          "find": "        for (i = start;; i += inc) {\n            if (!string_cmp(p, p1, i, 0, v_len)) {\n                ret = i;",
+          "replace": "        for (i = start;; i += inc) {\n            if (unlikely(v_len > 1024 ? __js_poll_interrupts(ctx) : js_poll_interrupts(ctx)))\n                goto fail;\n            if (!string_cmp(p, p1, i, 0, v_len)) {\n                ret = i;",
+          "expectedCount": 1
+        },
+        {
+          "find": "        for (i = start;; i++) {\n            if (!string_cmp(p, p1, i, 0, v_len)) {\n                ret = 1;",
+          "replace": "        for (i = start;; i++) {\n            if (unlikely(v_len > 1024 ? __js_poll_interrupts(ctx) : js_poll_interrupts(ctx)))\n                goto fail;\n            if (!string_cmp(p, p1, i, 0, v_len)) {\n                ret = 1;",
+          "expectedCount": 1
+        },
+        {
+          "find": "    for(;;) {\n        if (unlikely(searchp->len == 0)) {\n            if (is_first)",
+          "replace": "    for(;;) {\n        if (js_poll_interrupts(ctx))\n            goto exception;\n        if (unlikely(searchp->len == 0)) {\n            if (is_first)",
+          "expectedCount": 1
+        },
+        {
+          "find": "            pos = string_indexof(sp, searchp, endOfLastMatch);\n        }",
+          "replace": "            pos = string_indexof(ctx, sp, searchp, endOfLastMatch);\n            if (pos == -2)\n                goto exception;\n        }",
+          "expectedCount": 1
+        },
+        {
+          "find": "        e = string_indexof(sp, rp, q);\n        if (e < 0)",
+          "replace": "        e = string_indexof(ctx, sp, rp, q);\n        if (e == -2)\n            goto exception;\n        if (e < 0)",
+          "expectedCount": 1
+        }
+      ]
+    }
+  ]
+}

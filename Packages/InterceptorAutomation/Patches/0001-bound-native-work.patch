@@ -1,0 +1,171 @@
+--- a/Sources/CQuickJS/Vendor/quickjs.c
++++ b/Sources/CQuickJS/Vendor/quickjs.c
+@@ -509,7 +509,7 @@
+ 
+ /* must be large enough to have a negligible runtime cost and small
+    enough to call the interrupt callback often. */
+-#define JS_INTERRUPT_COUNTER_INIT 10000
++#define JS_INTERRUPT_COUNTER_INIT 64
+ 
+ struct JSContext {
+     JSGCObjectHeader header; /* must come first */
+@@ -9118,6 +9118,10 @@
+     JSAtom prop;
+     int present;
+ 
++    if (unlikely(js_poll_interrupts(ctx))) {
++        *pval = JS_UNDEFINED;
++        return -1;
++    }
+     if (likely((uint64_t)idx <= JS_ATOM_MAX_INT)) {
+         /* fast path */
+         present = JS_HasProperty(ctx, obj, __JS_AtomFromUInt32(idx));
+@@ -9147,6 +9151,9 @@
+ {
+     JSAtom prop;
+     JSValue val;
++
++    if (unlikely(js_poll_interrupts(ctx)))
++        return JS_EXCEPTION;
+ 
+     if ((uint64_t)idx <= INT32_MAX) {
+         /* fast path for fast arrays */
+@@ -10081,6 +10088,11 @@
+ {
+     JSAtom prop;
+     int res;
++
++    if (unlikely(js_poll_interrupts(ctx))) {
++        JS_FreeValue(ctx, val);
++        return -1;
++    }
+ 
+     if ((uint64_t)idx <= INT32_MAX) {
+         /* fast path for fast arrays */
+@@ -10944,6 +10956,9 @@
+     JSAtom prop;
+     int res;
+ 
++    if (unlikely(js_poll_interrupts(ctx)))
++        return -1;
++
+     if ((uint64_t)idx <= JS_ATOM_MAX_INT) {
+         /* fast path for fast arrays */
+         return JS_DeleteProperty(ctx, obj, __JS_AtomFromUInt32(idx), flags);
+@@ -11263,7 +11278,7 @@
+ 
+ /* bigint support */
+ 
+-#define JS_BIGINT_MAX_SIZE ((1024 * 1024) / JS_LIMB_BITS) /* in limbs */
++#define JS_BIGINT_MAX_SIZE (8192 / JS_LIMB_BITS) /* in limbs */
+ 
+ /* it is currently assumed that JS_SHORT_BIG_INT_BITS = JS_LIMB_BITS */
+ #if JS_SHORT_BIG_INT_BITS == 32
+@@ -42283,6 +42298,8 @@
+         }
+         if (js_get_fast_array(ctx, obj, &arrp, &count)) {
+             for (; n < count; n++) {
++                if (unlikely(js_poll_interrupts(ctx)))
++                    goto exception;
+                 if (js_strict_eq2(ctx, JS_DupValue(ctx, argv[0]),
+                                   JS_DupValue(ctx, arrp[n]),
+                                   JS_EQ_SAME_VALUE_ZERO)) {
+@@ -42332,6 +42349,8 @@
+         }
+         if (js_get_fast_array(ctx, obj, &arrp, &count)) {
+             for (; n < count; n++) {
++                if (unlikely(js_poll_interrupts(ctx)))
++                    goto exception;
+                 if (js_strict_eq2(ctx, JS_DupValue(ctx, argv[0]),
+                                   JS_DupValue(ctx, arrp[n]), JS_EQ_STRICT)) {
+                     res = n;
+@@ -42536,7 +42555,7 @@
+                 string_buffer_concat(b, p, 0, p->len);
+             }
+         }
+-        el = JS_GetPropertyUint32(ctx, obj, i);
++        el = JS_GetPropertyInt64(ctx, obj, i);
+         if (JS_IsException(el))
+             goto fail;
+         if (!JS_IsNull(el) && !JS_IsUndefined(el)) {
+@@ -43143,6 +43162,8 @@
+ 
+     if (psc->exception)
+         return 0;
++    if (unlikely(js_poll_interrupts(ctx)))
++        goto exception;
+ 
+     if (psc->has_method) {
+         /* custom sort function is specified as returning 0 for identical
+@@ -45343,16 +45364,21 @@
+     return -1;
+ }
+ 
+-static int string_indexof(JSString *p1, JSString *p2, int from)
++/* return the index, -1 if absent or -2 if interrupted (exception pending) */
++static int string_indexof(JSContext *ctx, JSString *p1, JSString *p2, int from)
+ {
+     /* assuming 0 <= from <= p1->len */
+     int c, i, j, len1 = p1->len, len2 = p2->len;
++    if (js_poll_interrupts(ctx))
++        return -2;
+     if (len2 == 0)
+         return from;
+     for (i = from, c = string_get(p2, 0); i + len2 <= len1; i = j + 1) {
+         j = string_indexof_char(p1, c, i);
+         if (j < 0 || j + len2 > len1)
+             break;
++        if (unlikely(len2 > 1024 ? __js_poll_interrupts(ctx) : js_poll_interrupts(ctx)))
++            return -2;
+         if (!string_cmp(p1, p2, j + 1, 1, len2 - 1))
+             return j;
+     }
+@@ -45492,6 +45518,8 @@
+     ret = -1;
+     if (len >= v_len && inc * (stop - start) >= 0) {
+         for (i = start;; i += inc) {
++            if (unlikely(v_len > 1024 ? __js_poll_interrupts(ctx) : js_poll_interrupts(ctx)))
++                goto fail;
+             if (!string_cmp(p, p1, i, 0, v_len)) {
+                 ret = i;
+                 break;
+@@ -45558,6 +45586,8 @@
+     }
+     if (start >= 0 && start <= stop) {
+         for (i = start;; i++) {
++            if (unlikely(v_len > 1024 ? __js_poll_interrupts(ctx) : js_poll_interrupts(ctx)))
++                goto fail;
+             if (!string_cmp(p, p1, i, 0, v_len)) {
+                 ret = 1;
+                 break;
+@@ -45833,6 +45863,8 @@
+     endOfLastMatch = 0;
+     is_first = TRUE;
+     for(;;) {
++        if (js_poll_interrupts(ctx))
++            goto exception;
+         if (unlikely(searchp->len == 0)) {
+             if (is_first)
+                 pos = 0;
+@@ -45841,7 +45873,9 @@
+             else
+                 pos = endOfLastMatch + 1;
+         } else {
+-            pos = string_indexof(sp, searchp, endOfLastMatch);
++            pos = string_indexof(ctx, sp, searchp, endOfLastMatch);
++            if (pos == -2)
++                goto exception;
+         }
+         if (pos < 0) {
+             if (is_first) {
+@@ -45951,7 +45985,9 @@
+         goto done;
+     }
+     for (q = p; (q += !r) <= s - r - !r; q = p = e + r) {
+-        e = string_indexof(sp, rp, q);
++        e = string_indexof(ctx, sp, rp, q);
++        if (e == -2)
++            goto exception;
+         if (e < 0)
+             break;
+         T = js_sub_string(ctx, sp, p, e);
