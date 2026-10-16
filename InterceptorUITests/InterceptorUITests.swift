@@ -33,9 +33,10 @@ final class InterceptorUITests: XCTestCase {
         openPrivacy(app)
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5), "Settings disclosure must be a dismissible sheet")
         XCTAssertFalse(app.buttons["Agree"].exists)
-        settingsButton(app, named: "consent.withdraw").tap()
+        withdrawalButton(app).tap()
         XCTAssertTrue(app.alerts.buttons["Cancel"].waitForExistence(timeout: 5))
         app.alerts.buttons["Cancel"].tap()
+        XCTAssertTrue(app.alerts.buttons["Cancel"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Close"].isHittable)
         XCTAssertFalse(app.buttons["Agree"].exists)
         attachDeviceScreenshot(named: "Data Use sheet after cancelling withdrawal")
@@ -302,16 +303,18 @@ final class InterceptorUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Data Use & Consent"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Purpose"].exists)
         XCTAssertFalse(app.buttons["Agree"].exists)
-        let withdrawal = settingsButton(app, named: "consent.withdraw")
+        let withdrawal = withdrawalButton(app)
         XCTAssertGreaterThanOrEqual(withdrawal.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(withdrawal.frame.height, 44)
         attachDeviceScreenshot(named: "Consent withdrawal button")
-        // Native toolbar buttons can report a smaller visual frame than their hit region.
-        // Exercise the top and bottom of a 44pt target instead of measuring its capsule.
-        for verticalOffset in [-21.5, 21.5] {
+        // Confirm the measured target works near both vertical edges, beyond checking its size.
+        let halfHeight = withdrawal.frame.height / 2 - 1
+        for verticalOffset in [-halfHeight, halfHeight] {
             withdrawal.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                 .withOffset(CGVector(dx: 0, dy: verticalOffset)).tap()
             XCTAssertTrue(app.alerts.buttons["Cancel"].waitForExistence(timeout: 5))
             app.alerts.buttons["Cancel"].tap()
+            XCTAssertTrue(app.alerts.buttons["Cancel"].waitForNonExistence(timeout: 5))
         }
         XCTAssertFalse(app.buttons["Agree"].exists)
         XCTAssertTrue(app.navigationBars["Data Use & Consent"].exists)
@@ -412,7 +415,7 @@ final class InterceptorUITests: XCTestCase {
             settings.tap()
             scrollTo(app, app.buttons[loc.privacy]).tap()
             XCTAssertTrue(app.navigationBars[loc.privacy].waitForExistence(timeout: 5))
-            scrollTo(app, app.buttons["consent.withdraw"]).tap()
+            withdrawalButton(app).tap()
             let confirm = app.alerts.buttons[loc.withdraw]
             XCTAssertTrue(confirm.waitForExistence(timeout: 5))
             confirm.tap()
@@ -440,9 +443,10 @@ final class InterceptorUITests: XCTestCase {
             XCTAssertEqual(assertDisclaimerBody(app, title: privacyTitle, loc: loc), initialBody,
                            "Initial and Settings consent must display the same disclosure")
             attachScreenshot(app, named: "Apple disclaimer in Data Use \(loc.isJapanese ? "ja" : "en")")
-            let withdrawal = scrollTo(app, app.buttons["consent.withdraw"])
+            let withdrawal = withdrawalButton(app)
             XCTAssertTrue(withdrawal.isHittable)
-            XCTAssertTrue(app.navigationBars.buttons["consent.withdraw"].isHittable)
+            XCTAssertGreaterThanOrEqual(withdrawal.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(withdrawal.frame.height, 44)
             attachDeviceScreenshot(named: "Consent withdrawal \(loc.isJapanese ? "ja" : "en")")
             app.terminate()
         }
@@ -501,24 +505,13 @@ final class InterceptorUITests: XCTestCase {
             app.buttons["Agree"].tap()
         }
         XCTAssertTrue(tab(app, named: "Settings").waitForExistence(timeout: 5))
-        // Existing installations may have dismissed the old optional consent screen.
-        // Grant through its old settings action before establishing a revoked baseline.
         tab(app, named: "Settings").tap()
-        if app.buttons["Review and Agree"].exists {
-            settingsButton(app, named: "Review and Agree").tap()
-            XCTAssertTrue(app.buttons["Agree"].waitForExistence(timeout: 5))
-            app.buttons["Agree"].tap()
-        }
     }
 
     @MainActor
     private func revokeForStartupTest(_ app: XCUIApplication) {
         tab(app, named: "Settings").tap()
-        // Normalize consent using either the old settings section or its replacement.
-        // This also lets the regression fail on the mandatory gate before the UI changes.
-        if !app.buttons["Read Details"].exists {
-            settingsButton(app, named: "Data Use & Consent").tap()
-        }
+        settingsButton(app, named: "Data Use & Consent").tap()
         withdrawConsent(app)
     }
 
@@ -558,8 +551,16 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
+    private func withdrawalButton(_ app: XCUIApplication) -> XCUIElement {
+        let button = app.navigationBars.buttons["consent.withdraw"]
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        XCTAssertTrue(button.isHittable)
+        return button
+    }
+
+    @MainActor
     private func withdrawConsent(_ app: XCUIApplication) {
-        settingsButton(app, named: "consent.withdraw").tap()
+        withdrawalButton(app).tap()
         let confirm = app.alerts.buttons["Withdraw Consent"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
