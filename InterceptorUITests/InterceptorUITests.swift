@@ -61,6 +61,51 @@ final class InterceptorUITests: XCTestCase {
     }
 
     @MainActor
+    func testConsentWithdrawalLabelStaysOnOneLine() {
+        defer { XCUIDevice.shared.orientation = .portrait }
+        for loc in [DisclaimerLocale.english, .japanese] {
+            let app = XCUIApplication()
+            app.launchArguments = loc.args + ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
+            app.launch()
+            defer { app.terminate() }
+            if app.buttons[loc.agree].waitForExistence(timeout: 3) {
+                app.buttons[loc.agree].tap()
+            }
+            tab(app, named: loc.settingsTab).tap()
+            scrollTo(app, app.buttons[loc.privacy]).tap()
+            let orientations: [UIDeviceOrientation] = UIDevice.current.userInterfaceIdiom == .pad
+                ? [.portrait, .landscapeLeft] : [.portrait]
+            for orientation in orientations {
+                XCUIDevice.shared.orientation = orientation
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    let rotated = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                        (app.frame.width > app.frame.height) == (orientation == .landscapeLeft)
+                    }, object: nil)
+                    XCTAssertEqual(XCTWaiter.wait(for: [rotated], timeout: 5), .completed)
+                }
+                let withdrawal = withdrawalButton(app)
+                let title = app.navigationBars[loc.privacy].staticTexts[loc.privacy]
+                XCTAssertTrue(title.exists)
+                attachDeviceScreenshot(named: "Single line consent action \(loc.isJapanese ? "ja" : "en") \(orientation.rawValue)")
+                let textWidth = (withdrawal.label as NSString).size(withAttributes: [
+                    .font: UIFont.systemFont(ofSize: 17),
+                ]).width
+                XCTAssertGreaterThanOrEqual(withdrawal.frame.width, textWidth + 16,
+                                            "The action must fit its full label with horizontal padding")
+                XCTAssertLessThanOrEqual(withdrawal.frame.height, 44.5, "The action must remain one standard toolbar row")
+                XCTAssertGreaterThanOrEqual(withdrawal.frame.height, 44)
+                XCTAssertGreaterThanOrEqual(withdrawal.frame.minX, title.frame.maxX + 8, "The title and action must not overlap")
+                withdrawal.tap()
+                let cancel = app.alerts.buttons[loc.isJapanese ? "キャンセル" : "Cancel"]
+                XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+                cancel.tap()
+                XCTAssertTrue(cancel.waitForNonExistence(timeout: 5))
+            }
+            app.terminate()
+        }
+    }
+
+    @MainActor
     func testWithdrawalSurvivesImmediateTermination() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]

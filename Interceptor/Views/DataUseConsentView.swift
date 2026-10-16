@@ -60,6 +60,8 @@ struct DataUseDetailsView: View {
             confirmWithdrawal = true
         } label: {
             Text("Disagree")
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 44)
