@@ -30,18 +30,10 @@ struct DataUseDetailsView: View {
         }
         .navigationTitle("Data Use & Consent")
         .navigationBarTitleDisplayMode(.inline)
-        .tint(.indigo)
         .toolbar {
             if showsWithdrawal {
-                if #available(iOS 26, *) {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        withdrawalButton
-                    }
-                    .sharedBackgroundVisibility(.hidden)
-                } else {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        withdrawalButton
-                    }
+                ToolbarItem(placement: .topBarTrailing) {
+                    withdrawalButton
                 }
             }
         }
@@ -56,22 +48,13 @@ struct DataUseDetailsView: View {
     }
 
     private var withdrawalButton: some View {
-        Button(role: .destructive) {
+        Button {
             confirmWithdrawal = true
         } label: {
             Text("Disagree")
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .background(.red.opacity(0.12), in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(.red.opacity(0.25), lineWidth: 1)
-                }
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .accessibilityIdentifier("consent.withdraw")
     }
 
@@ -134,6 +117,7 @@ struct DataUseConsentView: View {
 
     var body: some View {
         DataUseDetailsView()
+            .tint(.indigo)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Agree") {
