@@ -63,7 +63,8 @@ before applying the common defaults below. Preserve existing project-specific ru
   `.agents/skills/ios-development/references/testing-policy.md` where present;
   otherwise find the equivalent project workflow and report gaps. Capture-only
   is not a visual pass.
-- Web mocks and previews default to Tailscale-only access. Discover the actual
+- Web mocks, previews and remote screenshot/comparison viewers default to
+  Tailscale-only access. Discover the actual
   host's Tailscale IP or MagicDNS name and available port. Bind to the intended
   Tailscale interface, or use loopback behind Tailscale Serve; do not enable public
   Funnel or public hosting without explicit authorization.
@@ -71,6 +72,10 @@ before applying the common defaults below. Preserve existing project-specific ru
   tailnet client path, including API URLs and WebSocket/HMR when applicable;
   localhost success alone does not prove remote access. Report any client-side
   reachability that could not be verified. Preserve existing services and ports.
+- For remote screenshots, return actual tailnet image/viewer links, not just
+  remote filesystem paths. Follow the sharing section of
+  `.agents/skills/ios-development/references/testing-policy.md` where present;
+  otherwise use the equivalent project workflow and report missing capabilities.
 - Distinguish mock data from real backend integration. A web prototype does not
   replace required native simulator/device UI verification.
 - For App Store marketing screenshots, use the app-store-screenshots skill from

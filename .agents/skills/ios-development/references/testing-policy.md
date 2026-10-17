@@ -58,6 +58,53 @@ gate completes, locally or through actual CI coverage on matching inputs.
   required unrun cell is **unverified**, not a pass. Missing harnesses are reported
   as integration work; this instruction-only template installs none.
 
+## Sharing remote screenshots
+
+For remote screen captures, including ad-hoc UI inspection and test comparisons,
+return image/viewer URLs the user can open through Tailscale. Follow the root
+`AGENTS.md` tailnet-only access policy; a remote filesystem path or capture-host
+localhost URL alone does not deliver the images.
+
+- Identify the host holding the captures; it may differ from the coordinator or
+  container. Discover its actual Tailscale IP, listener and available port.
+  Prefer a suitable existing viewer. For direct serving, bind only to the
+  discovered Tailscale IP, never a wildcard or LAN/public interface; verify the
+  listener and choose another port on collision without stopping its owner.
+  Return the actual IP-based URL. If using an existing loopback service behind
+  Tailscale Serve, return its actual HTTPS hostname URL; do not substitute an IP
+  into a hostname certificate. Discover the host's supported CLI/configuration
+  before changing a route ([Serve documentation](https://tailscale.com/docs/features/tailscale-serve)).
+- Export only intended images and a small index/manifest into a run-specific
+  directory. Use sanitized fixtures; when suitability for sharing is unknown,
+  withhold the export and report that blocker. Never serve the repository, home,
+  DerivedData, credentials, raw logs or `.xcresult` bundles. Inspect the export's
+  file list, including hidden files and symlinks; every served file must belong
+  to that export. Simple static servers can follow links outside their root
+  ([Python HTTP server guidance](https://docs.python.org/3/library/http.server.html#security-considerations)).
+- Link to full-resolution captures; reuse the existing viewer or a small index
+  for navigation. When comparing images, label baseline/current/diff separately
+  and link every available image. State missing comparison artifacts rather than
+  inventing them. Reference the run/job ID, source fingerprint, checkpoint,
+  OS/runtime, device and other matching configuration/comparator metadata from
+  this policy. A reachable stale image is not evidence for newer source.
+- Open the viewer and each advertised image through the intended client tailnet
+  path. Confirm the response is the intended decodable image, not a login/error
+  page; check it against the export manifest/hash. Check index links as well.
+  Host-side localhost or HTTP success alone does not verify client access. When
+  no suitable client is available, report **client access not verified**, with
+  the actual URL and blocker. Keep sharing/reachability status separate from
+  captured-only, mock-comparison and regression-comparison status.
+- Before advertising a URL, record the serving host, owned process/job or Serve
+  route, export directory, responsible owner and review-window expiry time.
+  Keep exported images independent of test/simulator cleanup, so normal device
+  cleanup can finish while the reported review link remains usable. Register
+  cleanup for expiry or an explicit stop; remove only owned viewer resources,
+  routes and exports, preserving unrelated services and retained test evidence.
+  Report early termination or uncertain cleanup instead of promising availability.
+
+This template defines delivery rules; it starts no viewer and provides no live
+URL or client-reachability evidence by itself.
+
 ## iOS / iPadOS 18 and 26 cells
 
 For UI-affecting changes, run the affected visual checks on both iOS/iPadOS 18.x
