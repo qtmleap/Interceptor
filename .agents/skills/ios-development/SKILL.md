@@ -83,6 +83,9 @@ Cleanup, after confirming workers have stopped:
 No blanket `killall` or `shutdown all`; other sessions may be using them. Keep
 evidence, and report any cleanup you could not confirm. Leave an owned simulator
 open only when the user asks to inspect it, then close it after inspection.
+Keep shared image exports independent of simulator lifetime; see
+[remote screenshot sharing](references/testing-policy.md#sharing-remote-screenshots)
+for viewer ownership and expiry.
 
 ## 5. Real devices and services
 
@@ -96,6 +99,9 @@ evidence. Report required missing evidence as "not verified".
 - Web previews: follow the root Tailscale-only policy; discover the address
   yourself instead of asking. A web prototype does not replace simulator/device
   UI checks.
+- Remote captures: use the
+  [screenshot sharing workflow](references/testing-policy.md#sharing-remote-screenshots)
+  to return tailnet links the user can open.
 - Adopted mocks: compare simulator/device captures at the matching state and size
   to the adopted mock (root policy); record only actual human design selections.
 - Store screenshots and metadata: look for a suitable available skill (for
