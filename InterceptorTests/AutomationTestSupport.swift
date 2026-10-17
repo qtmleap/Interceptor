@@ -8,7 +8,12 @@ import Foundation
 /// Builds real, verified snapshots/packages through the production Core validators.
 enum AutomationFixtures {
     static let now = Date(timeIntervalSince1970: 1_800_000_000)
-    static let url = try! RepositoryURL(parsing: "https://plugins.example.com/repository.json")
+    static let url: RepositoryURL = {
+        guard let url = try? RepositoryURL(parsing: "https://plugins.example.com/repository.json") else {
+            preconditionFailure("Invalid fixture repository URL")
+        }
+        return url
+    }()
 
     static func iso(_ date: Date) -> String {
         let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime]; return f.string(from: date)
@@ -55,6 +60,9 @@ final class FakeRepositoryClient: RepositoryFetching, @unchecked Sendable {
     let snapshot: VerifiedSnapshot
     let packages: [UUID: PluginPackage]
     var delayNanoseconds: UInt64 = 0
+    /// When set, `preview` throws it (after the delay) instead of returning the snapshot.
+    private var _previewError: Error?
+    var previewError: Error? { get { lock.withLock { _previewError } } set { lock.withLock { _previewError = newValue } } }
     var previewCount: Int { lock.withLock { _previews } }
     var packageCount: Int { lock.withLock { _packages } }
 
@@ -65,6 +73,7 @@ final class FakeRepositoryClient: RepositoryFetching, @unchecked Sendable {
     func preview(url: RepositoryURL, now: Date) async throws -> VerifiedSnapshot {
         lock.withLock { _previews += 1 }
         if delayNanoseconds > 0 { try await Task.sleep(nanoseconds: delayNanoseconds) }
+        if let error = previewError { throw error }
         return snapshot
     }
 
