@@ -22,6 +22,7 @@ concurrency:
 
 jobs:
   ci-change-scope:
+    name: ci-change-scope
     permissions:
       contents: read
     uses: ./.github/workflows/ci-change-scope.yaml
