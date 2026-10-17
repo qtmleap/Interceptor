@@ -58,6 +58,27 @@ public actor AutomationStore {
 
     // MARK: Repositories
 
+    /// Registers bundled publisher identity against freshly verified metadata, once per URL.
+    /// Existing records (including removal tombstones) retain all user choices and high-water state.
+    public func seedIfAbsent(_ snapshot: VerifiedSnapshot, expectedURL: RepositoryURL, expectedRepositoryID: UUID,
+                             expectedFingerprint: String, now: Date) throws -> RepositoryRecord {
+        try transact { cat in
+            try Task.checkCancellation()
+            if let existing = cat.record(for: expectedURL) { return existing }
+            guard snapshot.url == expectedURL else { throw AutomationError.invalidURL }
+            guard snapshot.index.id == expectedRepositoryID else { throw AutomationError.repositoryIdentityChanged }
+            try RepositoryEnvelope.checkTime(snapshot.index, now: now)
+            guard case .signed(let key) = snapshot.signature, Digest.isHex64(expectedFingerprint),
+                  key.hex == expectedFingerprint else { throw AutomationError.fingerprintMismatch }
+            guard cat.repositories.count < Limits.repositories else { throw AutomationError.limitExceeded }
+            let record = RepositoryRecord(url: snapshot.url, repositoryID: snapshot.index.id, trust: .pinned(key),
+                                          sequence: snapshot.index.sequence, payloadDigest: snapshot.payloadDigest,
+                                          visible: true, generation: UUID(), snapshot: snapshot)
+            replace(record, in: &cat)
+            return record
+        }
+    }
+
     /// What Add/Refresh would do for this snapshot (reloads; mutates nothing).
     public func preview(_ snapshot: VerifiedSnapshot, now: Date) throws -> AcceptancePreview {
         let cat = try file.locked { try reload() }

@@ -8,6 +8,8 @@ import Foundation
 protocol AutomationStoring: Sendable {
     func load() async throws -> Catalog
     func catalog() async -> Catalog
+    func seedIfAbsent(_ snapshot: VerifiedSnapshot, expectedURL: RepositoryURL, expectedRepositoryID: UUID,
+                      expectedFingerprint: String, now: Date) async throws -> RepositoryRecord
     func preview(_ snapshot: VerifiedSnapshot, now: Date) async throws -> AcceptancePreview
     func accept(_ snapshot: VerifiedSnapshot, acknowledgeUnverified: Bool, now: Date) async throws -> RepositoryRecord
     func acceptAndPin(_ snapshot: VerifiedSnapshot, fingerprint: String, now: Date) async throws -> RepositoryRecord

@@ -4,8 +4,8 @@ import AutomationRuntime
 import Foundation
 import Observation
 
-/// Owns the installed-script and repository lists for Settings > Plugins. Everything here is explicit:
-/// previews fetch only, imports are disabled revisions, and nothing executes except `ScriptSession.run`.
+/// Owns Settings > Plugins. First entry registers the default publisher's metadata when absent.
+/// Imports remain explicit disabled revisions; nothing executes except `ScriptSession.run`.
 @MainActor @Observable
 final class AutomationController {
     private(set) var catalog = Catalog()
@@ -20,10 +20,12 @@ final class AutomationController {
     let client: any RepositoryFetching
     let executor: any ScriptRunning
     private let clock: @Sendable () -> Date
+    private let defaultRepository: DefaultRepository?
 
     init(store: any AutomationStoring, client: any RepositoryFetching, executor: any ScriptRunning,
-         clock: @escaping @Sendable () -> Date = { Date() }) {
+         clock: @escaping @Sendable () -> Date = { Date() }, defaultRepository: DefaultRepository? = nil) {
         self.store = store; self.client = client; self.executor = executor; self.clock = clock
+        self.defaultRepository = defaultRepository
     }
 
     var now: Date { clock() }
@@ -43,8 +45,28 @@ final class AutomationController {
     }
 
     func load() async {
-        do { catalog = try await store.load(); storeError = nil } catch { catalog = Catalog(); storeError = error }
-        isLoaded = true
+        defer { isLoaded = true }
+        do { catalog = try await store.load(); storeError = nil } catch {
+            catalog = Catalog(); storeError = error
+            return
+        }
+        guard let source = defaultRepository, catalog.record(for: source.url) == nil else { return }
+        do {
+            let snapshot = try await client.preview(url: source.url, now: now)
+            try Task.checkCancellation()
+            _ = try await store.seedIfAbsent(snapshot, expectedURL: source.url, expectedRepositoryID: source.repositoryID,
+                                            expectedFingerprint: source.fingerprint, now: now)
+            await refreshCatalog()
+            actionError = nil
+        } catch is CancellationError {
+            // Leaving Plugins cancels this entry's fetch; the next entry may retry.
+        } catch {
+            actionError = error
+            if (error as? AutomationError) == .corruptStore {
+                storeError = error
+                catalog = Catalog()
+            }
+        }
     }
 
     /// Re-reads the store's authoritative state after a mutation.
@@ -111,19 +133,23 @@ final class AutomationController {
 
     // MARK: Stable file location
 
+    private static var testStoreName: String? {
+        #if DEBUG
+        if let name = ProcessInfo.processInfo.environment["INTERCEPTOR_TEST_AUTOMATION_STORE"], name.hasPrefix("Interceptor.UITests."),
+           name.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" }) { return name }
+        #endif
+        return nil
+    }
+
     /// `Application Support/Interceptor/Automation/catalog.json`; the store applies backup exclusion and file protection.
     static func defaultStoreURL() -> URL {
         var base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        #if DEBUG
-        if let name = ProcessInfo.processInfo.environment["INTERCEPTOR_TEST_AUTOMATION_STORE"], name.hasPrefix("Interceptor.UITests."),
-           name.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" }) {
-            base.append(path: name, directoryHint: .isDirectory)
-        }
-        #endif
+        if let name = testStoreName { base.append(path: name, directoryHint: .isDirectory) }
         return base.appending(path: "Interceptor/Automation/catalog.json")
     }
 
     static func live() -> AutomationController {
-        AutomationController(store: AutomationStore(fileURL: defaultStoreURL()), client: RepositoryClient(), executor: JavaScriptExecutor())
+        AutomationController(store: AutomationStore(fileURL: defaultStoreURL()), client: RepositoryClient(), executor: JavaScriptExecutor(),
+                             defaultRepository: testStoreName == nil ? .official : nil)
     }
 }
