@@ -69,7 +69,13 @@ final class RepositoryDetailModel {
         }
     }
 
-    func close() { task?.cancel(); task = nil; token = UUID() }
+    /// Independent model for one script screen, so leaving the list never cancels the child (and vice versa).
+    func makeEntryModel() -> RepositoryDetailModel { RepositoryDetailModel(controller: controller, record: record) }
+
+    func close() {
+        task?.cancel(); task = nil; token = UUID()
+        if phase == .fetching { phase = .idle }
+    }
 
     private func finishFetch(_ run: UUID, _ pkg: PluginPackage) {
         guard run == token else { return }

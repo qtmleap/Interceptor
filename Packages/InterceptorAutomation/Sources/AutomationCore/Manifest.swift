@@ -33,13 +33,16 @@ public struct PluginManifest: Equatable, Sendable {
     public let read: PluginReadDeclaration
     public let endpointBindings: [String]
     public let settings: JSONValue
+    /// Optional publisher-supplied display text. Unauthenticated and unverified; never an identity claim.
+    public let author: String?
+    public let summary: String?
     public let json: JSONValue
 
     static let metadataNames: Set<String> = ["method", "host", "status", "path"]
 
     init(validating v: JSONValue) throws {
         let bad = AutomationError.invalidManifest
-        let f = try JSONFields(v, required: ["schemaVersion", "id", "name", "version", "subscriptions", "read", "endpointBindings", "settings"], error: bad)
+        let f = try JSONFields(v, required: ["schemaVersion", "id", "name", "version", "subscriptions", "read", "endpointBindings", "settings"], optional: ["author", "summary"], error: bad)
         guard try f.int("schemaVersion") == 1 else { throw bad }
         let name = try f.string("name"), version = try f.string("version")
         guard Text.isDisplayName(name) else { throw bad }
@@ -58,7 +61,21 @@ public struct PluginManifest: Equatable, Sendable {
         guard case .object = settings, settings.nesting <= Limits.settingsDepth,
               let encoded = try? settings.data(), encoded.count <= Limits.settingsBytes else { throw bad }
 
+        var author: String?, summary: String?
+        if f.has("author") {
+            let a = try f.string("author")
+            guard Text.isOptionalText(a, maxCharacters: 80, maxBytes: 256) else { throw bad }
+            author = a
+        }
+        if f.has("summary") {
+            let t = try f.string("summary")
+            guard Text.isOptionalText(t, maxCharacters: 280, maxBytes: 1024) else { throw bad }
+            summary = t
+        }
+
         id = try f.uuid("id")
+        self.author = author
+        self.summary = summary
         self.name = name
         self.version = version
         subscriptions = subs
