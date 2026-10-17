@@ -56,6 +56,13 @@ before applying the common defaults below. Preserve existing project-specific ru
 - For native UI with an adopted mock, compare real simulator/device captures at
   the matching state and size against it. A web screenshot is not native
   evidence, and a quantitative score is not automatic approval.
+- Every native iOS/iPadOS UI-test run captures its selected checkpoints and
+  compares them with approved baselines for that same OS/device/configuration.
+  Use separate 18/26 cells where both are supported; preserve other mandatory
+  platform gates. Pure logic/unit and docs checks need no screenshots. Follow
+  `.agents/skills/ios-development/references/testing-policy.md` where present;
+  otherwise find the equivalent project workflow and report gaps. Capture-only
+  is not a visual pass.
 - Web mocks and previews default to Tailscale-only access. Discover the actual
   host's Tailscale IP or MagicDNS name and available port. Bind to the intended
   Tailscale interface, or use loopback behind Tailscale Serve; do not enable public

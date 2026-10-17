@@ -42,6 +42,8 @@ App Review submission and follow-up route to
    (root policy). Small fixes need none.
 2. Local edit checks: the smallest relevant regression for the change, plus
    mandatory hooks. Broaden only for the change's risk or explicit project policy.
+   For native UI-test runs, read the screenshot-comparison and supported-OS
+   rules in `references/testing-policy.md`.
 3. Before a PR: scope checks by changed behavior. Full required CI then runs on
    the exact pushed source; do not substitute a local run or bypass it with
    local caches. If CI is lint-only, affected Xcode behavior still needs Mac
