@@ -306,6 +306,92 @@ final class AutomationControllerTests: XCTestCase {
         XCTAssertNil(detail.package)
     }
 
+    func testParentCloseDoesNotCancelIndependentChildAndChildDoesNotImport() async throws {
+        let (c, client) = try controller()
+        await c.load()
+        let record = try await acceptedRecord(c, client: client)
+        client.delayNanoseconds = 150_000_000
+        let parent = RepositoryDetailModel(controller: c, record: record)
+        let child = parent.makeEntryModel()
+        child.select(try XCTUnwrap(parent.entries.first))
+        parent.close()
+        let ready1 = await waitUntil { child.phase == .reviewing }
+        XCTAssertTrue(ready1)
+        XCTAssertNotNil(child.package)
+        XCTAssertNil(parent.package)
+        XCTAssertTrue(c.scripts.isEmpty, "navigation must not import")
+        XCTAssertEqual(client.previewCount, 0)
+        XCTAssertTrue(runner.runs.isEmpty)
+    }
+
+    func testChildCloseCancelsOnlyItselfAndReopenGetsFreshModelForOtherEntry() async throws {
+        let alpha = try AutomationFixtures.package(name: "Alpha")
+        let zeta = try AutomationFixtures.package(name: "Zeta")
+        let client = try FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [alpha, zeta]), packages: [alpha, zeta])
+        let (c, _) = try controller(client: client)
+        await c.load()
+        let record = try await acceptedRecord(c, client: client)
+        client.delayNanoseconds = 150_000_000
+        let parent = RepositoryDetailModel(controller: c, record: record)
+        let first = parent.makeEntryModel(), second = parent.makeEntryModel()
+        XCTAssertFalse(first === second)
+        let entry = try XCTUnwrap(parent.entries.first)
+        first.select(entry)
+        let otherEntry = try XCTUnwrap(parent.entries.last)
+        XCTAssertNotEqual(entry.id, otherEntry.id)
+        second.select(otherEntry)
+        first.close()
+        XCTAssertEqual(first.phase, .idle)
+        let ready2 = await waitUntil { second.phase == .reviewing }
+        XCTAssertTrue(ready2)
+        XCTAssertEqual(second.package?.manifest.id, otherEntry.id)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertNil(first.package, "closed child drops late result")
+        first.select(entry)
+        let ready3 = await waitUntil { first.phase == .reviewing }
+        XCTAssertTrue(ready3)
+        XCTAssertEqual(first.package?.manifest.id, entry.id)
+        XCTAssertTrue(c.scripts.isEmpty)
+    }
+
+    func testFetchFailureIsRetryable() async throws {
+        let (c, client) = try controller()
+        await c.load()
+        let record = try await acceptedRecord(c, client: client)
+        client.packageError = AutomationError.hashMismatch
+        let child = RepositoryDetailModel(controller: c, record: record).makeEntryModel()
+        let entry = try XCTUnwrap(child.entries.first)
+        child.select(entry)
+        let ready4 = await waitUntil { child.error != nil }
+        XCTAssertTrue(ready4)
+        XCTAssertNil(child.package)
+        XCTAssertEqual(child.phase, .idle)
+        client.packageError = nil
+        child.select(entry)
+        let ready5 = await waitUntil { child.phase == .reviewing }
+        XCTAssertTrue(ready5)
+        XCTAssertNil(child.error)
+        XCTAssertEqual(client.packageCount, 2)
+    }
+
+    func testReviewedPackageExposesAuthorAndSummary() async throws {
+        let base = try XCTUnwrap(StrictJSON.parse(AutomationTemplate.packageBytes(name: "Meta")).objectValue)
+        var manifest = try XCTUnwrap(base["manifest"]?.objectValue)
+        manifest["author"] = .string("Example Author"); manifest["summary"] = .string("Summarizes requests.")
+        let package = try PluginPackage.validate(JSONValue.object(["manifest": .object(manifest), "source": .string("function onRequest(){}")]).data())
+        let fake = try FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [package]), packages: [package])
+        let (c, _) = try controller(client: fake)
+        await c.load()
+        let record = try await acceptedRecord(c, client: fake)
+        let child = RepositoryDetailModel(controller: c, record: record).makeEntryModel()
+        child.select(try XCTUnwrap(child.entries.first))
+        let ready6 = await waitUntil { child.phase == .reviewing }
+        XCTAssertTrue(ready6)
+        XCTAssertEqual(child.package?.manifest.author, "Example Author")
+        XCTAssertEqual(child.package?.manifest.summary, "Summarizes requests.")
+        XCTAssertEqual(child.package?.revision, Digest.sha256Hex(try XCTUnwrap(child.package).bytes))
+    }
+
     func testDeletingRepositoryKeepsInstalledScripts() async throws {
         let (c, client) = try controller()
         await c.load()

@@ -63,6 +63,8 @@ final class FakeRepositoryClient: RepositoryFetching, @unchecked Sendable {
     /// When set, `preview` throws it (after the delay) instead of returning the snapshot.
     private var _previewError: Error?
     var previewError: Error? { get { lock.withLock { _previewError } } set { lock.withLock { _previewError = newValue } } }
+    private var _packageError: Error?
+    var packageError: Error? { get { lock.withLock { _packageError } } set { lock.withLock { _packageError = newValue } } }
     var previewCount: Int { lock.withLock { _previews } }
     var packageCount: Int { lock.withLock { _packages } }
 
@@ -80,6 +82,7 @@ final class FakeRepositoryClient: RepositoryFetching, @unchecked Sendable {
     func fetchPackage(entry: IndexEntry, from snapshot: VerifiedSnapshot) async throws -> PluginPackage {
         lock.withLock { _packages += 1 }
         if delayNanoseconds > 0 { try await Task.sleep(nanoseconds: delayNanoseconds) }
+        if let error = packageError { throw error }
         return packages[entry.id]!
     }
 }

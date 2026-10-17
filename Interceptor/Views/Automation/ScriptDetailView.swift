@@ -21,6 +21,8 @@ struct ScriptDetailView: View {
                     }
                 }
             } header: { Text(verbatim: session.revision.package.manifest.name) } footer: { Text("AUTO_DISABLED_FOOTER") }
+            ScriptMetadataSection(manifest: session.revision.package.manifest)
+            ScriptTargetsSection(manifest: session.revision.package.manifest)
             Section {
                 PluginSourceEditor(text: $session.source).frame(minHeight: 260)
                 if let error = session.saveError {
