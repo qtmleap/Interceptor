@@ -28,18 +28,27 @@ private struct SSLProxyingListView: View {
     @ObservedObject var store: SSLProxyingListStore
     @State private var draft: Draft?
     @State private var confirmReset = false
-    // Single owner: the list, rows, Edit button and toolbar all share this binding.
+    /// Single owner: the list, rows, Edit button and toolbar all share this binding.
     @State private var editMode: EditMode = .inactive
 
-    private var isEditing: Bool { editMode.isEditing }
+    private var isEditing: Bool {
+        editMode.isEditing
+    }
+
+    private var editButtonRole: ButtonRole? {
+        if #available(iOS 26.0, *), isEditing {
+            return .confirm
+        }
+        return nil
+    }
 
     var body: some View {
         List {
             if let error = store.loadError {
                 Section {
                     Text(error == .corrupt
-                         ? LocalizedStringKey("SSL_LIST_ERROR_CORRUPT")
-                         : LocalizedStringKey("SSL_LIST_ERROR_VERSION"))
+                        ? LocalizedStringKey("SSL_LIST_ERROR_CORRUPT")
+                        : LocalizedStringKey("SSL_LIST_ERROR_VERSION"))
                     Button("Reset List", role: .destructive) { confirmReset = true }
                         .accessibilityIdentifier("ssl.reset")
                 }
@@ -80,10 +89,8 @@ private struct SSLProxyingListView: View {
         .navigationTitle(Text("TITLE_SERVER_LIST"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                EditButton()
-                    .accessibilityIdentifier("ssl.edit")
-                if isEditing {
+            if isEditing {
+                ToolbarItem(placement: .primaryAction) {
                     Button(action: {
                         guard isEditing else { return }
                         draft = .init()
@@ -93,6 +100,20 @@ private struct SSLProxyingListView: View {
                     .disabled(store.loadError != nil)
                     .accessibilityIdentifier("ssl.add")
                 }
+            }
+            // Keep Edit/Done at the trailing edge when Add appears or disappears.
+            ToolbarItem(placement: .primaryAction) {
+                // Keep one button identity while its label and editing state change.
+                Button(role: editButtonRole) {
+                    editMode = isEditing ? .inactive : .active
+                } label: {
+                    if #available(iOS 26.0, *), isEditing {
+                        Label("SSL_LIST_DONE", systemImage: "checkmark")
+                    } else {
+                        Text(isEditing ? "SSL_LIST_DONE" : "SSL_LIST_EDIT")
+                    }
+                }
+                .accessibilityIdentifier("ssl.edit")
             }
         }
         .sheet(item: $draft) { draft in
@@ -106,7 +127,7 @@ private struct SSLProxyingListView: View {
             Text("SSL_LIST_RESET_CONFIRMATION")
         }
         .tint(Color(uiColor: .systemBlue))
-        // Outermost, so the toolbar's EditButton and the list resolve the same binding.
+        // Keep the list and toolbar actions on the same edit-mode binding.
         .environment(\.editMode, $editMode)
         // Return to viewing mode when leaving the list.
         .onDisappear { editMode = .inactive }
