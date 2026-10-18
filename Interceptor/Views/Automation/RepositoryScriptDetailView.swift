@@ -46,25 +46,25 @@ struct RepositoryScriptDetailView: View {
     @ViewBuilder private func review(_ package: PluginPackage) -> some View {
         ScriptMetadataSection(manifest: package.manifest)
         Section {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("AUTO_REVISION_HASH").font(.footnote).foregroundStyle(.secondary)
                 HashText(value: package.revision)
             }
+            .padding(.vertical, 8)
             Label("AUTO_HASH_MATCHES", systemImage: "checkmark.circle")
             signatureLabel
             if let key = model.record.keyFingerprint {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("AUTO_KEY_FINGERPRINT").font(.footnote).foregroundStyle(.secondary)
                     HashText(value: key.hex)
                 }
+                .padding(.vertical, 8)
             }
         } header: { Text("AUTO_SIGNATURE") } footer: { Text("AUTO_SIGNATURE_FOOTER") }
         .accessibilityIdentifier("repo.script.signature")
         ScriptTargetsSection(manifest: package.manifest)
         Section("AUTO_SOURCE") {
-            Text(verbatim: package.source).font(.system(.footnote, design: .monospaced))
-                .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("repo.script.source")
+            PluginSourceViewer(source: package.source)
         }
         Section {
             DisclosureGroup("AUTO_DECLARED_MANIFEST") {

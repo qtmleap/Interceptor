@@ -168,15 +168,27 @@ final class AutomationUITests: XCTestCase {
         attach(app, "Repository script integrity \(japanese ? "ja" : "en")")
         XCTAssertFalse(app.buttons["repo.imported"].exists, "navigation must not import")
         attach(app, "Repository script detail \(japanese ? "ja" : "en")")
+        let source = app.scrollViews["repo.script.source"].textViews.firstMatch
+        reach(source, in: app.collectionViews["repo.script.list"])
+        XCTAssertTrue(source.waitForExistence(timeout: 5), "JavaScript is a selectable native code viewer")
+        XCTAssertTrue((source.value as? String)?.contains("function onRequest") == true)
+        source.tap()
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "reviewing verified source must never open an editing keyboard")
+        attach(app, "Highlighted repository JavaScript \(japanese ? "ja" : "en")")
+        if (source.value as? String)?.contains("END OF VERIFIED SOURCE") == true {
+            app.scrollViews["repo.script.source"].swipeUp()
+            app.scrollViews["repo.script.source"].swipeUp()
+            attach(app, "Repository JavaScript scrolled to final line \(japanese ? "ja" : "en")")
+        }
         app.navigationBars["Request summary"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
         let alternate = app.buttons["repo.entry.Response details"]
         if alternate.exists {
             alternate.tap()
             XCTAssertTrue(app.navigationBars["Response details"].waitForExistence(timeout: 5))
-            let alternateSource = app.staticTexts["repo.script.source"]
+            let alternateSource = app.scrollViews["repo.script.source"].textViews.firstMatch
             reach(alternateSource, in: app.collectionViews["repo.script.list"])
-            XCTAssertTrue(alternateSource.label.contains("actions: []"))
+            XCTAssertEqual(alternateSource.value as? String, "function onRequest(event, config) { return { actions: [] }; }\n")
             attach(app, "Different repository script source \(japanese ? "ja" : "en")")
             app.navigationBars["Response details"].buttons.element(boundBy: 0).tap()
             XCTAssertTrue(entry.waitForExistence(timeout: 5))
@@ -235,7 +247,9 @@ final class AutomationUITests: XCTestCase {
     private func reach(_ element: XCUIElement, in form: XCUIElement) -> XCUIElement {
         for _ in 0..<14 {
             if element.exists && element.isHittable { return element }
-            form.swipeUp()
+            let start = form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.8))
+            let end = form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.25))
+            start.press(forDuration: 0.05, thenDragTo: end)
         }
         attach(XCUIApplication(), "Unreachable plugin control")
         XCTFail("Expected a reachable plugin control")
