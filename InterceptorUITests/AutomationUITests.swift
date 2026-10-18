@@ -107,7 +107,7 @@ final class AutomationUITests: XCTestCase {
         attach(app, "Add repository invalid URL")
         app.buttons["repo.cancel"].tap()
         XCTAssertTrue(url.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'insecure'")).count == 0)
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'insecure'")).count, 0)
     }
 
 
