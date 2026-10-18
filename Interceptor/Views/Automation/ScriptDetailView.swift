@@ -26,7 +26,7 @@ struct ScriptDetailView: View {
             Section {
                 PluginSourceEditor(text: $session.source).frame(minHeight: 260)
                 if let error = session.saveError {
-                    Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(.red)
+                    Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(AutomationStatusColor.error)
                 }
             } header: { Text("AUTO_SOURCE") } footer: { Text("AUTO_SAVE_FOOTER") }
             Section {
@@ -86,9 +86,9 @@ struct ScriptDetailView: View {
         switch session.runState {
         case .idle: Text("AUTO_NO_RESULT").foregroundStyle(.secondary)
         case .running: ProgressView()
-        case .failed(let key): Text(LocalizedStringKey(key)).foregroundStyle(.red).accessibilityIdentifier("script.error")
+        case .failed(let key): Text(LocalizedStringKey(key)).foregroundStyle(AutomationStatusColor.error).accessibilityIdentifier("script.error")
         case .finished(let actions):
-            Text("AUTO_VALIDATED_ACTIONS").font(.headline).accessibilityIdentifier("script.validated")
+            Text("AUTO_VALIDATED_ACTIONS").foregroundStyle(AutomationStatusColor.ok).font(.headline).accessibilityIdentifier("script.validated")
             Label("AUTO_NOT_SENT", systemImage: "paperplane.slash")
             if actions.isEmpty { Text("AUTO_NO_ACTIONS").foregroundStyle(.secondary) }
             ForEach(actions) { action in

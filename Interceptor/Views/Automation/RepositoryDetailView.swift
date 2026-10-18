@@ -36,7 +36,7 @@ struct RepositoryDetailView: View {
                 }
             }
             if let error = model.error {
-                Section { Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(.red) }
+                Section { Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(AutomationStatusColor.error) }
             }
         }
         .accessibilityIdentifier("repository.detail")

@@ -22,7 +22,7 @@ struct RepositoryScriptDetailView: View {
             }
             if let error = model.error {
                 Section {
-                    Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(.red)
+                    Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(AutomationStatusColor.error)
                         .accessibilityIdentifier("repo.script.error")
                     if model.package == nil {
                         Button("AUTO_RETRY") { model.select(entry) }.frame(minHeight: 44)
@@ -52,6 +52,7 @@ struct RepositoryScriptDetailView: View {
             }
             .padding(.vertical, 8)
             Label("AUTO_HASH_MATCHES", systemImage: "checkmark.circle")
+                .foregroundStyle(AutomationStatusColor.ok)
             signatureLabel
             if let key = model.record.keyFingerprint {
                 VStack(alignment: .leading, spacing: 8) {
@@ -75,7 +76,8 @@ struct RepositoryScriptDetailView: View {
         }
         Section {
             if model.phase == .imported {
-                Label("AUTO_IMPORTED", systemImage: "checkmark.circle").accessibilityIdentifier("repo.imported")
+                Label("AUTO_IMPORTED", systemImage: "checkmark.circle")
+                    .foregroundStyle(AutomationStatusColor.ok).accessibilityIdentifier("repo.imported")
             } else {
                 Button("AUTO_IMPORT_DISABLED") { model.importDisabled() }
                     .disabled(model.phase != .reviewing).frame(minHeight: 44)
@@ -86,9 +88,12 @@ struct RepositoryScriptDetailView: View {
 
     @ViewBuilder private var signatureLabel: some View {
         switch model.record.trust {
-        case .pinned: Label("AUTO_SIG_PINNED", systemImage: "checkmark.seal").foregroundStyle(.green)
-        case .signedUnverified: Label("AUTO_SIG_UNVERIFIED_KEY", systemImage: "questionmark.seal")
-        case .unsignedAcknowledged: Label("AUTO_SIG_UNSIGNED", systemImage: "exclamationmark.triangle")
+        case .pinned:
+            Label("AUTO_SIG_PINNED", systemImage: "checkmark.seal").foregroundStyle(AutomationStatusColor.ok)
+        case .signedUnverified:
+            Label("AUTO_SIG_UNVERIFIED_KEY", systemImage: "questionmark.seal").foregroundStyle(AutomationStatusColor.warning)
+        case .unsignedAcknowledged:
+            Label("AUTO_SIG_UNSIGNED", systemImage: "exclamationmark.triangle").foregroundStyle(AutomationStatusColor.warning)
         }
     }
 }

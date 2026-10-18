@@ -24,13 +24,13 @@ struct PluginsView: View {
         List {
             if let error = controller.storeError {
                 Section {
-                    Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(.red)
+                    Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(AutomationStatusColor.error)
                     Text("AUTO_STORE_PRESERVED").font(.footnote).foregroundStyle(.secondary)
                 }
                 .accessibilityIdentifier("plugins.storeError")
             }
             if let error = controller.actionError {
-                Section { Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(.red) }
+                Section { Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(AutomationStatusColor.error) }
                     .accessibilityIdentifier("plugins.error")
             }
             Section {
@@ -113,7 +113,15 @@ struct TrustBadgeLabel: View {
     let badge: AutomationTrustBadge
     var body: some View {
         Label(LocalizedStringKey(badge.titleKey), systemImage: badge.systemImage)
-            .foregroundStyle(badge == .publisherKeyVerified ? Color.green : Color.secondary)
+            .foregroundStyle(statusColor)
+    }
+
+    private var statusColor: Color {
+        switch badge {
+        case .publisherKeyVerified: AutomationStatusColor.ok
+        case .unsigned, .signedKeyUnverified: AutomationStatusColor.warning
+        case .localEdit, .localFile: .secondary
+        }
     }
 }
 
