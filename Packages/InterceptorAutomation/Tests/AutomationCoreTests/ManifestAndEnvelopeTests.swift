@@ -3,6 +3,47 @@ import XCTest
 @testable import AutomationCore
 
 final class ManifestTests: XCTestCase {
+    func testOptionalAuthorAndSummaryAreAcceptedAndPreservedWhenEditing() throws {
+        let manifest = manifestJSON(extra: #","author":"Example Author","summary":"Summarizes matching HTTP requests.""#)
+        let package = try PluginPackage.validate(packageBytes(manifest: manifest))
+        XCTAssertEqual(package.manifest.json.objectValue?["author"], .string("Example Author"))
+        XCTAssertEqual(package.manifest.json.objectValue?["summary"], .string("Summarizes matching HTTP requests."))
+        let edited = try package.replacingSource("function onRequest() { return {actions: []}; }")
+        XCTAssertEqual(edited.manifest, package.manifest)
+        XCTAssertNotEqual(edited.revision, package.revision)
+    }
+
+    func testAuthorAndSummaryAbsentAreNil() throws {
+        let p = try PluginPackage.validate(packageBytes())
+        XCTAssertNil(p.manifest.author)
+        XCTAssertNil(p.manifest.summary)
+    }
+
+    func testAuthorAndSummaryUnicodeAndBounds() throws {
+        let p = try PluginPackage.validate(packageBytes(manifest: manifestJSON(extra: #","author":"山田 太郎 👩🏽","summary":"リクエストを要約します""#)))
+        XCTAssertEqual(p.manifest.author, "山田 太郎 👩🏽")
+        XCTAssertEqual(p.manifest.summary, "リクエストを要約します")
+        func extra(_ k: String, _ v: String) -> String { #","\#(k)":"\#(v)""# }
+        check(manifestJSON(extra: extra("author", String(repeating: "a", count: 80))))
+        check(manifestJSON(extra: extra("author", String(repeating: "a", count: 81))), .invalidManifest)
+        check(manifestJSON(extra: extra("author", String(repeating: "あ", count: 80)))) // 240 bytes
+        check(manifestJSON(extra: extra("author", String(repeating: "😀", count: 65))), .invalidManifest) // 260 bytes
+        check(manifestJSON(extra: extra("summary", String(repeating: "s", count: 280))))
+        check(manifestJSON(extra: extra("summary", String(repeating: "s", count: 281))), .invalidManifest)
+        check(manifestJSON(extra: extra("summary", String(repeating: "あ", count: 280)))) // 840 bytes
+        check(manifestJSON(extra: extra("summary", String(repeating: "😀", count: 257))), .invalidManifest) // 1028 bytes
+    }
+
+    func testAuthorAndSummaryInvalidValuesRejected() {
+        for key in ["author", "summary"] {
+            func extra(_ v: String) -> String { #","\#(key)":\#(v)"# }
+            for bad in [#""""#, #""   ""#, #"" ""#, #""a\nb""#, #""a\u0000b""#, #""a b""#, #""a b""#,
+                        #""a‮b""#, #""a⁦b""#, "null", "1", "[]"] {
+                check(manifestJSON(extra: extra(bad)), .invalidManifest)
+            }
+        }
+    }
+
     private func check(_ m: String, _ e: AutomationError? = nil, source: String = "x", line: UInt = #line) {
         let b = packageBytes(manifest: m, source: source)
         if let e { assertThrows(e, try PluginPackage.validate(b), line: line) } else { XCTAssertNoThrow(try PluginPackage.validate(b), line: line) }

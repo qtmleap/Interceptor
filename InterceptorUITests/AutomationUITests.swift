@@ -30,6 +30,7 @@ final class AutomationUITests: XCTestCase {
 
             script.tap()
             let editor = app.scrollViews["plugin.source"].textViews.firstMatch
+            reach(editor, in: app.collectionViews["script.form"])
             XCTAssertTrue(editor.waitForExistence(timeout: 5))
             XCTAssertFalse(app.buttons["script.save"].isEnabled, "no edit yet")
             editor.tap()
@@ -106,12 +107,19 @@ final class AutomationUITests: XCTestCase {
         attach(app, "Add repository invalid URL")
         app.buttons["repo.cancel"].tap()
         XCTAssertTrue(url.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'insecure'")).count == 0)
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'insecure'")).count, 0)
     }
 
 
     @MainActor
     func testUnsignedRepositoryWarningAndVerifiedPackageImport() async throws {
+        for japanese in [false, true] {
+            try await verifyRepositoryScriptDetails(japanese: japanese)
+        }
+    }
+
+    @MainActor
+    private func verifyRepositoryScriptDetails(japanese: Bool) async throws {
         var ready = URLRequest(url: URL(string: "https://localhost:39443/__interceptor_fixture")!)
         ready.timeoutInterval = 2
         let configuration = URLSessionConfiguration.ephemeral
@@ -125,9 +133,9 @@ final class AutomationUITests: XCTestCase {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
         defer { XCUIDevice.shared.orientation = .portrait }
-        let app = launch(japanese: false, suite: "Interceptor.UITests.\(UUID().uuidString)")
+        let app = launch(japanese: japanese, suite: "Interceptor.UITests.\(UUID().uuidString)")
         defer { app.terminate() }
-        openPlugins(app, japanese: false)
+        openPlugins(app, japanese: japanese)
         app.buttons["plugins.add"].tap()
         app.buttons["plugins.addRepository"].tap()
         let url = app.textFields["repo.url"]
@@ -138,11 +146,11 @@ final class AutomationUITests: XCTestCase {
         let add = app.buttons["repo.addUnverified"]
         XCTAssertTrue(add.waitForExistence(timeout: 15))
         reach(add, in: app.collectionViews["repo.addForm"])
-        attach(app, "Unsigned repository preview")
+        attach(app, "Unsigned repository preview \(japanese ? "ja" : "en")")
         add.tap()
         let confirmation = app.buttons.matching(identifier: "repo.confirmUnverified").firstMatch
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
-        attach(app, "Unverified publisher warning")
+        attach(app, "Unverified publisher warning \(japanese ? "ja" : "en")")
         confirmation.tap()
         let repository = app.buttons["plugins.repo.Local repository fixture"]
         XCTAssertTrue(repository.waitForExistence(timeout: 10))
@@ -150,14 +158,51 @@ final class AutomationUITests: XCTestCase {
         let entry = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "repo.entry.")).firstMatch
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
         entry.tap()
+        XCTAssertTrue(app.collectionViews["repo.script.list"].waitForExistence(timeout: 10))
+        let author = app.descendants(matching: .any).matching(identifier: "script.author").firstMatch
+        XCTAssertTrue(author.waitForExistence(timeout: 10), "verified package metadata must load")
+        attach(app, "Repository script metadata \(japanese ? "ja" : "en")")
+        let signature = app.staticTexts[japanese ? "リポジトリは署名されていません" : "Repository is unsigned"]
+        reach(signature, in: app.collectionViews["repo.script.list"])
+        XCTAssertTrue(signature.exists, "signature state is separate from hash matching")
+        attach(app, "Repository script integrity \(japanese ? "ja" : "en")")
+        XCTAssertFalse(app.buttons["repo.imported"].exists, "navigation must not import")
+        attach(app, "Repository script detail \(japanese ? "ja" : "en")")
+        let source = app.scrollViews["repo.script.source"].textViews.firstMatch
+        reach(source, in: app.collectionViews["repo.script.list"])
+        XCTAssertTrue(source.waitForExistence(timeout: 5), "JavaScript is a selectable native code viewer")
+        XCTAssertTrue((source.value as? String)?.contains("function onRequest") == true)
+        source.tap()
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "reviewing verified source must never open an editing keyboard")
+        attach(app, "Highlighted repository JavaScript \(japanese ? "ja" : "en")")
+        if (source.value as? String)?.contains("END OF VERIFIED SOURCE") == true {
+            app.scrollViews["repo.script.source"].swipeUp()
+            app.scrollViews["repo.script.source"].swipeUp()
+            attach(app, "Repository JavaScript scrolled to final line \(japanese ? "ja" : "en")")
+        }
+        app.navigationBars["Request summary"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        let alternate = app.buttons["repo.entry.Response details"]
+        if alternate.exists {
+            alternate.tap()
+            XCTAssertTrue(app.navigationBars["Response details"].waitForExistence(timeout: 5))
+            let alternateSource = app.scrollViews["repo.script.source"].textViews.firstMatch
+            reach(alternateSource, in: app.collectionViews["repo.script.list"])
+            XCTAssertEqual(alternateSource.value as? String, "function onRequest(event, config) { return { actions: [] }; }\n")
+            attach(app, "Different repository script source \(japanese ? "ja" : "en")")
+            app.navigationBars["Response details"].buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        }
+        entry.tap()
+        XCTAssertTrue(app.collectionViews["repo.script.list"].waitForExistence(timeout: 10))
         let importButton = app.buttons["repo.import"]
-        reach(importButton, in: app.collectionViews["repository.detail"])
+        reach(importButton, in: app.collectionViews["repo.script.list"])
         XCTAssertTrue(importButton.exists)
-        attach(app, "Verified package review before import")
+        attach(app, "Verified package review before import \(japanese ? "ja" : "en")")
         importButton.tap()
         XCTAssertTrue(app.otherElements["repo.imported"].waitForExistence(timeout: 5)
-                      || app.staticTexts["Imported (disabled)"].waitForExistence(timeout: 3))
-        attach(app, "Repository package imported disabled")
+                      || app.staticTexts[japanese ? "取り込みました（無効）" : "Imported (disabled)"].waitForExistence(timeout: 3))
+        attach(app, "Repository package imported disabled \(japanese ? "ja" : "en")")
     }
 
     /// iPad keyboard presentation can move the form sheet after UIKit reports the app idle.
@@ -202,7 +247,9 @@ final class AutomationUITests: XCTestCase {
     private func reach(_ element: XCUIElement, in form: XCUIElement) -> XCUIElement {
         for _ in 0..<14 {
             if element.exists && element.isHittable { return element }
-            form.swipeUp()
+            let start = form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.8))
+            let end = form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.25))
+            start.press(forDuration: 0.05, thenDragTo: end)
         }
         attach(XCUIApplication(), "Unreachable plugin control")
         XCTFail("Expected a reachable plugin control")

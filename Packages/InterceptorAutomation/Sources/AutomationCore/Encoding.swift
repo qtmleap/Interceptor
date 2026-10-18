@@ -107,8 +107,13 @@ struct JSONFields {
 
 enum Text {
     /// 1...max characters, no control characters.
-    static func isDisplayName(_ s: String, max: Int = 80) -> Bool {
-        guard !s.isEmpty, s.utf8.count <= 256, s.count <= max else { return false }
+    static func isOptionalText(_ s: String, maxCharacters: Int, maxBytes: Int) -> Bool {
+        guard !s.unicodeScalars.allSatisfy({ $0.properties.isWhitespace }) else { return false }
+        return isDisplayName(s, max: maxCharacters, maxBytes: maxBytes)
+    }
+
+    static func isDisplayName(_ s: String, max: Int = 80, maxBytes: Int = 256) -> Bool {
+        guard !s.isEmpty, s.utf8.count <= maxBytes, s.count <= max else { return false }
         return !s.unicodeScalars.contains { scalar in
             switch scalar.properties.generalCategory {
             case .control, .format, .lineSeparator, .paragraphSeparator: return true

@@ -41,3 +41,9 @@ fingerprint 4b1e…
 - `keygen` writes a raw 32-byte private key with mode 0600, never overwrites, refuses symlinks, and refuses paths inside any Git checkout or a directory named `public`. Only the fingerprint is printed. Keep a backup somewhere safe; publish the fingerprint through a separate channel.
 - `publish` refuses a key inside the published directory. Omit `--key` for an unsigned repository. It verifies its own output with the app's verifier (using a placeholder URL `https://repository.example/repository.json`) and checks every package against the verified entries before atomically replacing `repository.json`.
 - Do not commit the generated `repository.json` (it expires) or any private key. Regenerate it with a higher `--sequence` before deploying, e.g. in your Pages build step.
+
+## Optional `author` and `summary`
+
+A manifest may include `author` (1–80 characters, at most 256 UTF-8 bytes) and `summary` (1–280 characters, at most 1024 bytes). Both are single-line plain text: empty or whitespace-only values, control, format (including bidirectional override), line and paragraph separator characters, `null` and non-strings are rejected. The app shows them as unverified publisher text and "Not provided" when absent; they never identify a person.
+
+**Compatibility caveat:** clients built before this field existed reject unknown manifest keys, so a package containing `author` or `summary` is refused by older apps. Publish them only when you accept that. The published example package and the Interceptor-Plugins repository are unchanged for this reason.

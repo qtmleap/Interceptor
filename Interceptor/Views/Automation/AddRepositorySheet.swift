@@ -22,7 +22,7 @@ struct AddRepositorySheet: View {
                     if model.phase == .fetching { ProgressView() }
                 } header: { Text("AUTO_REPOSITORY_URL") } footer: { Text("AUTO_PREVIEW_FOOTER") }
                 if let error = model.error {
-                    Section { Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(.red) }
+                    Section { Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(AutomationStatusColor.error) }
                         .accessibilityIdentifier("repo.error")
                 }
                 if let snapshot = model.snapshot { review(snapshot) }
