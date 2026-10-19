@@ -5,8 +5,15 @@ import UIKit
 
 struct ScriptDetailView: View {
     @State var session: ScriptSession
-    @State private var approvalGeneration: UUID?
-    @State private var confirmsActivation = false
+    @State private var approvalReview: ApprovalReview?
+    @State private var approvalStale = false
+
+    /// Frozen at capture time so the sheet can only ever show the package the generation was read for.
+    private struct ApprovalReview: Identifiable {
+        let id = UUID()
+        let revision: InstalledRevision
+        let expectedGeneration: UUID
+    }
 
     var body: some View {
         Form {
@@ -93,24 +100,8 @@ struct ScriptDetailView: View {
             }
         }
         .task { await session.refreshActivation() }
-        .confirmationDialog("AUTO_ACTIVATE_CONFIRM_TITLE", isPresented: $confirmsActivation, titleVisibility: .visible) {
-            Button("AUTO_ACTIVATE_CONFIRM") {
-                if let generation = approvalGeneration {
-                    Task { await session.activate(expectedGeneration: generation) }
-                }
-            }
-            .accessibilityIdentifier("script.confirmActivation")
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(verbatim: session.revision.package.manifest.name + "\n")
-                + Text("AUTO_TARGET_HOSTS") + Text(verbatim: ": " + declaredHosts + "\n")
-                + Text("AUTO_ACTIVATION_DATA") + Text(verbatim: " " + declaredData + "\n")
-                + Text(LocalizedStringKey(session.revision.package.manifest.writeRequestBody ? "AUTO_WRITE_REQUEST" : "AUTO_NO_WRITE_REQUEST"))
-                + Text(verbatim: "\n")
-                + Text(LocalizedStringKey(session.revision.package.manifest.writeResponseBody ? "AUTO_WRITE_RESPONSE" : "AUTO_NO_WRITE_RESPONSE"))
-                + Text(verbatim: "\n") + Text("AUTO_WEBHOOK_FOOTER")
-                + Text(verbatim: "\n") + Text("AUTO_ACTIVATE_CONFIRM_MESSAGE")
-                + Text(verbatim: "\n" + session.revision.package.revision)
+        .sheet(item: $approvalReview) { review in
+            approvalSheet(review)
         }
         .onDisappear { session.leave() }
         .tint(Color("PluginAccent"))
@@ -127,9 +118,10 @@ struct ScriptDetailView: View {
             } else {
                 Button("AUTO_ACTIVATE") {
                     Task {
+                        approvalStale = false
                         await session.refreshActivation()
-                        approvalGeneration = session.activationGeneration
-                        confirmsActivation = approvalGeneration != nil
+                        guard !session.isDirty, !session.isSaving, let generation = session.activationGeneration else { return }
+                        approvalReview = ApprovalReview(revision: session.revision, expectedGeneration: generation)
                     }
                 }
                 .disabled(session.isDirty || !session.activationAvailable)
@@ -145,11 +137,131 @@ struct ScriptDetailView: View {
                 Text(LocalizedStringKey(session.revision.package.manifest.writeResponseBody ? "AUTO_WRITE_RESPONSE" : "AUTO_NO_WRITE_RESPONSE"))
                 Text("AUTO_WEBHOOK_FOOTER")
                 Text("AUTO_ACTIVATION_CONNECTION")
-                if let key = session.activationErrorKey {
+                if approvalStale {
+                    Text("AUTO_ACTIVATION_STALE").foregroundStyle(AutomationStatusColor.error).accessibilityIdentifier("script.activationError")
+                } else if let key = session.activationErrorKey {
                     Text(LocalizedStringKey(key)).foregroundStyle(AutomationStatusColor.error).accessibilityIdentifier("script.activationError")
                 }
             }
         }
+    }
+
+    private func approvalSheet(_ review: ApprovalReview) -> some View {
+        let package = review.revision.package
+        let manifest = package.manifest
+        let rules = approvalRules(manifest)
+        let fields = approvalFields(manifest)
+        return NavigationStack {
+            Form {
+                Section {
+                    Text(verbatim: manifest.name)
+                    Text(verbatim: String.localizedStringWithFormat(String(localized: "AUTO_APPROVAL_COUNTS"),
+                                                                    Int64(rules.count), Int64(fields.count)))
+                } footer: { Text("AUTO_ALERT_CONNECTION") }
+                Section {
+                    ForEach(Array(rules.enumerated()), id: \.offset) { index, rule in
+                        HashText(value: rule, identifier: "script.approvalRule.\(index)")
+                    }
+                } header: { Text("AUTO_TARGETS") } footer: { Text("AUTO_APPROVAL_TARGETS_FOOTER") }
+                Section {
+                    LabeledContent("AUTO_APPROVAL_REQUEST_JSON") {
+                        Text(LocalizedStringKey(manifest.writeRequestBody ? "AUTO_APPROVAL_CAN_CHANGE" : "AUTO_APPROVAL_CANNOT_CHANGE"))
+                    }
+                    LabeledContent("AUTO_APPROVAL_RESPONSE_JSON") {
+                        Text(LocalizedStringKey(manifest.writeResponseBody ? "AUTO_APPROVAL_CAN_CHANGE" : "AUTO_APPROVAL_CANNOT_CHANGE"))
+                    }
+                } footer: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(LocalizedStringKey(manifest.writeRequestBody ? "AUTO_WRITE_REQUEST" : "AUTO_NO_WRITE_REQUEST"))
+                        Text(LocalizedStringKey(manifest.writeResponseBody ? "AUTO_WRITE_RESPONSE" : "AUTO_NO_WRITE_RESPONSE"))
+                        Text("AUTO_ALERT_WEBHOOK")
+                    }
+                }
+                Section {
+                    if fields.isEmpty {
+                        Text("AUTO_READ_NONE")
+                    }
+                    ForEach(Array(fields.enumerated()), id: \.offset) { index, field in
+                        HashText(value: field, identifier: "script.approvalRead.\(index)")
+                    }
+                } header: { Text("AUTO_APPROVAL_READ_DATA") }
+                Section {
+                    HashText(value: package.revision, identifier: "script.approvalRevision")
+                } header: { Text("AUTO_ALERT_REVISION") }
+            }
+            .accessibilityIdentifier("script.approvalForm")
+            .navigationTitle("AUTO_APPROVAL_REVIEW")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { approvalReview = nil }
+                        .accessibilityIdentifier("script.cancelActivation")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("AUTO_ACTIVATE_CONFIRM") { approve(review) }
+                        .accessibilityIdentifier("script.confirmActivation")
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .tint(Color("PluginAccent"))
+    }
+
+    private func approve(_ review: ApprovalReview) {
+        guard approvalReview?.id == review.id else { return }
+        approvalReview = nil
+        Task {
+            guard session.revision.id == review.revision.id,
+                  session.revision.package.revision == review.revision.package.revision,
+                  !session.isDirty, !session.isSaving
+            else {
+                approvalStale = true
+                return
+            }
+            await session.activate(expectedGeneration: review.expectedGeneration)
+        }
+    }
+
+    /// Every unique rule in full, in deterministic order. Names, hosts and paths come from an unverified
+    /// package, so they are only ever shown verbatim.
+    private func approvalRules(_ manifest: PluginManifest) -> [String] {
+        var seen = Set<String>()
+        var rules: [(sort: String, text: String)] = []
+        for match in manifest.matches {
+            let path: String = switch match.path {
+                case let .exact(value)?: value
+                case let .prefix(value)?: value + "*"
+                case nil: String(localized: "AUTO_RULE_ANY_PATH")
+            }
+            for host in match.hosts.sorted() {
+                for method in match.methods?.sorted() ?? [""] {
+                    let key = [method, host, path, match.path == nil ? "nil" : "p"].joined(separator: "\u{1F}")
+                    guard seen.insert(key).inserted else { continue }
+                    let methodText = method.isEmpty ? String(localized: "AUTO_RULE_ANY_METHOD") : method
+                    rules.append((key, [methodText, host, path].joined(separator: " ")))
+                }
+            }
+        }
+        return rules.sorted { $0.sort < $1.sort }.map(\.text)
+    }
+
+    private func approvalFields(_ manifest: PluginManifest) -> [String] {
+        let read = manifest.read
+        let metadata = read.metadata.map { field in
+            switch field {
+                case "method": String(localized: "AUTO_APPROVAL_READ_METHOD")
+                case "host": String(localized: "AUTO_APPROVAL_READ_HOST")
+                case "path": String(localized: "AUTO_APPROVAL_READ_PATH")
+                case "status": String(localized: "AUTO_APPROVAL_READ_STATUS")
+                default: field
+            }
+        }
+        var fields = metadata + read.headers.map { String(localized: "AUTO_APPROVAL_HEADER_PREFIX") + $0 }
+            + read.queryKeys.map { String(localized: "AUTO_APPROVAL_QUERY_PREFIX") + $0 }
+        if read.body == .json {
+            fields.append(String(localized: "AUTO_JSON_BODY"))
+        }
+        return fields
     }
 
     private var declaredHosts: String {

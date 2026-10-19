@@ -2548,13 +2548,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unsigned (publisher unverified)"
+            "value" : "Unsigned (publisher cannot be confirmed)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未署名（発行元未確認）"
+            "value" : "未署名（発行元を確認できません）"
           }
         }
       }
@@ -4244,13 +4244,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Approving, revoking, saving or deleting a script with live hooks stops the current capture connection. Reconnect manually to apply approvals. These operations do not add capture targets or start capture."
+            "value" : "Approving, revoking, saving or deleting a script with live hooks stops the current capture connection. To apply approvals, turn on Status in Settings → VPN Settings. These operations do not add capture targets or start capture."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "承認・承認の取り消し、実通信用スクリプトの保存・削除を行うと、現在のキャプチャ接続が停止します。承認した内容を適用するには、手動で再接続してください。キャプチャ対象の追加や接続の開始は行いません。"
+            "value" : "承認・承認の取り消し、実通信用スクリプトの保存・削除を行うと、現在のキャプチャ接続が停止します。承認した内容を適用するには「設定」→「VPN設定」の「接続状態」をオンにしてください。キャプチャ対象の追加や接続の開始は行いません。"
           }
         }
       }
@@ -4329,13 +4329,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "JSON body"
+            "value" : "Request and response JSON bodies"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "JSON本文"
+            "value" : "リクエストとレスポンスのJSON本文"
           }
         }
       }
@@ -4475,6 +4475,118 @@
         }
       }
     },
+    "AUTO_ALERT_RULES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matching traffic (method, host, exact path):"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対象通信（メソッド・ホスト・パスの完全一致）："
+          }
+        }
+      }
+    },
+    "AUTO_RULE_ANY_METHOD" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "any method"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任意のメソッド"
+          }
+        }
+      }
+    },
+    "AUTO_RULE_ANY_PATH" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(any path)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "（任意のパス）"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_WRITE_BOTH" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "May change request and response JSON bodies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストとレスポンスのJSON本文を変更できます。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_WRITE_REQUEST" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "May change request JSON bodies only."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストのJSON本文のみ変更できます。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_WRITE_RESPONSE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "May change response JSON bodies only."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レスポンスのJSON本文のみ変更できます。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_WRITE_NONE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot change request or response bodies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストもレスポンスも本文は変更できません。"
+          }
+        }
+      }
+    },
     "AUTO_WEBHOOK_FOOTER" : {
       "localizations" : {
         "en" : {
@@ -4503,6 +4615,294 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ファイル名を選ぶと編集対象を切り替えられます。保存すると、全ファイルの編集内容をまとめた新しいリビジョンが作られ、元の内容も残ります。保存前の編集は実通信に反映されません。保存した内容を実通信で使うには、別途確認して承認してください。保存だけでは実行されません。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_READ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reads:"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取り："
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_WEBHOOK" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Webhook actions do not send data to external destinations, including during live capture."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実通信でも、Webhookアクションで外部へデータを送信することはありません。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_CONNECTION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approving stops the current capture connection. To use this script, turn on Status in Settings → VPN Settings. Approval does not start capture; capture consent is required separately."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認すると、現在のキャプチャ接続が停止します。使用するには「設定」→「VPN設定」の「接続状態」をオンにしてください。承認だけでは接続は始まらず、キャプチャへの同意も必要です。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_REVISION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revision ID:"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リビジョンID："
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_REVIEW" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review live use"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実通信での使用を確認"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_COUNTS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Target rules: %1$lld · Read fields: %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対象条件：%1$lld件／読み取れる項目：%2$lld件"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_REQUEST_JSON" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request JSON"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストのJSON"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_RESPONSE_JSON" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response JSON"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レスポンスのJSON"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_CAN_CHANGE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "May change"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更可"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_CANNOT_CHANGE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot change"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更不可"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_READ_DATA" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Readable data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取れるデータ"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_TARGETS_FOOTER" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only captured traffic matching a method, host and exact path is selected. These rules do not add capture targets."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メソッド・ホスト・パスが一致するキャプチャ中の通信が対象です。キャプチャ対象のホストを追加する操作ではありません。"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_READ_METHOD" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HTTP method"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HTTPメソッド"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_READ_HOST" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホスト"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_READ_PATH" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Path"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パス"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_READ_STATUS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status code"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ステータスコード"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_HEADER_PREFIX" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Header: "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ヘッダー："
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_QUERY_PREFIX" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Query parameter: "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クエリパラメータ："
           }
         }
       }

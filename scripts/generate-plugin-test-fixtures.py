@@ -17,7 +17,7 @@ FIXTURES = ROOT / 'fixtures/plugin-repository'
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
-def write_swift(ui_package, live):
+def write_swift(ui_package, live, approval_package, approval_raw):
     ui = ui_package['sourceFiles']
     primary = 'hooks/example.com/synthetic/POST.js'
     secondary = 'hooks/example.com/other/GET.js'
@@ -29,6 +29,13 @@ def write_swift(ui_package, live):
         lines.append('    static let ' + label + ' = [')
         lines.extend('        ' + json.dumps(line) + ',' for line in source.split('\n'))
         lines.append('    ].joined(separator: "\\n")')
+    manifest = approval_package['manifest']
+    for label, values in [('approvalPaths', [match['path']['value'] for match in manifest['matches']]),
+                          ('approvalReadFields', manifest['read']['headers'] + manifest['read']['queryKeys'])]:
+        lines.append('    static let ' + label + ' = [')
+        lines.extend('        ' + json.dumps(value) + ',' for value in values)
+        lines.append('    ]')
+    lines.append('    static let approvalRevision = ' + json.dumps(hashlib.sha256(approval_raw).hexdigest()))
     lines.append('}')
     (ROOT / 'InterceptorUITests/PluginRepositorySources.swift').write_text('\n'.join(lines) + '\n')
     encoded = base64.b64encode(live).decode()
@@ -52,6 +59,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix='interceptor-native-fixtures-') as temporary:
         work = Path(temporary)
         shutil.copytree(FIXTURES / 'authored/plugins', work / 'plugins')
+        limits = work / 'plugins/ui-approval-limits'
+        limits.mkdir()
+        shutil.copy2(FIXTURES / 'authored/approval-limits.json', limits / 'plugin.json')
+        for index in range(1, 17):
+            hook = limits / 'hooks/limits.example.com/limits' / (f'route-{index:02}-' + 'abcdefghij' * 6) / 'POST.ts'
+            hook.parent.mkdir(parents=True)
+            shutil.copy2(FIXTURES / 'authored/approval-limits.ts', hook)
         (work / 'types').mkdir()
         shutil.copy2(sdk / 'types/interceptor.d.ts', work / 'types/interceptor.d.ts')
         result = subprocess.run(['bun', str(sdk / 'tools/compile.mjs'), str(work)],
@@ -63,13 +77,15 @@ def main():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     outputs = {}
-    for name, filename in [('ui-multifile', 'multi-file-hooks.json'), ('live-multifile', 'sdk-live-multi-file-hooks.json')]:
+    for name, filename in [('ui-multifile', 'multi-file-hooks.json'), ('live-multifile', 'sdk-live-multi-file-hooks.json'),
+                           ('ui-approval-limits', 'approval-limits.json')]:
         package = emitted[name]
         module.validate_manifest(package['manifest'], name)
         raw = module.package_bytes(package['manifest'], package['sourceFiles'])
         (FIXTURES / filename).write_bytes(raw)
         outputs[filename] = {'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw)}
-    write_swift(emitted['ui-multifile'], (FIXTURES / 'sdk-live-multi-file-hooks.json').read_bytes())
+    write_swift(emitted['ui-multifile'], (FIXTURES / 'sdk-live-multi-file-hooks.json').read_bytes(),
+                emitted['ui-approval-limits'], (FIXTURES / 'approval-limits.json').read_bytes())
     tool_paths = ['.bun-version', 'bun.lock', 'package.json', 'tools/compile.mjs', 'tools/discover_routes.py',
                   'tools/route_sources.py', 'tools/repository_config.py', 'types/interceptor.d.ts']
     provenance = {'schemaVersion': 1, 'sdkRepository': 'https://github.com/qtmleap/Interceptor-Plugins',

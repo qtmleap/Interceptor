@@ -6,7 +6,9 @@ struct AddRepositorySheet: View {
     @State private var model: AddRepositoryModel
     @State private var confirmUnverified = false
 
-    init(controller: AutomationController) { _model = State(initialValue: AddRepositoryModel(controller: controller)) }
+    init(controller: AutomationController) {
+        _model = State(initialValue: AddRepositoryModel(controller: controller))
+    }
 
     var body: some View {
         NavigationStack {
@@ -19,13 +21,17 @@ struct AddRepositorySheet: View {
                     Button("AUTO_PREVIEW") { model.preview() }
                         .disabled(!model.canPreview).frame(minHeight: 44)
                         .accessibilityIdentifier("repo.preview")
-                    if model.phase == .fetching { ProgressView() }
+                    if model.phase == .fetching {
+                        ProgressView()
+                    }
                 } header: { Text("AUTO_REPOSITORY_URL") } footer: { Text("AUTO_PREVIEW_FOOTER") }
                 if let error = model.error {
                     Section { Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(AutomationStatusColor.error) }
                         .accessibilityIdentifier("repo.error")
                 }
-                if let snapshot = model.snapshot { review(snapshot) }
+                if let snapshot = model.snapshot {
+                    review(snapshot)
+                }
             }
             .accessibilityIdentifier("repo.addForm")
             .navigationTitle(Text("AUTO_ADD_REPOSITORY"))
@@ -35,8 +41,14 @@ struct AddRepositorySheet: View {
                     Button("Cancel") { close() }.disabled(model.phase == .adding).accessibilityIdentifier("repo.cancel")
                 }
             }
-            .onChange(of: model.phase) { if model.phase == .added { close() } }
-            .confirmationDialog("AUTO_UNVERIFIED_TITLE", isPresented: $confirmUnverified, titleVisibility: .visible) {
+            .onChange(of: model.phase) {
+                if model.phase == .added {
+                    close()
+                }
+            }
+            .alert("AUTO_UNVERIFIED_TITLE", isPresented: $confirmUnverified) {
+                Button("Cancel", role: .cancel) {}
+                    .accessibilityIdentifier("repo.cancelUnverified")
                 Button("AUTO_ADD_UNVERIFIED", role: .destructive) { model.addUnverified() }
                     .accessibilityIdentifier("repo.confirmUnverified")
             } message: { Text("AUTO_UNVERIFIED_WARNING") }
@@ -46,7 +58,9 @@ struct AddRepositorySheet: View {
         .tint(Color("PluginAccent"))
     }
 
-    private func close() { model.cancel(); dismiss() }
+    private func close() {
+        model.cancel(); dismiss()
+    }
 
     @ViewBuilder private func review(_ s: VerifiedSnapshot) -> some View {
         Section("AUTO_REPOSITORY_DETAILS") {
@@ -82,8 +96,12 @@ struct AddRepositorySheet: View {
     }
 
     private func badge(_ s: VerifiedSnapshot) -> AutomationTrustBadge {
-        if let trust = model.acceptance?.resultingTrust { return AutomationTrustBadge(trust) }
-        if case .signed = s.signature { return .signedKeyUnverified }
+        if let trust = model.acceptance?.resultingTrust {
+            return AutomationTrustBadge(trust)
+        }
+        if case .signed = s.signature {
+            return .signedKeyUnverified
+        }
         return .unsigned
     }
 }

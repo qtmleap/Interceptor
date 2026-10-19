@@ -1,5 +1,7 @@
 {
   "authoredInputs": {
+    "authored/approval-limits.json": "678cfb92049f06ba40957c8579a631ce9bca7da2d0aa71ef98a8fa5266a0459d",
+    "authored/approval-limits.ts": "2e1189b6baaefd53e6e4ac2aa7f27f4893afffcbe5ec09683946018337070e95",
     "authored/plugins/live-multifile/hooks/api.example.com/other/POST.ts": "e0c8036571ed129f0e278fee2acc4874664c77e74eba5c55fc73ef4e3d70c07a",
     "authored/plugins/live-multifile/hooks/api.example.com/search/POST.ts": "e10b32ecb7cf5a3c4f4a93361181722b394c31f174173f28552b175dff6de7a2",
     "authored/plugins/live-multifile/plugin.json": "e6c1449d3f8eedb836d4f7b774fd5eecd0366ce8d6630c8e04e7b88b4e0d464e",
@@ -11,6 +13,10 @@
   "command": "python3 scripts/generate-plugin-test-fixtures.py --sdk-root /path/to/Interceptor-Plugins",
   "compilerEntryPoint": "tools/compile.mjs",
   "packages": {
+    "approval-limits.json": {
+      "sha256": "80b1908a2ddeef087e5b419bc07dae8ac2c61279f10eed40b934e814ae9b50af",
+      "size": 19767
+    },
     "multi-file-hooks.json": {
       "sha256": "6f007a8e930949b7e0094b59b17cbfb82128eaf196156edd9901495f543440fa",
       "size": 1628
@@ -24,7 +30,7 @@
   "sdkInputs": {
     ".bun-version": "f4eaae07c72dd003028a4583ee93e5146e4fb2e5ba80566d3e79d73edd39ee36",
     "bun.lock": "0ee70bb1b86ca5a5940080a89fb3b3cc0793e9f05e121c08daea40440c8322ee",
-    "package.json": "b721a3ccb91fbe9916a31296970166036d84b37b8a45456d1a34f9e9c4672bd0",
+    "package.json": "1bf1ad9f5d9c8d19d0c16d80553a46d86e45170310688d96d6c546cec6343b45",
     "tools/compile.mjs": "135058f8bdbed1192a09050d1110e74ae5386b8c21e6ead9daac8533de3dd7e1",
     "tools/discover_routes.py": "1c324f8ecca3f2c7005de68145a2734a687481594d6698d76b98c20e2ea1a0c8",
     "tools/repository_config.py": "6580c3f7ee8dc2ca3ffb4a9390485376fcb253107cb98ed4306e5cd2bd727135",
@@ -32,5 +38,5 @@
     "types/interceptor.d.ts": "b41a8ee26367b9b17cbb8a52a695d87dc36d8982fc843e57b9b45ad1d39aea01"
   },
   "sdkRepository": "https://github.com/qtmleap/Interceptor-Plugins",
-  "sdkRevision": "4653e66399adceafb43e32043650041993951dfb"
+  "sdkRevision": "5165358cbac8099dab3af0814c21453da0602902"
 }

@@ -144,9 +144,16 @@ struct TrustBadgeLabel: View {
 /// Read-only, selectable fingerprint text. Character wrapping never inserts visual hyphens.
 struct HashText: UIViewRepresentable {
     let value: String
+    let identifier: String?
+
+    init(value: String, identifier: String? = nil) {
+        self.value = value
+        self.identifier = identifier
+    }
 
     func makeUIView(context: Context) -> UITextView {
         let view = UITextView()
+        view.accessibilityIdentifier = identifier
         view.isEditable = false
         view.isSelectable = true
         view.isScrollEnabled = false
@@ -160,6 +167,7 @@ struct HashText: UIViewRepresentable {
     }
 
     func updateUIView(_ view: UITextView, context: Context) {
+        view.accessibilityIdentifier = identifier
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byCharWrapping
         paragraph.hyphenationFactor = 0

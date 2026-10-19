@@ -146,9 +146,10 @@ class PluginRepositoryFixtureTests(unittest.TestCase):
                 for path in ('/package.json', '/package.json?runToken=secret-query', '/missing'):
                     request = fixture.urllib.request.Request(server.base_url + path, headers={'Authorization': 'Bearer secret-header'})
                     try:
-                        fixture.urllib.request.urlopen(request, context=context, timeout=5).read()
-                    except fixture.urllib.error.HTTPError:
-                        pass
+                        with fixture.urllib.request.urlopen(request, context=context, timeout=5) as response:
+                            response.read()
+                    except fixture.urllib.error.HTTPError as error:
+                        error.close()
                 entries = server.diagnostics.snapshot()['entries']
             finally:
                 server.close()
@@ -157,6 +158,22 @@ class PluginRepositoryFixtureTests(unittest.TestCase):
             self.assertEqual(entries[0]['bytes'], len(body))
             self.assertGreaterEqual(entries[0]['elapsedSeconds'], 0)
             self.assertNotIn('secret', json.dumps(entries))
+
+    def test_loopback_fixture_does_not_depend_on_reverse_dns(self):
+        def forbidden(*args, **kwargs):
+            raise AssertionError('Fixture must not perform reverse DNS')
+        with tempfile.TemporaryDirectory() as temporary:
+            tls = fixture.make_tls(Path(temporary))
+            expected = b'{"ok":true}'
+            with patch.object(socket, 'getfqdn', forbidden), patch.object(socket, 'gethostbyaddr', forbidden):
+                server = fixture.FixtureServer({'/__interceptor_fixture': expected}, tls)
+                try:
+                    self.assertEqual(server.server.server_name, '127.0.0.1')
+                    self.assertEqual(server.server.server_port, server.port)
+                    context = fixture.check_ready(server, tls, expected)
+                    self.assertIsNotNone(context)
+                finally:
+                    server.close()
 
     def test_server_records_tls_handshake_failure_type_only(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -218,7 +235,7 @@ class PluginRepositoryFixtureTests(unittest.TestCase):
         self.assertEqual(marker['packageDigest'], digest)
         envelope = json.loads(files['/repository.json'])
         index = json.loads(base64.b64decode(envelope['payload'], validate=True))
-        self.assertEqual({e['name'] for e in index['plugins']}, {'Request summary', 'Response details', 'Multi-file hooks'})
+        self.assertEqual({e['name'] for e in index['plugins']}, {'Request summary', 'Response details', 'Multi-file hooks', 'Approval limits'})
         for entry in index['plugins']:
             raw = files['/' + entry['packagePath']]
             self.assertNotIn('/', entry['packagePath'])

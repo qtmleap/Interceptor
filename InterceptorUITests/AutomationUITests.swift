@@ -102,10 +102,25 @@ final class AutomationUITests: XCTestCase {
             XCTAssertTrue(approve.isEnabled)
             attach(app, "Hooks live approval scope \(locale)")
             approve.tap()
-            let confirm = app.buttons["script.confirmActivation"]
+            let confirm = app.buttons.matching(identifier: "script.confirmActivation").firstMatch
             XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+            let approvalForm = app.collectionViews["script.approvalForm"]
+            XCTAssertTrue(approvalForm.waitForExistence(timeout: 5))
+            XCTAssertEqual(confirm.label, japanese ? "使用を承認" : "Approve Use")
+            let cancelApproval = app.buttons.matching(identifier: "script.cancelActivation").firstMatch
+            XCTAssertTrue(cancelApproval.isHittable)
             attach(app, "Hooks exact revision confirmation \(locale)")
+            let reviewedRevision = app.textViews["script.approvalRevision"]
+            reachApprovalValue(reviewedRevision, in: approvalForm, app: app)
+            XCTAssertEqual((reviewedRevision.value as? String)?.utf8.count, 64)
+            attach(app, "Hooks approval details \(locale)")
+            cancelApproval.tap()
+            XCTAssertTrue(approvalForm.waitForNonExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["script.revoke"].exists, "cancelling must not approve the script")
+            approve.tap()
+            XCTAssertTrue(confirm.waitForExistence(timeout: 5))
             confirm.tap()
+            XCTAssertTrue(approvalForm.waitForNonExistence(timeout: 5))
             let revoke = app.buttons["script.revoke"]
             XCTAssertTrue(revoke.waitForExistence(timeout: 5))
             attach(app, "Hooks approved revision \(locale)")
@@ -136,6 +151,47 @@ final class AutomationUITests: XCTestCase {
             }
             app.terminate()
         }
+    }
+
+    /// Exercises the route-count and read-field-count limits with fixed confirmation actions.
+    @MainActor
+    func testLargeApprovalScopeCanBeReadAndCancelled() async {
+        continueAfterFailure = false
+        guard let repositoryURL = await repositoryFixtureURLIfReady() else {
+            XCTFail("The run-owned HTTPS fixture is required")
+            return
+        }
+        XCUIDevice.shared.orientation = .portrait
+        let app = launch(japanese: false, suite: "Interceptor.UITests.\(UUID().uuidString)")
+        defer { app.terminate() }
+        guard openFixturePackage("Approval limits", repositoryURL: repositoryURL, app: app, japanese: false) else { return }
+        reach(app.buttons["repo.import"], in: app.collectionViews["repo.script.list"], attempts: 90).tap()
+        XCTAssertTrue(app.otherElements["repo.imported"].waitForExistence(timeout: 5)
+            || app.staticTexts["Imported (disabled)"].waitForExistence(timeout: 3))
+        app.navigationBars["Approval limits"].buttons.element(boundBy: 0).tap()
+        app.navigationBars["Local repository fixture"].buttons.element(boundBy: 0).tap()
+        let installed = app.buttons["plugins.script.Approval limits"]
+        XCTAssertTrue(installed.waitForExistence(timeout: 5))
+        installed.tap()
+        let approve = reach(app.buttons["script.activate"], in: app.collectionViews["script.form"], attempts: 90)
+        approve.tap()
+        let form = app.collectionViews["script.approvalForm"]
+        XCTAssertTrue(form.waitForExistence(timeout: 5))
+        let confirm = app.buttons.matching(identifier: "script.confirmActivation").firstMatch
+        let cancel = app.buttons.matching(identifier: "script.cancelActivation").firstMatch
+        XCTAssertTrue(confirm.isHittable)
+        XCTAssertTrue(cancel.isHittable)
+        XCTAssertEqual(PluginRepositorySources.approvalPaths.count, 16)
+        XCTAssertEqual(PluginRepositorySources.approvalReadFields.count, 64)
+        attach(app, "Large approval scope top en")
+        verifyVisibleApprovalRows(app, form: form)
+        XCTAssertTrue(confirm.isHittable)
+        XCTAssertTrue(cancel.isHittable)
+        attach(app, "Large approval scope bottom en")
+        cancel.tap()
+        XCTAssertTrue(form.waitForNonExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["script.revoke"].exists)
+        XCTAssertTrue(approve.isEnabled, "cancelling must retain the unapproved package")
     }
 
     /// The tracked CI fixture wrapper supplies an owned HTTPS URL, nonce and simulator UUID.
@@ -286,7 +342,14 @@ private extension AutomationUITests {
         add.tap()
         let confirmation = app.buttons.matching(identifier: "repo.confirmUnverified").firstMatch
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        let cancelConfirmation = app.buttons.matching(identifier: "repo.cancelUnverified").firstMatch
+        XCTAssertTrue(cancelConfirmation.isHittable)
         attach(app, "Unverified publisher warning \(japanese ? "ja" : "en")")
+        cancelConfirmation.tap()
+        XCTAssertTrue(add.isEnabled, "cancelling must retain the preview without adding the repository")
+        XCTAssertEqual(url.value as? String, repositoryURL.absoluteString)
+        add.tap()
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
         confirmation.tap()
         let repository = app.buttons["plugins.repo.Local repository fixture"]
         XCTAssertTrue(repository.waitForExistence(timeout: 10))
@@ -523,6 +586,95 @@ private extension AutomationUITests {
         return element
     }
 
+    /// A full accessibility string is insufficient: every machine-value row must be on screen in full.
+    @MainActor
+    func reachApprovalValue(_ element: XCUIElement, in form: XCUIElement, app: XCUIApplication) {
+        for _ in 0 ..< 14 {
+            var viewport = form.frame.intersection(app.frame)
+            for bar in app.navigationBars.allElementsBoundByIndex where bar.exists && bar.frame.intersects(viewport) {
+                let top = max(viewport.minY, bar.frame.maxY)
+                viewport = CGRect(x: viewport.minX, y: top, width: viewport.width, height: max(0, viewport.maxY - top))
+            }
+            if element.exists && element.isHittable && viewport.insetBy(dx: 2, dy: 2).contains(element.frame) {
+                return
+            }
+            form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.8))
+                .press(forDuration: 0.05, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.35)))
+        }
+        XCTFail("The complete approval value must be visible: \(element.frame)")
+    }
+
+    @MainActor
+    func verifyVisibleApprovalRows(_ app: XCUIApplication, form: XCUIElement) {
+        var paths = Set(PluginRepositorySources.approvalPaths)
+        var fields = Set(PluginRepositorySources.approvalReadFields)
+        var inspected = Set<String>()
+        var sawRevision = false
+        var capturedRule = false
+        var capturedField = false
+        for _ in 0 ..< 120 {
+            var viewport = form.frame.intersection(app.frame)
+            for bar in app.navigationBars.allElementsBoundByIndex where bar.exists && bar.frame.intersects(viewport) {
+                let top = max(viewport.minY, bar.frame.maxY)
+                viewport = CGRect(x: viewport.minX, y: top, width: viewport.width, height: max(0, viewport.maxY - top))
+            }
+            viewport = viewport.insetBy(dx: 2, dy: 2)
+            let rows = form.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "script.approval")).allElementsBoundByIndex
+            for row in rows {
+                let identifier = row.identifier
+                guard !inspected.contains(identifier), row.exists, row.isHittable,
+                      viewport.contains(row.frame), row.frame.width > 0,
+                      let value = row.value as? String else { continue }
+                let isRule = identifier.hasPrefix("script.approvalRule.")
+                let isField = identifier.hasPrefix("script.approvalRead.")
+                let isRevision = identifier == "script.approvalRevision"
+                guard isRule || isField || isRevision else { continue }
+                // Conservative lower bound for the default-size monospaced UIKit text used by this fixture.
+                let minimumHeight = ceil(Double(value.utf16.count) * 7.5 / Double(row.frame.width)) * 14
+                XCTAssertGreaterThanOrEqual(Double(row.frame.height) + 1, minimumHeight, "machine values must wrap without clipping")
+                if isRule {
+                    XCTAssertTrue(value.contains("POST"))
+                    XCTAssertTrue(value.contains("limits.example.com"))
+                    for path in paths where value.contains(path) {
+                        paths.remove(path)
+                    }
+                    if !capturedRule {
+                        let image = XCTAttachment(screenshot: row.screenshot())
+                        image.name = "Large approval long rule render"
+                        image.lifetime = .keepAlways
+                        add(image)
+                        capturedRule = true
+                    }
+                } else if isField {
+                    for field in fields where value.hasSuffix(field) {
+                        fields.remove(field)
+                    }
+                    if !capturedField && value.contains(PluginRepositorySources.approvalReadFields.last ?? "") {
+                        let image = XCTAttachment(screenshot: row.screenshot())
+                        image.name = "Large approval long field render"
+                        image.lifetime = .keepAlways
+                        add(image)
+                        capturedField = true
+                    }
+                } else {
+                    XCTAssertEqual(value, PluginRepositorySources.approvalRevision, "the full exact revision must be visible")
+                    sawRevision = true
+                }
+                inspected.insert(identifier)
+            }
+            if paths.isEmpty && fields.isEmpty && sawRevision {
+                break
+            }
+            form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.8))
+                .press(forDuration: 0.05, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.35)))
+        }
+        XCTAssertTrue(paths.isEmpty, "all16 rule rows must be fully visible; missing: \(paths.count)")
+        XCTAssertTrue(fields.isEmpty, "all64 declared header/query rows must be fully visible; missing: \(fields.count)")
+        XCTAssertTrue(sawRevision, "the final revision row must be fully visible")
+        XCTAssertTrue(capturedRule && capturedField)
+    }
+
     /// iPad keyboard presentation can move the form sheet after UIKit reports the app idle.
     /// Use current geometry rather than a cached accessibility activation point.
     @MainActor
@@ -566,8 +718,8 @@ private extension AutomationUITests {
 
     @MainActor
     @discardableResult
-    func reach(_ element: XCUIElement, in form: XCUIElement) -> XCUIElement {
-        for _ in 0 ..< 14 {
+    func reach(_ element: XCUIElement, in form: XCUIElement, attempts: Int = 14) -> XCUIElement {
+        for _ in 0 ..< attempts {
             if isVisibleForTap(element, in: form) {
                 return element
             }

@@ -12,6 +12,7 @@ import re
 import shutil
 import signal
 import socket
+import socketserver
 import ssl
 import subprocess
 import sys
@@ -24,7 +25,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / 'fixtures/plugin-repository'
-PACKAGE_NAMES = ('request-summary.json', 'response-details.json', 'multi-file-hooks.json')
+PACKAGE_NAMES = ('request-summary.json', 'response-details.json', 'multi-file-hooks.json', 'approval-limits.json')
 MARKER = 'Interceptor Plugin Repository Fixture'
 
 
@@ -56,6 +57,17 @@ def load_packages():
         constants[name] = '\n'.join(json.loads(line.strip().rstrip(',')) for line in body.splitlines() if line.strip())
     if any(constants.get(leg + 'Source') != ui.get(constants.get(leg + 'File')) for leg in ('primary', 'secondary')):
         raise ValueError('UI source expectations differ from actual SDK output')
+    limits_raw = (FIXTURES / 'approval-limits.json').read_bytes()
+    limits = json.loads(limits_raw)['manifest']
+    for label, expected in [('approvalPaths', [match['path']['value'] for match in limits['matches']]),
+                            ('approvalReadFields', limits['read']['headers'] + limits['read']['queryKeys'])]:
+        match = re.search(r'static let ' + label + r' = \[(.*?)\]', ui_sources, re.S)
+        actual = [json.loads(line.strip().rstrip(',')) for line in match.group(1).splitlines() if line.strip()] if match else None
+        if actual != expected:
+            raise ValueError('Approval UI expectations differ from actual SDK output: ' + label)
+    expected_revision = re.search(r'static let approvalRevision = "([a-f0-9]{64})"', ui_sources)
+    if expected_revision is None or expected_revision.group(1) != digest(limits_raw):
+        raise ValueError('Approval revision expectation differs from actual SDK output')
     packages = {}
     for name in PACKAGE_NAMES:
         path = FIXTURES / name
@@ -184,6 +196,11 @@ class FixtureServer:
         class Server(http.server.ThreadingHTTPServer):
             daemon_threads = True
             block_on_close = False
+
+            def server_bind(self):
+                # HTTPServer.server_bind reverse-resolves the address via socket.getfqdn; loopback needs no DNS.
+                socketserver.TCPServer.server_bind(self)
+                self.server_name, self.server_port = self.server_address[:2]
 
             def finish_request(self, request, client_address):
                 started = time.monotonic()
@@ -379,9 +396,10 @@ def main():
         if options.self_test:
             for path in ['/private-tls/ca.key', '/../private-tls/server.key', '/authored/plugins/ui-multifile/plugin.json']:
                 try:
-                    urllib.request.urlopen(server.base_url + path, context=context, timeout=2)
+                    urllib.request.urlopen(server.base_url + path, context=context, timeout=2).close()
                     raise RuntimeError('Unexpected file served: ' + path)
                 except urllib.error.HTTPError as error:
+                    error.close()
                     if error.code != 404:
                         raise
             print('PASS own HTTPS CA/hostname/readiness, SDK provenance, explicit serving allowlist')
