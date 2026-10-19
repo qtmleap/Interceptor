@@ -6,8 +6,17 @@ import TreeSitterJavaScriptRunestone
 struct PluginSourceEditor: UIViewRepresentable {
     @Binding var text: String
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// Binding<String> can compare canonically equal; source revisions must compare exact bytes.
+    private let sourceUTF8: [UInt8]
 
-    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+    init(text: Binding<String>) {
+        _text = text
+        sourceUTF8 = Array(text.wrappedValue.utf8)
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
 
     func makeUIView(context: Context) -> TextView {
         let view = TextView()
@@ -25,15 +34,15 @@ struct PluginSourceEditor: UIViewRepresentable {
         view.smartDashesType = .no
         let theme = ScaledCodeTheme(contentSizeCategory: view.traitCollection.preferredContentSizeCategory)
         context.coordinator.category = theme.contentSizeCategory
-        view.setState(TextViewState(text: text, theme: theme, language: .javaScript))
+        view.setState(TextViewState(text: String(decoding: sourceUTF8, as: UTF8.self), theme: theme, language: .javaScript))
         return view
     }
 
     func updateUIView(_ view: TextView, context: Context) {
         context.coordinator.text = $text
-        if view.text != text {
+        if !view.text.utf8.elementsEqual(sourceUTF8) {
             context.coordinator.applying = true
-            view.text = text
+            view.text = String(decoding: sourceUTF8, as: UTF8.self)
             context.coordinator.applying = false
         }
         let category = view.traitCollection.preferredContentSizeCategory
@@ -48,7 +57,9 @@ struct PluginSourceEditor: UIViewRepresentable {
         var applying = false
         var category: UIContentSizeCategory?
 
-        init(text: Binding<String>) { self.text = text }
+        init(text: Binding<String>) {
+            self.text = text
+        }
 
         func textViewDidChange(_ textView: TextView) {
             guard !applying else { return }

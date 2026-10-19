@@ -1,38 +1,41 @@
 import AutomationCore
 import Foundation
 
-/// The "create example" starter: metadata-only reads, example.com, no live capture. The sample source
-/// returns at most one declarative webhook intent aimed at the fixed synthetic preview endpoint; nothing is sent.
+/// A disabled v2 example. Body edits are shown by the synthetic run and need separate live approval.
 enum AutomationTemplate {
     static let previewEndpointID = UUID(uuidString: "5E1D0C4A-0000-4000-8000-00000000A001")!
+    static let sourceFile = "hooks/example.com/synthetic/POST.js"
     static let source = """
-    // Synthetic example. Returns at most one declarative webhook intent; nothing is ever sent.
-    function onRequest(event, config) {
-      if (event.request.method !== "GET") return { actions: [] };
-      return { actions: [{ type: "webhook", endpointId: config.endpoints.preview,
-                           json: { eventId: event.id, phase: event.phase, host: event.request.host } }] };
-    }
-
-    function onResponse(event, config) {
-      if (event.response.status < 500) return { actions: [] };
-      return { actions: [{ type: "webhook", endpointId: config.endpoints.preview,
-                           json: { eventId: event.id, status: event.response.status } }] };
-    }
+    // Each callback uses a fresh VM. Leave callbacks see read-only traffic.
+    Interceptor.attach({
+      request: {
+        onEnter(request, config) { request.body.limit = 5; },
+        onLeave(request, config) {},
+      },
+      response: {
+        onEnter(response, config) { response.body.maintenance = true; },
+        onLeave(response, config) {},
+      },
+    });
 
     """
 
     static func packageBytes(name: String, id: UUID = UUID()) throws -> Data {
         let manifest: JSONValue = .object([
-            "schemaVersion": .integer(1), "id": .string(id.uuidString), "name": .string(name), "version": .string("1.0.0"),
-            "subscriptions": .array([
-                .object(["phase": .string("request.completed"), "match": .object(["hosts": .array([.string("example.com")])])]),
-                .object(["phase": .string("response.completed"), "match": .object(["hosts": .array([.string("example.com")])])]),
-            ]),
+            "schemaVersion": .integer(2), "id": .string(id.uuidString), "name": .string(name), "version": .string("1.0.0"),
+            "matches": .array([.object([
+                "hosts": .array([.string("example.com")]), "methods": .array([.string("POST")]),
+                "path": .object(["kind": .string("exact"), "value": .string("/synthetic")]),
+                "hooks": .object([
+                    "request": .object(["onEnter": .string(sourceFile), "onLeave": .string(sourceFile)]),
+                    "response": .object(["onEnter": .string(sourceFile), "onLeave": .string(sourceFile)]),
+                ]),
+            ])]),
             "read": .object(["metadata": .array([.string("method"), .string("host"), .string("status"), .string("path")]),
-                             "headers": .array([]), "queryKeys": .array([]), "body": .object(["mode": .string("none")])]),
-            "endpointBindings": .array([.string("preview")]),
-            "settings": .object([:]),
+                             "headers": .array([]), "queryKeys": .array([]), "body": .object(["mode": .string("json")])]),
+            "write": .object(["requestBody": .bool(true), "responseBody": .bool(true)]),
+            "endpointBindings": .array([]), "settings": .object([:]),
         ])
-        return try JSONValue.object(["manifest": manifest, "source": .string(source)]).data()
+        return try JSONValue.object(["manifest": manifest, "sourceFiles": .object([sourceFile: .string(source)])]).data()
     }
 }

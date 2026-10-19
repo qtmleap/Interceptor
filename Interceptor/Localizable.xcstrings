@@ -2068,13 +2068,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scripts are stored disabled. This feature is for testing only: it does not read captures, enable hooks or send webhooks."
+            "value" : "Imported and edited scripts stay inactive. Review and approve each exact revision to use its hooks on captured traffic. Synthetic tests and webhook intents never send data."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "スクリプトは無効状態で保存されます。この機能はテスト専用で、キャプチャの読み取り、フックの有効化、Webhookの送信は行いません。"
+            "value" : "読み込み・編集したスクリプトは、個別に承認するまで通信に適用されません。対象と読み取り内容を確認してから承認してください。サンプルテストやWebhookアクションが外部へデータを送ることはありません。"
           }
         }
       }
@@ -2740,13 +2740,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Declared matching rules. Currently available for synthetic tests only."
+            "value" : "Declared matching rules. Only explicitly configured capture hosts can produce hooks."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "対象条件の宣言です。現在はサンプルデータでのテスト実行のみ利用できます。"
+            "value" : "対象条件の宣言です。キャプチャ対象に設定済みのホストでのみ実行できます。"
           }
         }
       }
@@ -3124,13 +3124,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Disabled. Not connected to captures or webhooks."
+            "value" : "Imported and saved revisions stay inactive until separately approved. Legacy scripts support synthetic tests only."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "無効状態です。キャプチャやWebhookには接続されていません。"
+            "value" : "読み込み・保存したリビジョンは、個別に承認するまで通信に適用されません。旧形式のスクリプトはサンプルデータでのテストのみ利用できます。"
           }
         }
       }
@@ -3979,6 +3979,482 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完了"
+          }
+        }
+      }
+    }
+,
+    "AUTO_LIVE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live HTTP hooks"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信への適用"
+          }
+        }
+      }
+    }
+,
+    "AUTO_LIVE_STATUS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This revision"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このリビジョン"
+          }
+        }
+      }
+    }
+,
+    "AUTO_LIVE_ACTIVE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認済み"
+          }
+        }
+      }
+    }
+,
+    "AUTO_LIVE_INACTIVE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inactive"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未承認"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approve This Revision…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このリビジョンを承認…"
+          }
+        }
+      }
+    }
+,
+    "AUTO_REVOKE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revoke Approval"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認を取り消す"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATE_CONFIRM_TITLE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approve this exact revision?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このリビジョンを承認しますか？"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATE_CONFIRM" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approve Revision"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このリビジョンを承認"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATE_CONFIRM_MESSAGE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow the data access and JSON changes described above for this exact revision. Capture consent is also required. Revision:"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上に記載されたデータの読み取りとJSONの変更を、このリビジョンに許可します。別途、通信キャプチャへの同意も必要です。リビジョン："
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_SCOPE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Runs locally on captured HTTPS traffic for these hosts. It cannot add capture targets."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次のホストのHTTPS通信をキャプチャする場合に、端末内で実行します。キャプチャ対象のホストは追加しません。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_DATA" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This script receives the declared data below. Webhook actions remain intents; nothing is delivered."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このスクリプトは、以下の宣言されたデータを読み取れます。Webhookアクションは送信予定として扱い、外部へ送信しません。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_WRITE_REQUEST" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It may change the request JSON body sent to the server."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーへ送るリクエストのJSON本文を変更できます。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_NO_WRITE_REQUEST" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It cannot change request bodies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエスト本文は変更できません。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_WRITE_RESPONSE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It may change the response JSON body delivered to the app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリへ返すレスポンスのJSON本文を変更できます。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_NO_WRITE_RESPONSE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It cannot change response bodies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レスポンス本文は変更できません。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_CONNECTION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approving or revoking a script, or saving/deleting any script that supports live hooks, stops the current capture connection. Reconnect manually to apply approved revisions. It does not add capture hosts or start capture."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認・承認の取り消し、または通信に適用できるスクリプトの保存・削除を行うと、現在のキャプチャ接続が停止します。承認したリビジョンを適用するには、手動で再接続してください。キャプチャ対象の追加や接続の開始は行いません。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_ERROR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval could not be changed. Check capture consent and the activation store."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認を変更できませんでした。キャプチャへの同意と承認情報の状態を確認してください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_READ_NONE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No traffic data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信データなし"
+          }
+        }
+      }
+    }
+,
+    "AUTO_BODY_PREVIEW" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSON body preview"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSON本文のプレビュー"
+          }
+        }
+      }
+    }
+,
+    "AUTO_TEST_RESULT" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validated test result"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト結果を確認済み"
+          }
+        }
+      }
+    }
+,
+    "AUTO_JSON_BODY" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSON body"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSON本文"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_CONSENT" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow capture in Settings before approving a revision."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リビジョンを承認する前に、設定で通信キャプチャに同意してください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_LIMIT" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Up to four revisions can be active. Revoke another approval before adding this one."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認できるリビジョンは4つまでです。別の承認を取り消してから、もう一度お試しください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_STALE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval changed while this screen was open. Review the current revision and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画面を開いている間に承認情報が変わりました。現在のリビジョンを確認し、もう一度お試しください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_STORE_PRESERVED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval data is unreadable and was preserved. Approval changes, and saving or deleting scripts with live hooks, are blocked."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認情報を読み取れませんでした。データはそのまま保持しています。承認の変更や、通信に適用できるスクリプトの保存・削除は行えません。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_REVOCATION_PENDING" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval could not be revoked. Capture shutdown was requested, but approval may remain stored. Open this screen again to retry."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認を取り消せなかったため、キャプチャの停止を要求しました。承認情報が残っている可能性があります。この画面を開き直して、もう一度お試しください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_CAPTURE_APPROVAL_CHANGED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture stopped because script approvals changed. Reconnect manually."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリプトの承認情報が変更されたため、キャプチャを停止しました。手動で再接続してください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_CAPTURE_CONSENT_REQUIRED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture stopped because capture consent was withdrawn."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信キャプチャへの同意が取り消されたため、キャプチャを停止しました。"
           }
         }
       }

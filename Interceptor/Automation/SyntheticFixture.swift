@@ -6,27 +6,36 @@ import Foundation
 enum SyntheticFixture {
     static func eventJSON(for hook: JavaScriptHook) -> String {
         switch hook {
-        case .request:
-            return """
-            {
-              "id": "00000000-0000-4000-8000-000000000001",
-              "exchangeID": "00000000-0000-4000-8000-000000000002",
-              "phase": "request.completed",
-              "time": "2026-01-01T00:00:00Z",
-              "request": { "method": "GET", "host": "example.com", "path": "/synthetic" }
-            }
-            """
-        case .response:
-            return """
-            {
-              "id": "00000000-0000-4000-8000-000000000003",
-              "exchangeID": "00000000-0000-4000-8000-000000000002",
-              "phase": "response.completed",
-              "time": "2026-01-01T00:00:01Z",
-              "request": { "method": "GET", "host": "example.com", "path": "/synthetic" },
-              "response": { "status": 503 }
-            }
-            """
+            case .requestEnter, .requestLeave, .responseEnter, .responseLeave:
+                let response = hook == .responseEnter || hook == .responseLeave
+                return """
+                {
+                  "id": "00000000-0000-4000-8000-000000000002",
+                  "phase": "\(hook.rawValue)",
+                  "request": { "method": "POST", "host": "example.com", "path": "/synthetic", "headers": {}, "body": {"limit": 20} }\(response ? ",\n  \"response\": {\"status\": 200, \"headers\": {}, \"body\": {\"maintenance\": false}}" : "")
+                }
+                """
+            case .request:
+                return """
+                {
+                  "id": "00000000-0000-4000-8000-000000000001",
+                  "exchangeID": "00000000-0000-4000-8000-000000000002",
+                  "phase": "request.completed",
+                  "time": "2026-01-01T00:00:00Z",
+                  "request": { "method": "GET", "host": "example.com", "path": "/synthetic" }
+                }
+                """
+            case .response:
+                return """
+                {
+                  "id": "00000000-0000-4000-8000-000000000003",
+                  "exchangeID": "00000000-0000-4000-8000-000000000002",
+                  "phase": "response.completed",
+                  "time": "2026-01-01T00:00:01Z",
+                  "request": { "method": "GET", "host": "example.com", "path": "/synthetic" },
+                  "response": { "status": 503 }
+                }
+                """
         }
     }
 
@@ -45,7 +54,8 @@ struct ValidatedAction: Equatable, Identifiable {
     static func parse(_ data: Data) throws -> [ValidatedAction] {
         guard data.count <= JavaScriptLimits.maxResultBytes,
               let root = try? JSONValue(parsing: data), let object = root.objectValue, Set(object.keys) == ["actions"],
-              let actions = object["actions"]?.arrayValue, actions.count <= JavaScriptLimits.maxActions else {
+              let actions = object["actions"]?.arrayValue, actions.count <= JavaScriptLimits.maxActions
+        else {
             throw JavaScriptExecutionError.invalidResult
         }
         return try actions.enumerated().map { index, action in

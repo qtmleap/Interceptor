@@ -12,7 +12,7 @@ permissions:
 
 env:
   # Keep simulator verification and the signing build on the same package commit.
-  MUDMOUTH_REV: dddd2cb92fc67e414517dd316de33f6f2c6a9f4c
+  MUDMOUTH_REV: 65686d24858822627f674d8b9a22aaaa3b026812
 
 concurrency:
   # Every develop push must reach the deployment queue. PR runs still supersede
@@ -91,7 +91,7 @@ jobs:
           echo "PLL_SOURCE_PACKAGES_PATH=$RUNNER_TEMP/SourcePackages" >> "$GITHUB_ENV"
           simulator_set="$HOME/Library/Developer/CoreSimulator/Devices"
           export CI_SIMULATOR_DEVICE_SET="$simulator_set"
-          python3 -c 'import pathlib; [compile(p.read_text(), str(p), "exec") for p in map(pathlib.Path, ["scripts/ci-simulator-cleanup.py", "scripts/ci-simulator-start-worker.py"])]'
+          python3 -c 'import pathlib; [compile(p.read_text(), str(p), "exec") for p in map(pathlib.Path, ["scripts/ci-simulator-cleanup.py", "scripts/ci-simulator-start-worker.py", "scripts/ci-plugin-repository-fixture.py"])]'
           echo "CI_SIMULATOR_DEVICE_SET=$simulator_set" >> "$GITHUB_ENV"
           hostname > "$RUNNER_TEMP/simulator-host.txt"
           printf '%s\n' "$simulator_set" >> "$RUNNER_TEMP/simulator-host.txt"
@@ -142,7 +142,9 @@ jobs:
         if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') }}
         run: |
           set -o pipefail
-          NSUnbufferedIO=YES python3 scripts/ci-simulator-start-worker.py xcodebuild test \
+          python3 -m unittest discover -s scripts/tests -p test_plugin_repository_fixture.py -v
+          NSUnbufferedIO=YES python3 scripts/ci-simulator-start-worker.py python3 scripts/ci-plugin-repository-fixture.py \
+            --work-dir "$RUNNER_TEMP/plugin-repository-fixture" -- xcodebuild test \
             -project Interceptor.xcodeproj -scheme Interceptor \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UUID" \
             -destination-timeout 60 \
@@ -207,6 +209,8 @@ jobs:
             ${{ runner.temp }}/simulator-host.txt
             ${{ runner.temp }}/simulators-before.json
             ${{ runner.temp }}/simulator-processes-before.txt
+            ${{ runner.temp }}/plugin-repository-fixture/fixture-run.json
+            ${{ runner.temp }}/plugin-repository-fixture/public/
           if-no-files-found: ignore
           retention-days: 7
 

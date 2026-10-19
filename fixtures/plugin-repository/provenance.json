@@ -1,0 +1,36 @@
+{
+  "authoredInputs": {
+    "authored/plugins/live-multifile/hooks/api.example.com/other/POST.ts": "e0c8036571ed129f0e278fee2acc4874664c77e74eba5c55fc73ef4e3d70c07a",
+    "authored/plugins/live-multifile/hooks/api.example.com/search/POST.ts": "e10b32ecb7cf5a3c4f4a93361181722b394c31f174173f28552b175dff6de7a2",
+    "authored/plugins/live-multifile/plugin.json": "e6c1449d3f8eedb836d4f7b774fd5eecd0366ce8d6630c8e04e7b88b4e0d464e",
+    "authored/plugins/ui-multifile/hooks/example.com/other/GET.ts": "d7768530939909ae9051ffb364d91e13323e694b9a966acd1e1bce58955eb8ab",
+    "authored/plugins/ui-multifile/hooks/example.com/synthetic/POST.ts": "a4954cab4684d4a5bcb7045a516216db7cf734687ef377c6811d5eea2ec90947",
+    "authored/plugins/ui-multifile/plugin.json": "247310515830ec431cdf333d4ff5cd2333c4158bfd94bce9bd1ba5856181d240"
+  },
+  "bunVersion": "1.3.6",
+  "command": "python3 scripts/generate-plugin-test-fixtures.py --sdk-root /path/to/Interceptor-Plugins",
+  "compilerEntryPoint": "tools/compile.mjs",
+  "packages": {
+    "multi-file-hooks.json": {
+      "sha256": "6f007a8e930949b7e0094b59b17cbfb82128eaf196156edd9901495f543440fa",
+      "size": 1628
+    },
+    "sdk-live-multi-file-hooks.json": {
+      "sha256": "d767abccbfa13ba1a381f12cb706c77b98e98a2121737647bb22203b62622d10",
+      "size": 2392
+    }
+  },
+  "schemaVersion": 1,
+  "sdkInputs": {
+    ".bun-version": "f4eaae07c72dd003028a4583ee93e5146e4fb2e5ba80566d3e79d73edd39ee36",
+    "bun.lock": "0ee70bb1b86ca5a5940080a89fb3b3cc0793e9f05e121c08daea40440c8322ee",
+    "package.json": "b721a3ccb91fbe9916a31296970166036d84b37b8a45456d1a34f9e9c4672bd0",
+    "tools/compile.mjs": "135058f8bdbed1192a09050d1110e74ae5386b8c21e6ead9daac8533de3dd7e1",
+    "tools/discover_routes.py": "1c324f8ecca3f2c7005de68145a2734a687481594d6698d76b98c20e2ea1a0c8",
+    "tools/repository_config.py": "6580c3f7ee8dc2ca3ffb4a9390485376fcb253107cb98ed4306e5cd2bd727135",
+    "tools/route_sources.py": "9db30d0d01e8eb1555f808a804336729d130968a5cd0bdd988b65d182bf676c0",
+    "types/interceptor.d.ts": "b41a8ee26367b9b17cbb8a52a695d87dc36d8982fc843e57b9b45ad1d39aea01"
+  },
+  "sdkRepository": "https://github.com/qtmleap/Interceptor-Plugins",
+  "sdkRevision": "4653e66399adceafb43e32043650041993951dfb"
+}

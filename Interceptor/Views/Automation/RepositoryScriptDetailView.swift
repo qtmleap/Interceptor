@@ -33,12 +33,18 @@ struct RepositoryScriptDetailView: View {
             if model.phase == .fetching {
                 Section { ProgressView().accessibilityIdentifier("repo.script.loading") }
             }
-            if let package = model.package { review(package) }
+            if let package = model.package {
+                review(package)
+            }
         }
         .accessibilityIdentifier("repo.script.list")
         .navigationTitle(Text(verbatim: entry.name))
         .navigationBarTitleDisplayMode(.inline)
-        .task { if model.package == nil, model.phase == .idle, model.error == nil { model.select(entry) } }
+        .task {
+            if model.package == nil, model.phase == .idle, model.error == nil {
+                model.select(entry)
+            }
+        }
         .onDisappear { model.close() }
         .tint(Color("PluginAccent"))
     }
@@ -62,10 +68,20 @@ struct RepositoryScriptDetailView: View {
                 .padding(.vertical, 8)
             }
         } header: { Text("AUTO_SIGNATURE") } footer: { Text("AUTO_SIGNATURE_FOOTER") }
-        .accessibilityIdentifier("repo.script.signature")
+            .accessibilityIdentifier("repo.script.signature")
         ScriptTargetsSection(manifest: package.manifest)
         Section("AUTO_SOURCE") {
-            PluginSourceViewer(source: package.source)
+            if let source = package.source {
+                PluginSourceViewer(source: source)
+            } else {
+                ForEach(package.sourceFiles.keys.sorted(), id: \.self) { file in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(verbatim: file).font(.system(.footnote, design: .monospaced))
+                            .textSelection(.enabled)
+                        PluginSourceViewer(source: package.sourceFiles[file] ?? "")
+                    }
+                }
+            }
         }
         Section {
             DisclosureGroup("AUTO_DECLARED_MANIFEST") {
@@ -88,12 +104,12 @@ struct RepositoryScriptDetailView: View {
 
     @ViewBuilder private var signatureLabel: some View {
         switch model.record.trust {
-        case .pinned:
-            Label("AUTO_SIG_PINNED", systemImage: "checkmark.seal").foregroundStyle(AutomationStatusColor.ok)
-        case .signedUnverified:
-            Label("AUTO_SIG_UNVERIFIED_KEY", systemImage: "questionmark.seal").foregroundStyle(AutomationStatusColor.warning)
-        case .unsignedAcknowledged:
-            Label("AUTO_SIG_UNSIGNED", systemImage: "exclamationmark.triangle").foregroundStyle(AutomationStatusColor.warning)
+            case .pinned:
+                Label("AUTO_SIG_PINNED", systemImage: "checkmark.seal").foregroundStyle(AutomationStatusColor.ok)
+            case .signedUnverified:
+                Label("AUTO_SIG_UNVERIFIED_KEY", systemImage: "questionmark.seal").foregroundStyle(AutomationStatusColor.warning)
+            case .unsignedAcknowledged:
+                Label("AUTO_SIG_UNSIGNED", systemImage: "exclamationmark.triangle").foregroundStyle(AutomationStatusColor.warning)
         }
     }
 }

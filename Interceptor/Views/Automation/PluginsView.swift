@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-/// Settings > Plugins. Repositories and scripts; nothing here enables, captures or sends anything.
+/// Settings > Plugins. Imports stay inactive; a detail screen can explicitly approve one revision.
 struct PluginsView: View {
     @State private var controller = AutomationController.live()
     @State private var showAddRepository = false
@@ -14,8 +14,8 @@ struct PluginsView: View {
         case script(InstalledRevision), repository(RepositoryRecord)
         var id: String {
             switch self {
-            case .script(let r): "s" + r.id
-            case .repository(let r): "r" + r.url.canonical
+                case let .script(r): "s" + r.id
+                case let .repository(r): "r" + r.url.canonical
             }
         }
     }
@@ -33,8 +33,14 @@ struct PluginsView: View {
                 Section { Text(LocalizedStringKey(AutomationErrorText.key(for: error))).foregroundStyle(AutomationStatusColor.error) }
                     .accessibilityIdentifier("plugins.error")
             }
+            if let key = controller.activationErrorKey {
+                Section { Text(LocalizedStringKey(key)).foregroundStyle(AutomationStatusColor.error) }
+                    .accessibilityIdentifier("plugins.activationError")
+            }
             Section {
-                if controller.repositories.isEmpty { Text("AUTO_REPOSITORIES_EMPTY").foregroundStyle(.secondary) }
+                if controller.repositories.isEmpty {
+                    Text("AUTO_REPOSITORIES_EMPTY").foregroundStyle(.secondary)
+                }
                 ForEach(controller.repositories, id: \.url) { record in
                     NavigationLink {
                         RepositoryDetailView(model: RepositoryDetailModel(controller: controller, record: record))
@@ -49,7 +55,9 @@ struct PluginsView: View {
                 }
             } header: { Text("AUTO_REPOSITORIES") }
             Section {
-                if controller.scripts.isEmpty { Text("AUTO_SCRIPTS_EMPTY").foregroundStyle(.secondary) }
+                if controller.scripts.isEmpty {
+                    Text("AUTO_SCRIPTS_EMPTY").foregroundStyle(.secondary)
+                }
                 ForEach(controller.scripts, id: \.id) { revision in
                     NavigationLink {
                         ScriptDetailView(session: ScriptSession(controller: controller, revision: revision))
@@ -84,24 +92,32 @@ struct PluginsView: View {
         }
         .sheet(isPresented: $showAddRepository) { AddRepositorySheet(controller: controller) }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
-            guard case .success(let url) = result else { return }
+            guard case let .success(url) = result else { return }
             let scoped = url.startAccessingSecurityScopedResource()
-            Task { await controller.importFile(at: url); if scoped { url.stopAccessingSecurityScopedResource() } }
+            Task {
+                await controller.importFile(at: url); if scoped {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
         }
-        .confirmationDialog("AUTO_DELETE_TITLE", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-                            titleVisibility: .visible, presenting: pendingDelete) { item in
+        .confirmationDialog("AUTO_DELETE_TITLE", isPresented: Binding(get: { pendingDelete != nil }, set: {
+            if !$0 {
+                pendingDelete = nil
+            }
+        }),
+        titleVisibility: .visible, presenting: pendingDelete) { item in
             Button("Delete", role: .destructive) {
                 Task {
                     switch item {
-                    case .script(let r): await controller.deleteScript(id: r.id)
-                    case .repository(let r): await controller.deleteRepository(r.url)
+                        case let .script(r): await controller.deleteScript(id: r.id)
+                        case let .repository(r): await controller.deleteRepository(r.url)
                     }
                 }
             }
         } message: { item in
             switch item {
-            case .script: Text("AUTO_DELETE_SCRIPT_MESSAGE")
-            case .repository: Text("AUTO_DELETE_REPOSITORY_MESSAGE")
+                case .script: Text("AUTO_DELETE_SCRIPT_MESSAGE")
+                case .repository: Text("AUTO_DELETE_REPOSITORY_MESSAGE")
             }
         }
         .task { await controller.load() }
@@ -118,9 +134,9 @@ struct TrustBadgeLabel: View {
 
     private var statusColor: Color {
         switch badge {
-        case .publisherKeyVerified: AutomationStatusColor.ok
-        case .unsigned, .signedKeyUnverified: AutomationStatusColor.warning
-        case .localEdit, .localFile: .secondary
+            case .publisherKeyVerified: AutomationStatusColor.ok
+            case .unsigned, .signedKeyUnverified: AutomationStatusColor.warning
+            case .localEdit, .localFile: .secondary
         }
     }
 }
@@ -149,10 +165,11 @@ struct HashText: UIViewRepresentable {
         paragraph.hyphenationFactor = 0
         paragraph.lineBreakStrategy = []
         let baseSize = UIFont.preferredFont(forTextStyle: .footnote,
-            compatibleWith: UITraitCollection(preferredContentSizeCategory: .large)).pointSize
+                                            compatibleWith: UITraitCollection(preferredContentSizeCategory: .large)).pointSize
         let font = UIFontMetrics(forTextStyle: .footnote).scaledFont(
             for: UIFont.monospacedSystemFont(ofSize: baseSize, weight: .regular),
-            compatibleWith: view.traitCollection)
+            compatibleWith: view.traitCollection,
+        )
         view.attributedText = NSAttributedString(string: value, attributes: [
             .font: font,
             .foregroundColor: UIColor.label,

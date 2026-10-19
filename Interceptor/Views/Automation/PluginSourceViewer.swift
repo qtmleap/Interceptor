@@ -4,21 +4,27 @@ import TreeSitterJavaScriptRunestone
 
 /// Read-only, syntax-highlighted package source. The text is shown exactly as downloaded.
 struct PluginSourceViewer: View {
-    let source: String
+    private let sourceUTF8: [UInt8]
     @ScaledMetric(relativeTo: .body) private var lineHeight: CGFloat = 17 * 1.3
+
+    init(source: String) {
+        sourceUTF8 = Array(source.utf8)
+    }
 
     var body: some View {
         // Approximate natural height by newline count, bounded so short scripts stay compact and large ones scroll.
-        let lines = CGFloat(source.utf8.reduce(1) { $1 == 0x0A ? $0 + 1 : $0 })
+        let lines = CGFloat(sourceUTF8.reduce(1) { $1 == 0x0A ? $0 + 1 : $0 })
         let height = min(max(lines * lineHeight + 24, 120), 320)
-        PluginSourceViewerRepresentable(text: source).frame(height: height)
+        PluginSourceViewerRepresentable(sourceUTF8: sourceUTF8).frame(height: height)
     }
 }
 
 private struct PluginSourceViewerRepresentable: UIViewRepresentable {
-    let text: String
+    let sourceUTF8: [UInt8]
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeUIView(context: Context) -> TextView {
         let view = TextView()
@@ -43,15 +49,15 @@ private struct PluginSourceViewerRepresentable: UIViewRepresentable {
     /// Rebuilds the state only when the source or the content size category changed.
     private func apply(to view: TextView, coordinator: Coordinator) {
         let category = view.traitCollection.preferredContentSizeCategory
-        guard coordinator.text != text || coordinator.category != category else { return }
-        coordinator.text = text
+        guard coordinator.sourceUTF8 != sourceUTF8 || coordinator.category != category else { return }
+        coordinator.sourceUTF8 = sourceUTF8
         coordinator.category = category
         let theme = ScaledCodeTheme(contentSizeCategory: category)
-        view.setState(TextViewState(text: text, theme: theme, language: .javaScript))
+        view.setState(TextViewState(text: String(decoding: sourceUTF8, as: UTF8.self), theme: theme, language: .javaScript))
     }
 
     final class Coordinator {
-        var text: String?
+        var sourceUTF8: [UInt8]?
         var category: UIContentSizeCategory?
     }
 }

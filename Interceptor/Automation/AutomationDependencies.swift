@@ -18,6 +18,8 @@ protocol AutomationStoring: Sendable {
     func install(_ package: PluginPackage, from snapshot: VerifiedSnapshot, expectedGeneration: UUID, now: Date) async throws -> InstalledRevision
     func importLocal(_ bytes: Data) async throws -> InstalledRevision
     func editSource(of revisionID: String, to source: String) async throws -> InstalledRevision
+    func editSource(of revisionID: String, file: String, to source: String) async throws -> InstalledRevision
+    func editSources(of revisionID: String, to sources: [String: String]) async throws -> InstalledRevision
     func deleteRevision(_ revisionID: String) async throws
 }
 
@@ -28,7 +30,14 @@ protocol RepositoryFetching: Sendable {
 
 protocol ScriptRunning: AnyObject, Sendable {
     func run(source: String, hook: JavaScriptHook, eventJSON: Data, configJSON: Data) async throws -> Data
+    func runV2(packageJSON: Data, hook: JavaScriptHook, eventJSON: Data, configJSON: Data) async throws -> Data
     func cancel()
+}
+
+extension ScriptRunning {
+    func runV2(packageJSON: Data, hook: JavaScriptHook, eventJSON: Data, configJSON: Data) async throws -> Data {
+        throw JavaScriptExecutionError.invalidInput
+    }
 }
 
 extension AutomationStore: AutomationStoring {}

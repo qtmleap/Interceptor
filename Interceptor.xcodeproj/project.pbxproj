@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A16C00000000000000000028 /* NIOCore in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000026 /* NIOCore */; };
+		A16C00000000000000000029 /* NIOHTTP1 in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000027 /* NIOHTTP1 */; };
+		A16C00000000000000000020 /* MudmouthHTTPHooks in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000019 /* MudmouthHTTPHooks */; };
+		A16C00000000000000000021 /* MudmouthHTTPHooks in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000019 /* MudmouthHTTPHooks */; };
+		A16C00000000000000000016 /* AutomationCore in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000002 /* AutomationCore */; };
+		A16C00000000000000000017 /* AutomationRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000004 /* AutomationRuntime */; };
+		A16C00000000000000000018 /* MudmouthHTTPHooks in Frameworks */ = {isa = PBXBuildFile; productRef = A16C00000000000000000019 /* MudmouthHTTPHooks */; };
 		104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 104F3BAE2E49131900A2D6F1 /* Mudmouth */; };
 		104F3BB22E49135800A2D6F1 /* Mudmouth in Frameworks */ = {isa = PBXBuildFile; productRef = 104F3BB12E49135800A2D6F1 /* Mudmouth */; };
 		1089BCFA2E5239CA0088488B /* TreeSitterJSON in Frameworks */ = {isa = PBXBuildFile; productRef = 1089BCF92E5239CA0088488B /* TreeSitterJSON */; };
@@ -95,6 +102,9 @@
 			membershipExceptions = (
 				Localizable.xcstrings,
 				Structs/CaptureHostList.swift,
+				Automation/AutomationSharedConfiguration.swift,
+				Automation/HTTPPluginProcessor.swift,
+				Automation/TunnelAuthorizationMonitor.swift,
 			);
 			target = 10F701B82E491546006ECDD2 /* PacketTunnel */;
 		};
@@ -138,6 +148,7 @@
 				A16C00000000000000000010 /* AutomationCore in Frameworks */,
 				A16C00000000000000000012 /* AutomationRepository in Frameworks */,
 				A16C00000000000000000014 /* AutomationRuntime in Frameworks */,
+				A16C00000000000000000020 /* MudmouthHTTPHooks in Frameworks */,
 				10925F5D2E4CFA25003611AA /* QuantumLeap in Frameworks */,
 				10B520E52E52A344006C2045 /* TreeSitterJavaScript in Frameworks */,
 				104F3BAF2E49131900A2D6F1 /* Mudmouth in Frameworks */,
@@ -156,9 +167,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A16C00000000000000000028 /* NIOCore in Frameworks */,
+				A16C00000000000000000029 /* NIOHTTP1 in Frameworks */,
 				A16C00000000000000000011 /* AutomationCore in Frameworks */,
 				A16C00000000000000000013 /* AutomationRepository in Frameworks */,
 				A16C00000000000000000015 /* AutomationRuntime in Frameworks */,
+				A16C00000000000000000021 /* MudmouthHTTPHooks in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -174,6 +188,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				10F701BC2E491546006ECDD2 /* NetworkExtension.framework in Frameworks */,
+				A16C00000000000000000016 /* AutomationCore in Frameworks */,
+				A16C00000000000000000017 /* AutomationRuntime in Frameworks */,
+				A16C00000000000000000018 /* MudmouthHTTPHooks in Frameworks */,
 				10F701CB2E491567006ECDD2 /* Mudmouth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -237,6 +254,7 @@
 				A16C00000000000000000002 /* AutomationCore */,
 				A16C00000000000000000003 /* AutomationRepository */,
 				A16C00000000000000000004 /* AutomationRuntime */,
+				A16C00000000000000000019 /* MudmouthHTTPHooks */,
 				104F3BAE2E49131900A2D6F1 /* Mudmouth */,
 				104F3BB12E49135800A2D6F1 /* Mudmouth */,
 				10925F5C2E4CFA25003611AA /* QuantumLeap */,
@@ -271,9 +289,12 @@
 			);
 			name = InterceptorTests;
 			packageProductDependencies = (
+				A16C00000000000000000026 /* NIOCore */,
+				A16C00000000000000000027 /* NIOHTTP1 */,
 				A16C00000000000000000002 /* AutomationCore */,
 				A16C00000000000000000003 /* AutomationRepository */,
 				A16C00000000000000000004 /* AutomationRuntime */,
+				A16C00000000000000000019 /* MudmouthHTTPHooks */,
 			);
 			productName = InterceptorTests;
 			productReference = 104F3B8E2E49099300A2D6F1 /* InterceptorTests.xctest */;
@@ -320,6 +341,9 @@
 			name = PacketTunnel;
 			packageProductDependencies = (
 				10F701CA2E491567006ECDD2 /* Mudmouth */,
+				A16C00000000000000000002 /* AutomationCore */,
+				A16C00000000000000000004 /* AutomationRuntime */,
+				A16C00000000000000000019 /* MudmouthHTTPHooks */,
 			);
 			productName = "packet-tunnel";
 			productReference = 10F701B92E491546006ECDD2 /* PacketTunnel.appex */;
@@ -363,6 +387,7 @@
 			mainGroup = 104F3B782E49099100A2D6F1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A16C00000000000000000025 /* XCRemoteSwiftPackageReference "swift-nio" */,
 				A16C00000000000000000001 /* XCLocalSwiftPackageReference "Packages/InterceptorAutomation" */,
 				104F3BB02E49135800A2D6F1 /* XCLocalSwiftPackageReference "../Mudmouth" */,
 				10925F5B2E4CFA25003611AA /* XCRemoteSwiftPackageReference "QuantumLeap" */,
@@ -860,6 +885,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A16C00000000000000000025 /* XCRemoteSwiftPackageReference "swift-nio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-nio.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.86.0;
+			};
+		};
 		1089BCF82E5239CA0088488B /* XCRemoteSwiftPackageReference "treesitterlanguages" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/simonbs/treesitterlanguages";
@@ -887,6 +920,9 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A16C00000000000000000026 /* NIOCore */ = {isa = XCSwiftPackageProductDependency; package = A16C00000000000000000025 /* XCRemoteSwiftPackageReference "swift-nio" */; productName = NIOCore; };
+		A16C00000000000000000027 /* NIOHTTP1 */ = {isa = XCSwiftPackageProductDependency; package = A16C00000000000000000025 /* XCRemoteSwiftPackageReference "swift-nio" */; productName = NIOHTTP1; };
+		A16C00000000000000000019 /* MudmouthHTTPHooks */ = {isa = XCSwiftPackageProductDependency; package = 104F3BB02E49135800A2D6F1 /* XCLocalSwiftPackageReference "../Mudmouth" */; productName = MudmouthHTTPHooks; };
 		104F3BAE2E49131900A2D6F1 /* Mudmouth */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Mudmouth;
