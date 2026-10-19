@@ -48,7 +48,10 @@ struct ScriptDetailView: View {
                 if let key = session.saveErrorKey {
                     Text(LocalizedStringKey(key)).foregroundStyle(AutomationStatusColor.error)
                 }
-            } header: { Text("AUTO_SOURCE") } footer: { Text(LocalizedStringKey(session.isV2 ? "AUTO_SAVE_PACKAGE_FOOTER" : "AUTO_SAVE_FOOTER")) }
+            } header: { Text("AUTO_SOURCE") } footer: {
+                Text(LocalizedStringKey(session.isV2 ? "AUTO_SAVE_PACKAGE_FOOTER" : "AUTO_SAVE_FOOTER"))
+                    .accessibilityIdentifier("script.saveGuidance")
+            }
             Section {
                 if session.isV2 {
                     Picker("AUTO_HOOK", selection: $session.hook) {

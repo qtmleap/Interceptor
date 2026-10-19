@@ -249,6 +249,14 @@ final class AutomationUITests: XCTestCase {
             selectSourceFile(Self.secondaryFile, app: app)
             assertSource(editor, equals: secondEdit)
             attach(app, "Multi-file drafts retained \(locale)")
+            let guidance = app.descendants(matching: .any).matching(identifier: "script.saveGuidance").firstMatch
+            reach(guidance, in: form)
+            if !visibleFormFrame(form).contains(guidance.frame) {
+                form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.8))
+                    .press(forDuration: 0.05, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.6)))
+            }
+            XCTAssertTrue(visibleFormFrame(form).contains(guidance.frame), "the complete save and reapproval guidance must be visible")
+            attach(app, "Multi-file save guidance \(locale)")
             XCTAssertTrue(app.buttons["script.save"].isEnabled)
             app.buttons["script.save"].tap()
             let run = reach(app.buttons["script.run"], in: form)
