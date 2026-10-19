@@ -20,7 +20,7 @@ let package = Package(
         .target(name: "AutomationRuntime", dependencies: ["CQuickJS", "AutomationCore"]),
         .target(name: "AutomationRepository", dependencies: ["AutomationCore"]),
         .testTarget(name: "AutomationRepositoryTests", dependencies: ["AutomationRepository", "AutomationCore"]),
-        .testTarget(name: "AutomationRuntimeTests", dependencies: ["AutomationRuntime", "AutomationCore"]),
+        .testTarget(name: "AutomationRuntimeTests", dependencies: ["AutomationRuntime", "AutomationCore", "CQuickJS"]),
         .testTarget(name: "AutomationCoreTests", dependencies: ["AutomationCore"]),
     ],
     cLanguageStandard: .gnu11

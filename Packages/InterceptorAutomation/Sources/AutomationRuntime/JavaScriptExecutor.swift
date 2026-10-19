@@ -6,12 +6,25 @@ import Foundation
 public enum JavaScriptHook: String, Sendable, CaseIterable {
     case request
     case response
+    case requestEnter = "request.onEnter"
+    case requestLeave = "request.onLeave"
+    case responseEnter = "response.onEnter"
+    case responseLeave = "response.onLeave"
 
-    /// Global function name the script must define for this hook.
+    /// Global function name the script must define for this hook (legacy v1 hooks only).
     public var functionName: String {
         switch self {
         case .request: return "onRequest"
         case .response: return "onResponse"
+        case .requestEnter, .requestLeave, .responseEnter, .responseLeave: return rawValue
+        }
+    }
+
+    /// The four dotted lifecycle phases run through `JavaScriptExecutor.runV2` only.
+    public var isLifecyclePhase: Bool {
+        switch self {
+        case .request, .response: return false
+        case .requestEnter, .requestLeave, .responseEnter, .responseLeave: return true
         }
     }
 }
@@ -40,6 +53,7 @@ public enum JavaScriptLimits {
     public static let maxResultBytes = 32 * 1024
     public static let maxResultDepth = 32
     public static let maxActions = 2
+    public static let maxManifestBytes = 32 * 1024
 }
 
 /// One admitted invocation. Owns the native cancel token for exactly its lifetime: the token is
@@ -85,11 +99,16 @@ public final class JavaScriptExecutor: @unchecked Sendable {
 
     public func run(source: String, hook: JavaScriptHook, eventJSON: Data, configJSON: Data) async throws -> Data {
         // Cheap caps first; the bridge re-checks everything (including UTF-8, NUL and JSON shape).
-        guard source.utf8.count <= JavaScriptLimits.maxSourceBytes,
+        guard !hook.isLifecyclePhase,
+              source.utf8.count <= JavaScriptLimits.maxSourceBytes,
               eventJSON.count <= JavaScriptLimits.maxEventBytes,
               configJSON.count <= JavaScriptLimits.maxConfigBytes else {
             throw JavaScriptExecutionError.invalidInput
         }
+        return try await admitAndRun(source: source, hookName: hook.functionName, event: eventJSON, config: configJSON, manifest: nil)
+    }
+
+    private func admitAndRun(source: String, hookName: String, event: Data, config: Data, manifest: Data?) async throws -> Data {
         if Task.isCancelled { throw JavaScriptExecutionError.cancelled }
         guard let job = Job() else { throw JavaScriptExecutionError.internalFailure }
         guard admit(job) else {
@@ -97,12 +116,11 @@ public final class JavaScriptExecutor: @unchecked Sendable {
             throw JavaScriptExecutionError.busy
         }
         let sourceBytes = Array(source.utf8)
-        let hookName = hook.functionName
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
                 queue.async {
                     let outcome = Result { try Self.execute(job: job, source: sourceBytes, hook: hookName,
-                                                           event: eventJSON, config: configJSON) }
+                                                           event: event, config: config, manifest: manifest) }
                     // Release admission before resuming so the caller can immediately run again.
                     self.release(job)
                     continuation.resume(with: outcome)
@@ -112,6 +130,23 @@ public final class JavaScriptExecutor: @unchecked Sendable {
             job.cancel()
         }
     }
+
+
+    /// Four-phase HTTP lifecycle entry (`qjs_run_v2`). Same admission, limits and fresh-VM guarantees
+    /// as `run`; `manifestJSON` (<= 32 KiB) is the full strict schemaVersion 2 manifest and `eventJSON` the public
+    /// envelope. The C entry revalidates both and filters the callback views by the manifest read grants.
+    public func runV2(source: String, hook: JavaScriptHook, eventJSON: Data, configJSON: Data, manifestJSON: Data) async throws -> Data {
+        guard hook.isLifecyclePhase,
+              source.utf8.count <= JavaScriptLimits.maxSourceBytes,
+              eventJSON.count <= JavaScriptLimits.maxEventBytes,
+              configJSON.count <= JavaScriptLimits.maxConfigBytes,
+              manifestJSON.count <= JavaScriptLimits.maxManifestBytes else {
+            throw JavaScriptExecutionError.invalidInput
+        }
+        return try await admitAndRun(source: source, hookName: hook.functionName, event: eventJSON, config: configJSON,
+                                     manifest: manifestJSON)
+    }
+
 
     /// Cancels the currently admitted invocation, if any. Idle calls must not affect later runs.
     public func cancel() {
@@ -136,11 +171,14 @@ public final class JavaScriptExecutor: @unchecked Sendable {
         lock.unlock()
     }
 
-    private static func execute(job: Job, source: [UInt8], hook: String, event: Data, config: Data) throws -> Data {
+    private static func execute(job: Job, source: [UInt8], hook: String, event: Data, config: Data, manifest: Data?) throws -> Data {
         // Run strict parsing on the worker queue, before JS can discard duplicate keys.
         do {
             guard case .object = try JSONValue(parsing: event),
                   case .object = try JSONValue(parsing: config) else {
+                throw JavaScriptExecutionError.invalidInput
+            }
+            if let manifest, case .object = try JSONValue(parsing: manifest) {} else if manifest != nil {
                 throw JavaScriptExecutionError.invalidInput
             }
         } catch { throw JavaScriptExecutionError.invalidInput }
@@ -158,11 +196,15 @@ public final class JavaScriptExecutor: @unchecked Sendable {
         var result = source.withUnsafeBufferPointer { src in
             event.withUnsafeBytes { ev in
                 config.withUnsafeBytes { cfg in
-                    qjs_run(token, &limits,
-                            src.baseAddress, src.count,
-                            hook,
-                            ev.baseAddress?.assumingMemoryBound(to: UInt8.self), ev.count,
-                            cfg.baseAddress?.assumingMemoryBound(to: UInt8.self), cfg.count)
+                    let evp = ev.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                    let cfgp = cfg.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                    guard let manifest else {
+                        return qjs_run(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count)
+                    }
+                    return manifest.withUnsafeBytes { man in
+                        qjs_run_v2(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count,
+                                   man.baseAddress?.assumingMemoryBound(to: UInt8.self), man.count)
+                    }
                 }
             }
         }

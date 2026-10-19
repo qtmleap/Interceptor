@@ -111,7 +111,7 @@ final class JavaScriptExecutorTests: XCTestCase, @unchecked Sendable {
 
     func testLexicalHandlersWorkForBothHooks() async throws {
         for declaration in ["const", "let", "var"] {
-            for hook in JavaScriptHook.allCases {
+            for hook in [JavaScriptHook.request, .response] {
                 let result = try await actions(run("\(declaration) \(hook.functionName) = (event, config) => ({actions:[]});", hook: hook))
                 XCTAssertTrue(result.isEmpty)
             }

@@ -52,6 +52,28 @@ void qjs_cancel_token_free(QJSCancelToken *token) {
 
 // MARK: run state, budget
 
+#define MAX_REGS 16
+
+typedef struct { char *s; size_t n; } Str;
+
+// Canonical form of one match: string sets are sorted and duplicate-free so equality is exact.
+typedef struct {
+    Str *hosts;
+    size_t nhosts;
+    Str *methods;
+    size_t nmethods;
+    int has_methods;
+    int path_kind;   // 0 none, 1 exact, 2 prefix
+    Str path;
+    int has_status;
+    int lo, hi;
+} Match;
+
+typedef struct {
+    int match;      // index of the declared manifest match this registration equals
+    JSValue cb;     // callback for the invoked phase, or JS_UNDEFINED
+} Reg;
+
 typedef struct RunState {
     QJSCancelToken *token;
     uint64_t deadline_ns;
@@ -59,6 +81,23 @@ typedef struct RunState {
     int oom;    // allocator refused (limit or malloc failure)
     JSClassID cls_object;
     JSClassID cls_array;
+    // v2 only: registrations made by Interceptor.attach while the source is evaluated.
+    int sealed;          // set once the source has been evaluated; later attach calls fail
+    int attach_failed;   // sticky: any invalid or surplus registration fails the whole execution
+    int nregs;
+    Reg regs[MAX_REGS];
+    int phase_leg;       // 0 request, 1 response
+    int phase_kind;      // 0 enter, 1 leave
+    int ndecl;           // declared manifest matches parsed so far
+    Match decl[MAX_REGS];
+    // v2 only: manifest read grants (header names lowercased), applied while building the event views.
+    unsigned read_meta;  // 1 method, 2 host, 4 status, 8 path
+    Str *rd_headers;
+    size_t n_rd_headers;
+    Str *rd_query;
+    size_t n_rd_query;
+    int read_body_json;
+    int body_writable;   // enter phase with the manifest write grant for the invoked leg
 } RunState;
 
 static uint64_t now_ns(void) {
@@ -478,6 +517,7 @@ typedef struct {
     unsigned nodes;
     int max_depth;
     size_t max_actions;
+    size_t nactions;   // actions emitted so far (v2 accumulates across callbacks)
 } V;
 
 static int v_fail(V *v) {
@@ -934,6 +974,1075 @@ cleanup:
     free(src);
     free(ev);
     free(cfg);
+    res.status = status;
+    return res;
+}
+
+// MARK: v2: four HTTP lifecycle phases
+//
+// `qjs_run_v2` shares the limits, allocator, scanner and result serializer above. In addition:
+//  * `Interceptor.attach(match, callbacks)` is a native function installed before user code. Every
+//    registration is read with own-data-property descriptors only (no getters, no Proxy, no
+//    prototype lookups) and must equal one match declared in the manifest, otherwise the whole
+//    execution fails, even if the script catches the TypeError. All registrations are checked while
+//    the source is evaluated, before any callback is invoked.
+//  * Matching uses the UNFILTERED request method/host/path and response status of the public event
+//    envelope and the declared match, never
+//    anything the script can influence. Only callbacks of the invoked phase whose declared match
+//    accepts the identity are called, each with (own leg, config).
+//  * The only possible mutation is the JSON `body` of the invoked leg, for an enter phase whose
+//    write grant is declared in the manifest. The final tree is compared with the canonical form
+//    of the original tree; an unchanged tree yields no mutation at all.
+
+#define BODY_COMPARE_CAP (512u * 1024u)
+#define BODY_COMPARE_DEPTH 64
+
+static void str_free(Str *s) { free(s->s); s->s = NULL; s->n = 0; }
+
+static void strs_free(Str *a, size_t n) {
+    for (size_t i = 0; i < n; i++) str_free(&a[i]);
+    free(a);
+}
+
+static void match_free(Match *m) {
+    strs_free(m->hosts, m->nhosts);
+    strs_free(m->methods, m->nmethods);
+    str_free(&m->path);
+    memset(m, 0, sizeof(*m));
+}
+
+static int str_cmp(const void *a, const void *b) {
+    const Str *x = a, *y = b;
+    size_t n = x->n < y->n ? x->n : y->n;
+    int c = n ? memcmp(x->s, y->s, n) : 0;
+    if (c) return c;
+    return x->n < y->n ? -1 : (x->n > y->n);
+}
+
+static int strs_equal(const Str *a, size_t an, const Str *b, size_t bn) {
+    if (an != bn) return 0;
+    for (size_t i = 0; i < an; i++) if (str_cmp(&a[i], &b[i]) != 0) return 0;
+    return 1;
+}
+
+static int match_equal(const Match *a, const Match *b) {
+    return strs_equal(a->hosts, a->nhosts, b->hosts, b->nhosts) && a->has_methods == b->has_methods &&
+           strs_equal(a->methods, a->nmethods, b->methods, b->nmethods) && a->path_kind == b->path_kind &&
+           (a->path_kind == 0 || str_cmp(&a->path, &b->path) == 0) && a->has_status == b->has_status &&
+           (!a->has_status || (a->lo == b->lo && a->hi == b->hi));
+}
+
+// Enumerable own data property; takes ownership of *out. Never invokes accessors.
+static int own_data(JSContext *ctx, JSValueConst obj, JSAtom atom, JSValue *out) {
+    JSPropertyDescriptor d;
+    if (JS_GetOwnProperty(ctx, &d, obj, atom) <= 0) return 0;
+    int ok = !(d.flags & JS_PROP_GETSET) && (d.flags & JS_PROP_ENUMERABLE);
+    JS_FreeValue(ctx, d.getter);
+    JS_FreeValue(ctx, d.setter);
+    if (!ok) { JS_FreeValue(ctx, d.value); return 0; }
+    *out = d.value;
+    return 1;
+}
+
+static int str_eq(JSContext *ctx, JSValueConst s, const char *lit) {
+    if (!JS_IsString(s)) return 0;
+    size_t n;
+    const char *c = JS_ToCStringLen2(ctx, &n, s, 0);
+    if (!c) return 0;
+    int eq = n == strlen(lit) && memcmp(c, lit, n) == 0;
+    JS_FreeCString(ctx, c);
+    return eq;
+}
+
+// Reads a plain object whose own property names are a subset of `keys` (all enumerable data), with
+// the `required` bit mask present. vals[i] is owned, JS_UNDEFINED when absent. All-or-nothing.
+static int read_obj(RunState *st, JSContext *ctx, JSValueConst obj, const char *const *keys, int n,
+                    unsigned required, JSValue *vals) {
+    for (int i = 0; i < n; i++) vals[i] = JS_UNDEFINED;
+    if (JS_GetClassID(obj) != st->cls_object) return 0;
+    JSPropertyEnum *tab;
+    uint32_t cnt;
+    if (JS_GetOwnPropertyNames(ctx, &tab, &cnt, obj, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) return 0;
+    int ok = 1;
+    unsigned seen = 0;
+    for (uint32_t j = 0; j < cnt && ok; j++) {
+        JSValue kv = JS_AtomToValue(ctx, tab[j].atom);
+        int idx = -1;
+        if (JS_IsString(kv)) {
+            for (int i = 0; i < n; i++) if (str_eq(ctx, kv, keys[i])) idx = i;
+        }
+        JS_FreeValue(ctx, kv);
+        if (idx < 0 || (seen >> idx & 1u)) { ok = 0; break; }
+        JSValue d;
+        if (!own_data(ctx, obj, tab[j].atom, &d)) { ok = 0; break; }
+        vals[idx] = d;
+        seen |= 1u << idx;
+    }
+    JS_FreePropertyEnum(ctx, tab, cnt);
+    if (ok && (seen & required) != required) ok = 0;
+    if (!ok) {
+        for (int i = 0; i < n; i++) { JS_FreeValue(ctx, vals[i]); vals[i] = JS_UNDEFINED; }
+    }
+    return ok;
+}
+
+static int get_str(JSContext *ctx, JSValueConst v, Str *out, size_t max) {
+    if (!JS_IsString(v)) return 0;
+    size_t n;
+    const char *c = JS_ToCStringLen2(ctx, &n, v, 0);
+    if (!c) return 0;
+    int ok = n <= max && memchr(c, 0, n) == NULL && utf8_valid((const uint8_t *)c, n);
+    if (ok) {
+        out->s = malloc(n + 1);
+        if (out->s) { memcpy(out->s, c, n); out->s[n] = 0; out->n = n; } else ok = 0;
+    }
+    JS_FreeCString(ctx, c);
+    return ok;
+}
+
+static int get_int(JSValueConst v, int *out) {
+    if (JS_VALUE_GET_TAG(v) == JS_TAG_INT) { *out = JS_VALUE_GET_INT(v); return 1; }
+    if (JS_VALUE_GET_TAG(v) == JS_TAG_FLOAT64) {
+        double d = JS_VALUE_GET_FLOAT64(v);
+        if (d >= -2147483648.0 && d <= 2147483647.0 && d == (double)(int)d) { *out = (int)d; return 1; }
+    }
+    return 0;
+}
+
+// Plain dense array of strings, sorted, no duplicates, 1...max entries.
+static int get_str_set(RunState *st, JSContext *ctx, JSValueConst arr, size_t max, Str **out, size_t *count) {
+    V tmp;
+    memset(&tmp, 0, sizeof(tmp));
+    tmp.ctx = ctx;
+    tmp.st = st;
+    tmp.out.cap = 65536;
+    int32_t n;
+    *out = NULL;
+    *count = 0;
+    if (!array_prepare(&tmp, arr, &n) || n < 1 || (size_t)n > max) return 0;
+    Str *a = calloc((size_t)n, sizeof(Str));
+    if (!a) return 0;
+    int ok = 1;
+    for (int32_t i = 0; i < n && ok; i++) {
+        JSValue el;
+        if (!array_get(&tmp, arr, i, &el)) { ok = 0; break; }
+        ok = get_str(ctx, el, &a[i], 1024);
+        JS_FreeValue(ctx, el);
+    }
+    if (ok) {
+        qsort(a, (size_t)n, sizeof(Str), str_cmp);
+        for (int32_t i = 1; i < n; i++) if (str_cmp(&a[i - 1], &a[i]) == 0) ok = 0;
+    }
+    if (!ok) { strs_free(a, (size_t)n); return 0; }
+    *out = a;
+    *count = (size_t)n;
+    return 1;
+}
+
+// {hosts, methods?, path?:{kind,value}, status?:{min,max}} -> canonical Match. On failure `m` is freed.
+static int parse_match(RunState *st, JSContext *ctx, JSValueConst obj, Match *m) {
+    static const char *const mk[] = {"hosts", "methods", "path", "status"};
+    static const char *const pk[] = {"kind", "value"};
+    static const char *const sk[] = {"min", "max"};
+    JSValue f[4], p[2], s[2];
+    int ok = 0;
+    memset(m, 0, sizeof(*m));
+    if (!read_obj(st, ctx, obj, mk, 4, 1u, f)) return 0;
+    if (!get_str_set(st, ctx, f[0], 32, &m->hosts, &m->nhosts)) goto done;
+    for (size_t i = 0; i < m->nhosts; i++) if (m->hosts[i].n == 0 || m->hosts[i].n > 253) goto done;
+    if (!JS_IsUndefined(f[1])) {
+        m->has_methods = 1;
+        if (!get_str_set(st, ctx, f[1], 16, &m->methods, &m->nmethods)) goto done;
+    }
+    if (!JS_IsUndefined(f[2])) {
+        if (!read_obj(st, ctx, f[2], pk, 2, 3u, p)) goto done;
+        int good = (str_eq(ctx, p[0], "exact") || str_eq(ctx, p[0], "prefix")) && get_str(ctx, p[1], &m->path, 1024);
+        if (good) m->path_kind = str_eq(ctx, p[0], "exact") ? 1 : 2;
+        JS_FreeValue(ctx, p[0]);
+        JS_FreeValue(ctx, p[1]);
+        if (!good) goto done;
+    }
+    if (!JS_IsUndefined(f[3])) {
+        if (!read_obj(st, ctx, f[3], sk, 2, 3u, s)) goto done;
+        int good = get_int(s[0], &m->lo) && get_int(s[1], &m->hi) && m->lo >= 100 && m->hi <= 599 && m->lo <= m->hi;
+        JS_FreeValue(ctx, s[0]);
+        JS_FreeValue(ctx, s[1]);
+        if (!good) goto done;
+        m->has_status = 1;
+    }
+    ok = 1;
+done:
+    for (int i = 0; i < 4; i++) JS_FreeValue(ctx, f[i]);
+    if (!ok) match_free(m);
+    return ok;
+}
+
+typedef struct {
+    Str method, host, path;
+    int status;   // 0 when absent
+} Ident;
+
+static void ident_free(Ident *id) {
+    str_free(&id->method);
+    str_free(&id->host);
+    str_free(&id->path);
+}
+
+static int in_set(const Str *a, size_t n, const Str *s) {
+    for (size_t i = 0; i < n; i++) if (a[i].n == s->n && memcmp(a[i].s, s->s, s->n) == 0) return 1;
+    return 0;
+}
+
+// Fields combine with AND, set members with OR. A status constraint never matches a leg without one.
+static int match_accepts(const Match *m, const Ident *id, int response_phase) {
+    if (!in_set(m->hosts, m->nhosts, &id->host)) return 0;
+    if (m->has_methods && !in_set(m->methods, m->nmethods, &id->method)) return 0;
+    if (m->path_kind == 1 && !(m->path.n == id->path.n && memcmp(m->path.s, id->path.s, id->path.n) == 0)) return 0;
+    if (m->path_kind == 2 && !(id->path.n >= m->path.n && memcmp(m->path.s, id->path.s, m->path.n) == 0)) return 0;
+    if (m->has_status && !(response_phase && id->status >= m->lo && id->status <= m->hi)) return 0;
+    return 1;
+}
+
+static JSValue js_attach(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    static const char *const ck[] = {"request", "response"};
+    static const char *const hk[] = {"onEnter", "onLeave"};
+    (void)this_val;
+    RunState *st = JS_GetContextOpaque(ctx);
+    Match m;
+    JSValue legs[2], cb = JS_UNDEFINED;
+    int have_match = 0, ok = 0, idx = -1;
+    legs[0] = legs[1] = JS_UNDEFINED;
+    if (!st || st->sealed || argc != 2 || st->nregs >= MAX_REGS) goto done;
+    if (!parse_match(st, ctx, argv[0], &m)) goto done;
+    have_match = 1;
+    for (int i = 0; i < st->ndecl; i++) if (match_equal(&st->decl[i], &m)) { idx = i; break; }
+    if (idx < 0) goto done;
+    if (!read_obj(st, ctx, argv[1], ck, 2, 0u, legs)) goto done;
+    for (int l = 0; l < 2; l++) {
+        if (JS_IsUndefined(legs[l])) continue;
+        JSValue h[2];
+        if (!read_obj(st, ctx, legs[l], hk, 2, 0u, h)) goto done;
+        int good = (JS_IsUndefined(h[0]) || JS_IsFunction(ctx, h[0])) && (JS_IsUndefined(h[1]) || JS_IsFunction(ctx, h[1]));
+        if (good && l == st->phase_leg) cb = JS_DupValue(ctx, h[st->phase_kind]);
+        JS_FreeValue(ctx, h[0]);
+        JS_FreeValue(ctx, h[1]);
+        if (!good) goto done;
+    }
+    st->regs[st->nregs].match = idx;
+    st->regs[st->nregs].cb = cb;
+    cb = JS_UNDEFINED;
+    st->nregs++;
+    ok = 1;
+done:
+    if (have_match) match_free(&m);
+    JS_FreeValue(ctx, legs[0]);
+    JS_FreeValue(ctx, legs[1]);
+    JS_FreeValue(ctx, cb);
+    if (ok) return JS_UNDEFINED;
+    if (st) st->attach_failed = 1;
+    return JS_ThrowTypeError(ctx, "invalid Interceptor.attach");
+}
+
+static int install_interceptor(JSContext *ctx) {
+    JSValue global = JS_GetGlobalObject(ctx);
+    JSValue ns = JS_NewObject(ctx);
+    JSValue fn = JS_NewCFunction(ctx, js_attach, "attach", 2);
+    int ok = !JS_IsException(ns) && !JS_IsException(fn) &&
+             JS_DefinePropertyValueStr(ctx, ns, "attach", fn, JS_PROP_ENUMERABLE) > 0;   // read-only, fixed
+    fn = JS_UNDEFINED;
+    if (ok) ok = JS_DefinePropertyValueStr(ctx, global, "Interceptor", ns, 0) > 0;
+    else JS_FreeValue(ctx, ns);
+    JS_FreeValue(ctx, fn);
+    JS_FreeValue(ctx, global);
+    return ok;
+}
+
+// Canonical JSON of one value into a fresh buffer (caller frees buf->p).
+static int serialize_value(RunState *st, JSContext *ctx, JSValueConst val, int depth, int max_depth, size_t cap, Buf *out) {
+    V v;
+    memset(&v, 0, sizeof(v));
+    v.ctx = ctx;
+    v.st = st;
+    v.max_depth = max_depth;
+    v.out.cap = cap;
+    v.out.p = malloc(cap + 1);
+    if (!v.out.p) return 0;
+    int ok = emit_value(&v, val, depth);
+    if (ok) v.out.p[v.out.len] = 0;
+    if (!ok) { free(v.out.p); return 0; }
+    *out = v.out;
+    return 1;
+}
+
+// Appends the actions of one callback result: exactly {actions:[...]}; at most max_actions in total.
+static int emit_actions(V *v, JSValueConst root) {
+    static const char *const root_keys[] = {"actions"};
+    static const char *const action_keys[] = {"type", "endpointId", "json"};
+    JSValue actions = JS_UNDEFINED;
+    int32_t n = 0, i;
+    if (!exact_props(v, root, root_keys, 1, &actions)) return v_fail(v);
+    int ok = 0;
+    if (!array_prepare(v, actions, &n) || (size_t)n > v->max_actions - v->nactions) goto done;
+    for (i = 0; i < n; i++) {
+        JSValue act, f[3];
+        if (!array_get(v, actions, i, &act)) goto done;
+        int exact = exact_props(v, act, action_keys, 3, f);
+        JS_FreeValue(v->ctx, act);
+        if (!exact) goto done;
+        int good = string_equals(v, f[0], "webhook");
+        if (v->nactions) b_ch(&v->out, ',');
+        if (good) {
+            b_str(&v->out, "{\"type\":\"webhook\",\"endpointId\":");
+            good = emit_uuid(v, f[1]);
+        }
+        if (good) {
+            b_str(&v->out, ",\"json\":");
+            good = emit_value(v, f[2], 4);   // root=1, actions=2, action=3, json value=4
+        }
+        if (good) b_ch(&v->out, '}');
+        JS_FreeValue(v->ctx, f[0]);
+        JS_FreeValue(v->ctx, f[1]);
+        JS_FreeValue(v->ctx, f[2]);
+        if (!good) goto done;
+        v->nactions++;
+    }
+    ok = !v->out.overflow;
+done:
+    JS_FreeValue(v->ctx, actions);
+    return ok ? 1 : v_fail(v);
+}
+
+static int parse_phase(const char *hook, int *leg, int *kind) {
+    if (!hook) return 0;
+    if (!strcmp(hook, "request.onEnter")) { *leg = 0; *kind = 0; return 1; }
+    if (!strcmp(hook, "request.onLeave")) { *leg = 0; *kind = 1; return 1; }
+    if (!strcmp(hook, "response.onEnter")) { *leg = 1; *kind = 0; return 1; }
+    if (!strcmp(hook, "response.onLeave")) { *leg = 1; *kind = 1; return 1; }
+    return 0;
+}
+
+// MARK: strict v2 manifest (validated here as well: the Rust CLI reaches this entry directly)
+//
+// Mirrors AutomationCore.PluginManifest for schemaVersion 2. Exactly these keys, nothing else:
+// schemaVersion=2, id, name, version, matches(1...16), read, write, endpointBindings(0...4), settings
+// and optional author, summary. Any violation (schema 1/3, missing, unknown or mistyped field) is
+// QJS_INVALID_INPUT. The read grants are applied to the event before any plugin code exists.
+
+#define MAX_MAP_ENTRIES 256
+
+static int next_cp(const uint8_t *p, size_t avail, uint32_t *cp, size_t *len) {
+    size_t k = utf8_seq(p, avail);
+    if (k == 0) return 0;
+    uint32_t c = p[0];
+    if (k == 2) c &= 0x1F; else if (k == 3) c &= 0x0F; else if (k == 4) c &= 0x07;
+    for (size_t i = 1; i < k; i++) c = (c << 6) | (p[i] & 0x3F);
+    *cp = c;
+    *len = k;
+    return 1;
+}
+
+static int is_format_cp(uint32_t c) {
+    return c == 0xAD || (c >= 0x600 && c <= 0x605) || c == 0x61C || c == 0x6DD || c == 0x70F || c == 0x180E ||
+           (c >= 0x200B && c <= 0x200F) || (c >= 0x2028 && c <= 0x202E) || (c >= 0x2060 && c <= 0x2064) ||
+           (c >= 0x2066 && c <= 0x206F) || c == 0xFEFF || (c >= 0xFFF9 && c <= 0xFFFB) || c == 0xE0001 ||
+           (c >= 0xE0020 && c <= 0xE007F);
+}
+
+static int is_space_cp(uint32_t c) {
+    return c == 0x20 || (c >= 0x09 && c <= 0x0D) || c == 0xA0 || c == 0x1680 || (c >= 0x2000 && c <= 0x200A) ||
+           c == 0x202F || c == 0x205F || c == 0x3000;
+}
+
+// Display text: non-empty, bounded in scalars and bytes, no control/format/separator scalars.
+static int text_ok(const Str *s, size_t max_chars, size_t max_bytes, int reject_blank) {
+    size_t i = 0, chars = 0;
+    int all_space = 1;
+    if (s->n == 0 || s->n > max_bytes) return 0;
+    while (i < s->n) {
+        uint32_t c;
+        size_t k;
+        if (!next_cp((const uint8_t *)s->s + i, s->n - i, &c, &k)) return 0;
+        if (c < 0x20 || (c >= 0x7F && c <= 0x9F) || is_format_cp(c)) return 0;
+        if (!is_space_cp(c)) all_space = 0;
+        i += k;
+        chars++;
+    }
+    return chars <= max_chars && !(reject_blank && all_space);
+}
+
+static int is_alnum_c(int c) { return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+
+static int semver_ok(const Str *s) {
+    const char *p = s->s, *end = s->s + s->n;
+    if (s->n == 0 || s->n > 64) return 0;
+    for (int part = 0; part < 3; part++) {
+        const char *q = p;
+        while (q < end && *q >= '0' && *q <= '9') q++;
+        size_t n = (size_t)(q - p);
+        if (n == 0 || n > 10 || (n > 1 && *p == '0')) return 0;
+        p = q;
+        if (part < 2) { if (p >= end || *p != '.') return 0; p++; }
+    }
+    for (int tail = 0; tail < 2 && p < end; tail++) {
+        char lead = tail == 0 ? '-' : '+';
+        if (*p != lead) { if (tail == 0) continue; return 0; }
+        p++;
+        for (;;) {
+            const char *q = p;
+            int numeric = 1;
+            while (q < end && (is_alnum_c(*q) || *q == '-')) { if (*q < '0' || *q > '9') numeric = 0; q++; }
+            size_t n = (size_t)(q - p);
+            if (n == 0) return 0;
+            if (tail == 0 && numeric && n > 1 && *p == '0') return 0;
+            p = q;
+            if (p < end && *p == '.') { p++; continue; }
+            break;
+        }
+    }
+    return p == end;
+}
+
+static int uuid_ok(const Str *s) {
+    if (s->n != 36) return 0;
+    for (size_t i = 0; i < 36; i++) {
+        if (i == 8 || i == 13 || i == 18 || i == 23) { if (s->s[i] != '-') return 0; }
+        else if (hexval((unsigned char)s->s[i]) < 0) return 0;
+    }
+    return 1;
+}
+
+static int binding_ok(const Str *s) {
+    if (s->n == 0 || s->n > 32 || !((s->s[0] >= 'A' && s->s[0] <= 'Z') || (s->s[0] >= 'a' && s->s[0] <= 'z'))) return 0;
+    for (size_t i = 0; i < s->n; i++) if (!is_alnum_c(s->s[i]) && s->s[i] != '_') return 0;
+    return 1;
+}
+
+static int host_ok(const Str *s) {
+    if (s->n == 0 || s->n > 253) return 0;
+    size_t label = 0;
+    for (size_t i = 0; i <= s->n; i++) {
+        if (i == s->n || s->s[i] == '.') {
+            if (label == 0 || label > 63 || s->s[i - label] == '-' || s->s[i - 1] == '-') return 0;
+            label = 0;
+        } else {
+            char c = s->s[i];
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || c == '-')) return 0;
+            label++;
+        }
+    }
+    return 1;
+}
+
+static int method_ok(const Str *s) {
+    if (s->n == 0 || s->n > 16) return 0;
+    for (size_t i = 0; i < s->n; i++) if (s->s[i] < 'A' || s->s[i] > 'Z') return 0;
+    return 1;
+}
+
+static int encoded_path_ok(const Str *s, size_t max) {
+    if (s->n == 0 || s->n > max || s->s[0] != '/') return 0;
+    for (size_t i = 0; i < s->n; i++) {
+        unsigned char c = (unsigned char)s->s[i];
+        if (c == '%') {
+            if (i + 2 >= s->n || hexval((unsigned char)s->s[i + 1]) < 0 || hexval((unsigned char)s->s[i + 2]) < 0) return 0;
+            i += 2;
+        } else if (!(is_alnum_c(c) || strchr("-._~!$&'()*+,;=:@/", c))) return 0;
+    }
+    return 1;
+}
+
+static int header_name_ok(const Str *s) {
+    if (s->n == 0 || s->n > 128) return 0;
+    for (size_t i = 0; i < s->n; i++) if (!(is_alnum_c(s->s[i]) || strchr("!#$%&'*+-.^_`|~", s->s[i]))) return 0;
+    return 1;
+}
+
+static int decl_match_ok(const Match *m) {
+    for (size_t i = 0; i < m->nhosts; i++) if (!host_ok(&m->hosts[i])) return 0;
+    for (size_t i = 0; i < m->nmethods; i++) if (!method_ok(&m->methods[i])) return 0;
+    return m->path_kind == 0 || encoded_path_ok(&m->path, 1024);
+}
+
+// `arr` -> sorted unique strings, min...max entries. n == 0 yields *out == NULL.
+static int get_list(RunState *st, JSContext *ctx, JSValueConst arr, size_t min, size_t max, Str **out, size_t *count) {
+    V tmp;
+    int32_t n;
+    memset(&tmp, 0, sizeof(tmp));
+    tmp.ctx = ctx;
+    tmp.st = st;
+    tmp.out.cap = 65536;
+    *out = NULL;
+    *count = 0;
+    if (!array_prepare(&tmp, arr, &n) || (size_t)n < min || (size_t)n > max) return 0;
+    if (n == 0) return 1;
+    return get_str_set(st, ctx, arr, max, out, count);
+}
+
+static int load_read(RunState *st, JSContext *ctx, JSValueConst v) {
+    static const char *const rk[] = {"metadata", "headers", "queryKeys", "body"};
+    static const char *const bk[] = {"mode"};
+    JSValue f[4], b[1];
+    Str *meta = NULL;
+    size_t nmeta = 0;
+    int ok = 0;
+    if (!read_obj(st, ctx, v, rk, 4, 15u, f)) return 0;
+    b[0] = JS_UNDEFINED;
+    if (!get_list(st, ctx, f[0], 0, 4, &meta, &nmeta)) goto done;
+    for (size_t i = 0; i < nmeta; i++) {
+        if (meta[i].n == 6 && !memcmp(meta[i].s, "method", 6)) st->read_meta |= 1u;
+        else if (meta[i].n == 4 && !memcmp(meta[i].s, "host", 4)) st->read_meta |= 2u;
+        else if (meta[i].n == 6 && !memcmp(meta[i].s, "status", 6)) st->read_meta |= 4u;
+        else if (meta[i].n == 4 && !memcmp(meta[i].s, "path", 4)) st->read_meta |= 8u;
+        else goto done;
+    }
+    if (!get_list(st, ctx, f[1], 0, 32, &st->rd_headers, &st->n_rd_headers)) goto done;
+    for (size_t i = 0; i < st->n_rd_headers; i++) {
+        if (!header_name_ok(&st->rd_headers[i])) goto done;
+        for (size_t j = 0; j < st->rd_headers[i].n; j++) {
+            char *c = &st->rd_headers[i].s[j];
+            if (*c >= 'A' && *c <= 'Z') *c = (char)(*c + 32);
+        }
+        for (size_t k = 0; k < i; k++) if (str_cmp(&st->rd_headers[k], &st->rd_headers[i]) == 0) goto done;
+    }
+    if (!get_list(st, ctx, f[2], 0, 32, &st->rd_query, &st->n_rd_query)) goto done;
+    for (size_t i = 0; i < st->n_rd_query; i++) {
+        const Str *q = &st->rd_query[i];
+        if (q->n == 0 || q->n > 128) goto done;
+        for (size_t j = 0; j < q->n; j++) if ((unsigned char)q->s[j] < 0x20 || q->s[j] == 0x7F) goto done;
+    }
+    if (!read_obj(st, ctx, f[3], bk, 1, 1u, b)) goto done;
+    if (str_eq(ctx, b[0], "json")) st->read_body_json = 1;
+    else if (!str_eq(ctx, b[0], "none")) goto done;
+    ok = 1;
+done:
+    strs_free(meta, nmeta);
+    for (int i = 0; i < 4; i++) JS_FreeValue(ctx, f[i]);
+    JS_FreeValue(ctx, b[0]);
+    return ok;
+}
+
+static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *write_request, int *write_response) {
+    static const char *const mk[] = {"schemaVersion", "id", "name", "version", "matches", "read", "write",
+                                     "endpointBindings", "settings", "author", "summary"};
+    static const char *const wk[] = {"requestBody", "responseBody"};
+    JSValue f[11], w[2];
+    Str s = {NULL, 0}, *bind = NULL;
+    size_t nbind = 0;
+    int ok = 0;
+    w[0] = w[1] = JS_UNDEFINED;
+    if (!read_obj(st, ctx, root, mk, 11, 0x1FFu, f)) return 0;
+    if (JS_VALUE_GET_TAG(f[0]) != JS_TAG_INT || JS_VALUE_GET_INT(f[0]) != 2) goto done;
+    if (!get_str(ctx, f[1], &s, 36) || !uuid_ok(&s)) goto done;
+    str_free(&s);
+    if (!get_str(ctx, f[2], &s, 256) || !text_ok(&s, 80, 256, 0)) goto done;
+    str_free(&s);
+    if (!get_str(ctx, f[3], &s, 64) || !semver_ok(&s)) goto done;
+    str_free(&s);
+    if (!JS_IsUndefined(f[9])) {
+        if (!get_str(ctx, f[9], &s, 256) || !text_ok(&s, 80, 256, 1)) goto done;
+        str_free(&s);
+    }
+    if (!JS_IsUndefined(f[10])) {
+        if (!get_str(ctx, f[10], &s, 1024) || !text_ok(&s, 280, 1024, 1)) goto done;
+        str_free(&s);
+    }
+    {
+        V tmp;
+        int32_t n;
+        memset(&tmp, 0, sizeof(tmp));
+        tmp.ctx = ctx;
+        tmp.st = st;
+        tmp.out.cap = 65536;
+        if (!array_prepare(&tmp, f[4], &n) || n < 1 || n > MAX_REGS) goto done;
+        for (int32_t i = 0; i < n; i++) {
+            JSValue el;
+            if (!array_get(&tmp, f[4], i, &el)) goto done;
+            int good = parse_match(st, ctx, el, &st->decl[st->ndecl]);
+            JS_FreeValue(ctx, el);
+            if (!good) goto done;
+            st->ndecl++;
+            if (!decl_match_ok(&st->decl[st->ndecl - 1])) goto done;
+        }
+    }
+    if (!load_read(st, ctx, f[5])) goto done;
+    if (!read_obj(st, ctx, f[6], wk, 2, 3u, w)) goto done;
+    if (JS_VALUE_GET_TAG(w[0]) != JS_TAG_BOOL || JS_VALUE_GET_TAG(w[1]) != JS_TAG_BOOL) goto done;
+    *write_request = JS_VALUE_GET_BOOL(w[0]);
+    *write_response = JS_VALUE_GET_BOOL(w[1]);
+    if (!get_list(st, ctx, f[7], 0, 4, &bind, &nbind)) goto done;
+    for (size_t i = 0; i < nbind; i++) if (!binding_ok(&bind[i])) goto done;
+    if (JS_GetClassID(f[8]) != st->cls_object) goto done;
+    {
+        Buf settings = {NULL, 0, 0, 0};
+        if (!serialize_value(st, ctx, f[8], 1, 16, 8192, &settings)) goto done;
+        free(settings.p);
+    }
+    ok = 1;
+done:
+    str_free(&s);
+    strs_free(bind, nbind);
+    for (int i = 0; i < 11; i++) JS_FreeValue(ctx, f[i]);
+    JS_FreeValue(ctx, w[0]);
+    JS_FreeValue(ctx, w[1]);
+    return ok;
+}
+
+// MARK: immutable views
+//
+// Everything a callback receives is frozen natively before user code exists (own properties become
+// non-writable/non-configurable, objects non-extensible) and v2 sources are evaluated in strict mode,
+// so every attempted edit - nested assignment, replacement, delete, defineProperty, adding keys - throws
+// deterministically. The single exception is the invoked leg's `body` tree, and only for an enter phase
+// whose manifest write grant is declared. Frozen values still serialize as plain JSON data.
+
+static int freeze_flags(JSContext *ctx, JSValueConst obj, JSAtom atom) {
+    return JS_DefineProperty(ctx, obj, atom, JS_UNDEFINED, JS_UNDEFINED, JS_UNDEFINED,
+                             JS_PROP_HAS_CONFIGURABLE | JS_PROP_HAS_WRITABLE) > 0;
+}
+
+// skip_body: leave the leg's own `body` property (writable, configurable) untouched.
+static int freeze_tree(RunState *st, JSContext *ctx, JSValueConst val, int depth, int skip_body) {
+    if (JS_VALUE_GET_TAG(val) != JS_TAG_OBJECT) return 1;
+    if (depth > 80) return 0;
+    JSClassID cid = JS_GetClassID(val);
+    if (cid != st->cls_object && cid != st->cls_array) return 0;
+    JSPropertyEnum *tab;
+    uint32_t cnt;
+    int ok = 1;
+    if (JS_GetOwnPropertyNames(ctx, &tab, &cnt, val, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) return 0;
+    for (uint32_t j = 0; j < cnt && ok; j++) {
+        JSValue child;
+        if (budget_exceeded(st)) { ok = 0; break; }
+        if (skip_body) {
+            JSValue kv = JS_AtomToValue(ctx, tab[j].atom);
+            int is_body = str_eq(ctx, kv, "body");
+            JS_FreeValue(ctx, kv);
+            if (is_body) continue;
+        }
+        if (cid == st->cls_array && tab[j].is_enumerable == 0) {   // length: not enumerable, still frozen below
+            ok = freeze_flags(ctx, val, tab[j].atom);
+            continue;
+        }
+        if (own_data(ctx, val, tab[j].atom, &child)) {
+            ok = freeze_tree(st, ctx, child, depth + 1, 0);
+            JS_FreeValue(ctx, child);
+        } else {
+            ok = 0;   // accessor or non-enumerable property: not plain data
+        }
+        if (ok) ok = freeze_flags(ctx, val, tab[j].atom);
+    }
+    JS_FreePropertyEnum(ctx, tab, cnt);
+    if (ok) ok = JS_PreventExtensions(ctx, val) >= 0;
+    return ok;
+}
+
+// MARK: public event envelope -> unfiltered identity + granted views
+//
+// Envelope: {id?, phase?, exchangeID?, time?, request, response?} and nothing else. request is
+// {method, host, path, headers?, query?, body?}, response {status, headers?, body?}. Matching uses the
+// UNFILTERED method/host/path/status. Callbacks only ever see the views built here from the manifest's
+// read grants: metadata names, declared header names (ASCII case-insensitive, exposed lowercase),
+// declared exact query keys, and the JSON body only for read.body.mode == "json".
+
+static int define_dup(JSContext *ctx, JSValueConst obj, const char *name, JSValueConst v) {
+    return JS_DefinePropertyValueStr(ctx, obj, name, JS_DupValue(ctx, v), JS_PROP_C_W_E) > 0;
+}
+
+// Plain object of string -> string. Returns a fresh object holding only the granted entries.
+static int filter_map(RunState *st, JSContext *ctx, JSValueConst obj, const Str *granted, size_t ng, int fold, JSValue *out) {
+    JSPropertyEnum *tab;
+    uint32_t cnt;
+    Str *keys = NULL;
+    JSValue res;
+    int ok = 0;
+    uint32_t made = 0;
+    *out = JS_UNDEFINED;
+    if (JS_GetClassID(obj) != st->cls_object) return 0;
+    if (JS_GetOwnPropertyNames(ctx, &tab, &cnt, obj, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) return 0;
+    res = JS_NewObject(ctx);
+    if (cnt > MAX_MAP_ENTRIES || JS_IsException(res)) goto done;
+    keys = calloc(cnt ? cnt : 1, sizeof(Str));
+    if (!keys) goto done;
+    for (uint32_t j = 0; j < cnt; j++, made++) {
+        JSValue kv = JS_AtomToValue(ctx, tab[j].atom), d;
+        int good = get_str(ctx, kv, &keys[j], 1024);
+        JS_FreeValue(ctx, kv);
+        if (!good) goto done;
+        if (fold) for (size_t c = 0; c < keys[j].n; c++) if (keys[j].s[c] >= 'A' && keys[j].s[c] <= 'Z') keys[j].s[c] += 32;
+        for (uint32_t k = 0; k < j; k++) if (str_cmp(&keys[k], &keys[j]) == 0) goto done;
+        if (!own_data(ctx, obj, tab[j].atom, &d)) goto done;
+        if (!JS_IsString(d)) { JS_FreeValue(ctx, d); goto done; }
+        for (size_t i = 0; i < ng; i++) {
+            if (str_cmp(&granted[i], &keys[j]) == 0) {
+                if (JS_DefinePropertyValueStr(ctx, res, granted[i].s, d, JS_PROP_C_W_E) <= 0) goto done;
+                d = JS_UNDEFINED;
+                break;
+            }
+        }
+        JS_FreeValue(ctx, d);
+    }
+    ok = 1;
+done:
+    JS_FreePropertyEnum(ctx, tab, cnt);
+    for (uint32_t j = 0; j < cnt && keys; j++) str_free(&keys[j]);
+    free(keys);
+    (void)made;
+    if (ok) *out = res; else JS_FreeValue(ctx, res);
+    return ok;
+}
+
+static int granted_map(RunState *st, JSContext *ctx, JSValueConst v, const Str *granted, size_t ng, int fold, JSValue *out) {
+    if (JS_IsUndefined(v)) { *out = JS_NewObject(ctx); return !JS_IsException(*out); }
+    return filter_map(st, ctx, v, granted, ng, fold, out);
+}
+
+static int build_request(RunState *st, JSContext *ctx, JSValueConst req, Ident *id, JSValue *out) {
+    static const char *const rk[] = {"method", "host", "path", "headers", "query", "body"};
+    JSValue f[6], view = JS_UNDEFINED, hdr = JS_UNDEFINED, qry = JS_UNDEFINED;
+    int ok = 0;
+    if (!read_obj(st, ctx, req, rk, 6, 7u, f)) return 0;
+    if (!get_str(ctx, f[0], &id->method, 16) || !method_ok(&id->method)) goto done;
+    if (!get_str(ctx, f[1], &id->host, 253) || id->host.n == 0) goto done;
+    if (!get_str(ctx, f[2], &id->path, 4096) || id->path.n == 0 || id->path.s[0] != '/' ||
+        memchr(id->path.s, '?', id->path.n) || memchr(id->path.s, '#', id->path.n)) goto done;
+    if (!granted_map(st, ctx, f[3], st->rd_headers, st->n_rd_headers, 1, &hdr)) goto done;
+    if (!granted_map(st, ctx, f[4], st->rd_query, st->n_rd_query, 0, &qry)) goto done;
+    view = JS_NewObject(ctx);
+    if (JS_IsException(view)) goto done;
+    if (((st->read_meta & 1u) && !define_dup(ctx, view, "method", f[0])) ||
+        ((st->read_meta & 2u) && !define_dup(ctx, view, "host", f[1])) ||
+        ((st->read_meta & 8u) && !define_dup(ctx, view, "path", f[2]))) goto done;
+    if (JS_DefinePropertyValueStr(ctx, view, "headers", hdr, JS_PROP_C_W_E) <= 0) { hdr = JS_UNDEFINED; goto done; }
+    hdr = JS_UNDEFINED;
+    if (JS_DefinePropertyValueStr(ctx, view, "query", qry, JS_PROP_C_W_E) <= 0) { qry = JS_UNDEFINED; goto done; }
+    qry = JS_UNDEFINED;
+    if (st->read_body_json && !JS_IsUndefined(f[5]) && !define_dup(ctx, view, "body", f[5])) goto done;
+    ok = 1;
+done:
+    for (int i = 0; i < 6; i++) JS_FreeValue(ctx, f[i]);
+    JS_FreeValue(ctx, hdr);
+    JS_FreeValue(ctx, qry);
+    if (ok) *out = view; else JS_FreeValue(ctx, view);
+    return ok;
+}
+
+static int build_response(RunState *st, JSContext *ctx, JSValueConst resp, Ident *id, JSValue *out) {
+    static const char *const sk[] = {"status", "headers", "body"};
+    JSValue f[3], view = JS_UNDEFINED, hdr = JS_UNDEFINED;
+    int ok = 0;
+    if (!read_obj(st, ctx, resp, sk, 3, 1u, f)) return 0;
+    if (!get_int(f[0], &id->status) || id->status < 100 || id->status > 599) goto done;
+    if (!granted_map(st, ctx, f[1], st->rd_headers, st->n_rd_headers, 1, &hdr)) goto done;
+    view = JS_NewObject(ctx);
+    if (JS_IsException(view)) goto done;
+    if ((st->read_meta & 4u) && !define_dup(ctx, view, "status", f[0])) goto done;
+    if (JS_DefinePropertyValueStr(ctx, view, "headers", hdr, JS_PROP_C_W_E) <= 0) { hdr = JS_UNDEFINED; goto done; }
+    hdr = JS_UNDEFINED;
+    if (st->read_body_json && !JS_IsUndefined(f[2]) && !define_dup(ctx, view, "body", f[2])) goto done;
+    ok = 1;
+done:
+    for (int i = 0; i < 3; i++) JS_FreeValue(ctx, f[i]);
+    JS_FreeValue(ctx, hdr);
+    if (ok) *out = view; else JS_FreeValue(ctx, view);
+    return ok;
+}
+
+// Envelope -> identity (unfiltered) and the invoked leg's granted view in *legv.
+static int load_event(RunState *st, JSContext *ctx, JSValueConst ev, const char *hook, int response_phase,
+                      Ident *id, JSValue *legv) {
+    static const char *const ek[] = {"id", "phase", "exchangeID", "time", "request", "response"};
+    JSValue f[6], reqv = JS_UNDEFINED, respv = JS_UNDEFINED;
+    Str s = {NULL, 0};
+    int ok = 0;
+    if (!read_obj(st, ctx, ev, ek, 6, 16u | (response_phase ? 32u : 0u), f)) return 0;
+    for (int i = 0; i < 3; i += 2) {   // id, exchangeID
+        if (JS_IsUndefined(f[i])) continue;
+        if (!get_str(ctx, f[i], &s, 36) || !uuid_ok(&s)) goto done;
+        str_free(&s);
+    }
+    if (!JS_IsUndefined(f[1])) {
+        if (!get_str(ctx, f[1], &s, 32) || s.n != strlen(hook) || memcmp(s.s, hook, s.n)) goto done;
+        str_free(&s);
+    }
+    if (!JS_IsUndefined(f[3])) {
+        if (!get_str(ctx, f[3], &s, 64) || s.n == 0) goto done;
+        for (size_t i = 0; i < s.n; i++) if ((unsigned char)s.s[i] < 0x20 || s.s[i] == 0x7F) goto done;
+        str_free(&s);
+    }
+    if (!build_request(st, ctx, f[4], id, &reqv)) goto done;
+    if (!JS_IsUndefined(f[5])) {
+        if (!build_response(st, ctx, f[5], id, &respv)) goto done;
+        if (!response_phase) id->status = 0;   // a response is meaningless for request phases; never matched or exposed
+    }
+    if (response_phase) {
+        if (!freeze_tree(st, ctx, reqv, 1, 0)) goto done;   // response.request is read-only, body included
+        if (JS_DefinePropertyValueStr(ctx, respv, "request", reqv, JS_PROP_C_W_E) <= 0) { reqv = JS_UNDEFINED; goto done; }
+        reqv = JS_UNDEFINED;
+        if (!freeze_tree(st, ctx, respv, 1, st->body_writable)) goto done;
+        *legv = respv;
+        respv = JS_UNDEFINED;
+    } else {
+        if (!freeze_tree(st, ctx, reqv, 1, st->body_writable)) goto done;
+        *legv = reqv;
+        reqv = JS_UNDEFINED;
+    }
+    ok = 1;
+done:
+    str_free(&s);
+    for (int i = 0; i < 6; i++) JS_FreeValue(ctx, f[i]);
+    JS_FreeValue(ctx, reqv);
+    JS_FreeValue(ctx, respv);
+    return ok;
+}
+
+// Keep the shared C entry safe even when a caller bypasses Swift/Rust JSON preflight.
+// An integer outside the common JSON range would be rounded by JS_ParseJSON, then silently
+// change an untouched field when another body field is edited. Strings and floating tokens
+// retain the existing IEEE-754 contract. This scanner runs after strict JSON validation.
+static int v2_safe_integer_tokens(const uint8_t *text, size_t len) {
+    int quoted = 0, escaped = 0;
+    for (size_t i = 0; i < len; i++) {
+        uint8_t c = text[i];
+        if (quoted) {
+            if (escaped) escaped = 0;
+            else if (c == '\\') escaped = 1;
+            else if (c == '"') quoted = 0;
+        } else if (c == '"') quoted = 1;
+        else if (c == '-' || (c >= '0' && c <= '9')) {
+            size_t start = i;
+            int integral = 1;
+            while (i < len && !strchr(" \t\r\n,]}", text[i])) {
+                if (text[i] == '.' || text[i] == 'e' || text[i] == 'E') integral = 0;
+                i++;
+            }
+            size_t digits = start + (c == '-'), count = i - digits;
+            if (integral && (count > 16 || (count == 16 && memcmp(text + digits, "9007199254740991", 16) > 0))) return 0;
+            if (i) i--;
+        }
+    }
+    return 1;
+}
+
+static int v2_setup_failure(const RunState *st) {
+    return st->stop ? st->stop : st->oom ? QJS_MEMORY_OR_STACK : QJS_INVALID_INPUT;
+}
+
+QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
+                     const uint8_t *source, size_t source_len,
+                     const char *hook,
+                     const uint8_t *event_json, size_t event_len,
+                     const uint8_t *config_json, size_t config_len,
+                     const uint8_t *manifest_json, size_t manifest_len) {
+    QJSResult res = {QJS_INTERNAL, NULL, 0};
+    uint8_t *src = NULL, *ev = NULL, *cfg = NULL, *man = NULL;
+    JSRuntime *rt = NULL;
+    JSContext *ctx = NULL;
+    JSValue evv = JS_UNDEFINED, cfgv = JS_UNDEFINED, manv = JS_UNDEFINED, legv = JS_UNDEFINED;
+    Buf original = {NULL, 0, 0, 0};
+    Ident id;
+    RunState st;
+    int status = QJS_INTERNAL, have_id = 0, leg = 0, kind = 0;
+    int write_request = 0, write_response = 0, had_body = 0;
+
+    memset(&st, 0, sizeof(st));
+    memset(&id, 0, sizeof(id));
+    for (int i = 0; i < MAX_REGS; i++) st.regs[i].cb = JS_UNDEFINED;
+    st.token = token;
+    st.deadline_ns = now_ns() + (uint64_t)(limits ? limits->deadline_ms : 0) * 1000000ull;
+
+    if (!limits || limits->deadline_ms == 0 || limits->heap_bytes == 0 || limits->stack_bytes == 0 ||
+        limits->max_result_bytes == 0 || limits->max_result_depth == 0) {
+        return res;
+    }
+    if (!parse_phase(hook, &leg, &kind)) { res.status = QJS_INVALID_INPUT; return res; }
+    st.phase_leg = leg;
+    st.phase_kind = kind;
+
+    if (!source || source_len == 0 || source_len > limits->max_source_bytes ||
+        !event_json || event_len == 0 || event_len > limits->max_event_bytes ||
+        !config_json || config_len == 0 || config_len > limits->max_config_bytes ||
+        !manifest_json || manifest_len == 0 || manifest_len > QJS_MAX_MANIFEST_BYTES) {
+        res.status = QJS_INVALID_INPUT;
+        return res;
+    }
+    if (memchr(source, 0, source_len) != NULL || !utf8_valid(source, source_len)) {
+        res.status = QJS_INVALID_INPUT;
+        return res;
+    }
+    if (budget_exceeded(&st)) { res.status = st.stop; return res; }
+    src = copy_z(source, source_len);
+    ev = copy_z(event_json, event_len);
+    cfg = copy_z(config_json, config_len);
+    man = copy_z(manifest_json, manifest_len);
+    if (!src || !ev || !cfg || !man) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
+    if (!json_check(ev, event_len, 64) || !json_check(cfg, config_len, 64) || !json_check(man, manifest_len, 32) ||
+        !v2_safe_integer_tokens(ev, event_len) || !v2_safe_integer_tokens(cfg, config_len) ||
+        !v2_safe_integer_tokens(man, manifest_len)) {
+        status = QJS_INVALID_INPUT;
+        goto cleanup;
+    }
+
+    rt = JS_NewRuntime2(&limited_funcs, &st);
+    if (!rt) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
+    JS_SetMemoryLimit(rt, limits->heap_bytes);
+    JS_SetMaxStackSize(rt, limits->stack_bytes);
+    JS_UpdateStackTop(rt);
+    JS_SetCanBlock(rt, 0);
+    JS_SetInterruptHandler(rt, interrupt_cb, &st);
+
+    ctx = JS_NewContextRaw(rt);
+    if (!ctx) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
+    if (JS_AddIntrinsicBaseObjects(ctx) || JS_AddIntrinsicDate(ctx) || JS_AddIntrinsicEval(ctx) ||
+        JS_AddIntrinsicStringNormalize(ctx) || JS_AddIntrinsicRegExp(ctx) || JS_AddIntrinsicJSON(ctx) ||
+        JS_AddIntrinsicProxy(ctx) || JS_AddIntrinsicMapSet(ctx) || JS_AddIntrinsicPromise(ctx)) {
+        status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL;
+        goto cleanup;
+    }
+    {
+        JSValue o = JS_NewObject(ctx), a = JS_NewArray(ctx);
+        st.cls_object = JS_GetClassID(o);
+        st.cls_array = JS_GetClassID(a);
+        JS_FreeValue(ctx, o);
+        JS_FreeValue(ctx, a);
+        if (!st.cls_object || !st.cls_array || st.cls_object == st.cls_array) goto cleanup;
+    }
+    JS_SetContextOpaque(ctx, &st);
+
+    // Manifest, event and config are parsed and validated natively before user code exists.
+    manv = JS_ParseJSON(ctx, (const char *)man, manifest_len, "<manifest>");
+    if (JS_IsException(manv)) { status = classify_exception(ctx, &st, QJS_INVALID_INPUT); goto cleanup; }
+    evv = JS_ParseJSON(ctx, (const char *)ev, event_len, "<event>");
+    if (JS_IsException(evv)) { status = classify_exception(ctx, &st, QJS_INVALID_INPUT); goto cleanup; }
+    cfgv = JS_ParseJSON(ctx, (const char *)cfg, config_len, "<config>");
+    if (JS_IsException(cfgv)) { status = classify_exception(ctx, &st, QJS_INVALID_INPUT); goto cleanup; }
+
+    if (!load_manifest(&st, ctx, manv, &write_request, &write_response)) { status = v2_setup_failure(&st); goto cleanup; }
+    st.body_writable = kind == 0 && (leg == 0 ? write_request : write_response);
+    if (!freeze_tree(&st, ctx, cfgv, 1, 0)) { status = v2_setup_failure(&st); goto cleanup; }
+    have_id = 1;   // ident_free tolerates a partially filled identity
+    if (!load_event(&st, ctx, evv, hook, leg == 1, &id, &legv)) { status = v2_setup_failure(&st); goto cleanup; }
+
+    // Canonical form of the original body of the invoked leg (the only thing a callback may change).
+    if (kind == 0 && (leg == 0 ? write_request : write_response)) {
+        JSAtom ba = JS_NewAtom(ctx, "body");
+        JSValue b = JS_UNDEFINED;
+        if (ba == JS_ATOM_NULL) { status = QJS_INTERNAL; goto cleanup; }
+        had_body = own_data(ctx, legv, ba, &b);
+        JS_FreeAtom(ctx, ba);
+        if (had_body) {
+            int ok = serialize_value(&st, ctx, b, 1, BODY_COMPARE_DEPTH, BODY_COMPARE_CAP, &original);
+            JS_FreeValue(ctx, b);
+            if (!ok) { status = budget_exceeded(&st) ? st.stop : v2_setup_failure(&st); goto cleanup; }
+        }
+    }
+
+    if (!install_interceptor(ctx)) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
+
+    {
+        JSValue completion = JS_Eval(ctx, (const char *)src, source_len, "<plugin>", JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_STRICT);
+        if (JS_IsException(completion)) { status = classify_exception(ctx, &st, QJS_SCRIPT_ERROR); goto cleanup; }
+        JS_FreeValue(ctx, completion);
+        st.sealed = 1;
+        if (st.attach_failed) { status = st.stop ? st.stop : QJS_SCRIPT_ERROR; goto cleanup; }
+    }
+
+    {
+        V v;
+        int ok = 1;
+        memset(&v, 0, sizeof(v));
+        v.ctx = ctx;
+        v.st = &st;
+        v.max_depth = (int)limits->max_result_depth;
+        v.max_actions = limits->max_actions;
+        v.out.cap = limits->max_result_bytes;
+        v.out.p = malloc(v.out.cap + 1);
+        if (!v.out.p) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
+        b_str(&v.out, "{\"actions\":[");
+        for (int i = 0; i < st.nregs && ok; i++) {
+            if (!JS_IsFunction(ctx, st.regs[i].cb)) continue;
+            if (!match_accepts(&st.decl[st.regs[i].match], &id, leg == 1)) continue;
+            JSValueConst argv[2];
+            argv[0] = legv;
+            argv[1] = cfgv;
+            JSValue ret = JS_Call(ctx, st.regs[i].cb, JS_UNDEFINED, 2, argv);
+            if (JS_IsException(ret)) {
+                status = classify_exception(ctx, &st, QJS_SCRIPT_ERROR);
+                free(v.out.p);
+                goto cleanup;
+            }
+            if (!JS_IsUndefined(ret)) ok = emit_actions(&v, ret);
+            JS_FreeValue(ctx, ret);
+        }
+        if (ok) b_ch(&v.out, ']');
+        if (ok && kind == 0 && (leg == 0 ? write_request : write_response)) {
+            JSAtom ba = JS_NewAtom(ctx, "body");
+            JSValue b = JS_UNDEFINED;
+            int now_has = ba != JS_ATOM_NULL;
+            if (now_has) {
+                // An accessor or non-enumerable replacement counts as present-but-invalid.
+                JSPropertyDescriptor d;
+                int has = JS_GetOwnProperty(ctx, &d, legv, ba);
+                if (has > 0) { JS_FreeValue(ctx, d.value); JS_FreeValue(ctx, d.getter); JS_FreeValue(ctx, d.setter); }
+                now_has = has != 0;
+                if (has > 0 && !own_data(ctx, legv, ba, &b)) ok = 0;
+                else if (has < 0) ok = 0;
+            } else ok = 0;
+            if (ba != JS_ATOM_NULL) JS_FreeAtom(ctx, ba);
+            if (ok && had_body != now_has) ok = 0;   // body may be changed in place or replaced, never added/removed
+            if (ok && had_body) {
+                Buf finalb = {NULL, 0, 0, 0};
+                if (!serialize_value(&st, ctx, b, 1, BODY_COMPARE_DEPTH, BODY_COMPARE_CAP, &finalb)) {
+                    ok = 0;
+                } else {
+                    int same = finalb.len == original.len && memcmp(finalb.p, original.p, finalb.len) == 0;
+                    free(finalb.p);
+                    if (!same) {
+                        b_str(&v.out, ",\"mutation\":{\"body\":");
+                        ok = emit_value(&v, b, 3);   // root=1, mutation=2, body value=3
+                        b_str(&v.out, "}");
+                    }
+                }
+            }
+            JS_FreeValue(ctx, b);
+        }
+        if (ok) b_ch(&v.out, '}');
+        if (ok && v.out.overflow) ok = 0;
+        if (ok) v.out.p[v.out.len] = 0;
+        if (ok && !json_check(v.out.p, v.out.len, (int)limits->max_result_depth)) ok = 0;
+        if (budget_exceeded(&st)) {
+            status = st.stop;
+        } else if (ok) {
+            res.data = v.out.p;
+            res.length = v.out.len;
+            status = QJS_OK;
+            v.out.p = NULL;
+        } else if (st.oom) {
+            status = QJS_MEMORY_OR_STACK;
+        } else {
+            status = v.err ? v.err : QJS_INVALID_RESULT;
+        }
+        free(v.out.p);
+    }
+
+cleanup:
+    if (ctx) {
+        for (int i = 0; i < st.nregs; i++) JS_FreeValue(ctx, st.regs[i].cb);
+        JS_FreeValue(ctx, legv);
+        JS_FreeValue(ctx, cfgv);
+        JS_FreeValue(ctx, evv);
+        JS_FreeValue(ctx, manv);
+        JS_FreeContext(ctx);
+    }
+    if (rt) JS_FreeRuntime(rt);
+    for (int i = 0; i < st.ndecl; i++) match_free(&st.decl[i]);
+    strs_free(st.rd_headers, st.n_rd_headers);
+    strs_free(st.rd_query, st.n_rd_query);
+    if (have_id) ident_free(&id);
+    free(original.p);
+    free(src);
+    free(ev);
+    free(cfg);
+    free(man);
     res.status = status;
     return res;
 }

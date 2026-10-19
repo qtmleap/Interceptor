@@ -24,7 +24,8 @@ struct CatalogFile: Sendable {
     }
 
     /// Checks the open file before allocation, and also caps reads if it grows after fstat.
-    func read() throws -> Data? {
+    func read(maximumBytes: Int = Limits.catalogBytes) throws -> Data? {
+        guard (0...Limits.catalogBytes).contains(maximumBytes) else { throw AutomationError.corruptStore }
         let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
         guard fd >= 0 else {
             if errno == ENOENT { return nil }
@@ -34,12 +35,12 @@ struct CatalogFile: Sendable {
         defer { try? handle.close() }
         var info = stat()
         guard fstat(fd, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
-              info.st_size >= 0, info.st_size <= Limits.catalogBytes else { throw AutomationError.corruptStore }
+              info.st_size >= 0, info.st_size <= maximumBytes else { throw AutomationError.corruptStore }
         do {
             var result = Data()
-            while let chunk = try handle.read(upToCount: min(65_536, Limits.catalogBytes + 1 - result.count)), !chunk.isEmpty {
+            while let chunk = try handle.read(upToCount: min(65_536, maximumBytes + 1 - result.count)), !chunk.isEmpty {
                 result.append(chunk)
-                guard result.count <= Limits.catalogBytes else { throw AutomationError.corruptStore }
+                guard result.count <= maximumBytes else { throw AutomationError.corruptStore }
             }
             return result
         } catch { throw AutomationError.corruptStore }
