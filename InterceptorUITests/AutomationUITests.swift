@@ -36,14 +36,7 @@ final class AutomationUITests: XCTestCase {
             reach(editor, in: app.collectionViews["script.form"])
             XCTAssertTrue(editor.waitForExistence(timeout: 5))
             XCTAssertFalse(app.buttons["script.save"].isEnabled, "no edit yet")
-            let replacement = """
-            // local edit
-            Interceptor.attach({
-              request:{onEnter(request, config){request.body.limit = 7;},onLeave(){}},
-              response:{onEnter(response, config){response.body.maintenance = true;},onLeave(){}}
-            });
-
-            """
+            let replacement = editedHookSource(requestLimit: 7, maintenance: true)
             replaceSource(editor, with: replacement, app: app, japanese: japanese)
             XCTAssertTrue(app.buttons["script.save"].isEnabled)
             app.buttons["script.save"].tap()
@@ -67,6 +60,22 @@ final class AutomationUITests: XCTestCase {
             XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5))
             XCTAssertEqual(rows.count, 2, "original and local-edit revisions persist")
             attach(reopened, "Plugins after relaunch \(japanese ? "ja" : "en")")
+            var foundEditedChild = false
+            for index in 0 ..< 2 {
+                rows.element(boundBy: index).tap()
+                let reopenedEditor = sourceEditor(reopened)
+                reach(reopenedEditor, in: reopened.collectionViews["script.form"])
+                XCTAssertTrue(reopenedEditor.waitForExistence(timeout: 5))
+                if (reopenedEditor.value as? String)?.utf8.elementsEqual(replacement.utf8) == true {
+                    assertSource(reopenedEditor, equals: replacement)
+                    XCTAssertFalse(reopened.buttons["script.save"].isEnabled)
+                    attach(reopened, "Edited source after relaunch \(japanese ? "ja" : "en")")
+                    foundEditedChild = true
+                    break
+                }
+                reopened.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
+            }
+            XCTAssertTrue(foundEditedChild, "the exact edited source must persist in the child revision")
             reopened.terminate()
         }
     }
@@ -167,8 +176,8 @@ final class AutomationUITests: XCTestCase {
             hierarchy.name = "Multi-file installed editor hierarchy \(locale)"
             hierarchy.lifetime = .keepAlways
             add(hierarchy)
-            let firstEdit = Self.primarySource.replacingOccurrences(of: "limit = 5", with: "limit = 7")
-            let secondEdit = Self.secondarySource.replacingOccurrences(of: "limit = 15", with: "limit = 17")
+            let firstEdit = editedHookSource(requestLimit: 7, maintenance: true)
+            let secondEdit = editedHookSource(requestLimit: 17, maintenance: false)
             let editor = sourceEditor(app)
             selectSourceFile(Self.primaryFile, app: app, fromTop: true)
             assertSource(editor, equals: Self.primarySource)
@@ -437,15 +446,17 @@ private extension AutomationUITests {
         add(diagnostic)
     }
 
+    /// UI lifecycle typing uses one line; SDK source review and native byte regressions remain multiline.
+    func editedHookSource(requestLimit: Int, maintenance: Bool) -> String {
+        "Interceptor.attach({" +
+            "request:{onEnter(req,cfg){req.body.limit=\(requestLimit);},onLeave(req,cfg){}}," +
+            "response:{onEnter(res,cfg){res.body.maintenance=\(maintenance);},onLeave(res,cfg){}}});"
+    }
+
     @MainActor
     func replaceSource(_ editor: XCUIElement, with replacement: String, app: XCUIApplication, japanese: Bool) {
-        let pasteboard = UIPasteboard.general
-        pasteboard.string = replacement
-        let ownedPasteboardChange = pasteboard.changeCount
-        defer {
-            if pasteboard.changeCount == ownedPasteboardChange {
-                pasteboard.items = []
-            }
+        guard !replacement.contains(where: \.isNewline) else {
+            return XCTFail("Lifecycle source input must stay on one line; multiline byte updates have native coverage")
         }
         editor.tap()
         let introduction = app.otherElements["UIContinuousPathIntroductionView"]
@@ -471,56 +482,9 @@ private extension AutomationUITests {
         }
         XCTAssertTrue(selectAll.waitForExistence(timeout: 3), app.debugDescription)
         selectAll.tap()
-        // Select All dismisses the menu on iOS18. Command-V invokes the same UIKit paste action.
-        let runner = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
-            ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
-            ?? ProcessInfo.processInfo.processName
-        guard !runner.isEmpty else { return XCTFail("The UI runner must expose its actual paste source name") }
-        let title = app.navigationBars.firstMatch.staticTexts.firstMatch
-        XCTAssertTrue(title.waitForExistence(timeout: 3))
-        let titleFrame = title.frame
-        let appOrigin = app.frame.origin
-        let titlePoint = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
-            dx: titleFrame.midX - appOrigin.x, dy: titleFrame.midY - appOrigin.y,
-        ))
-        let identity = XCTAttachment(string: "Runner bundle name: \(runner); inert title: \(title.label); frame: \(titleFrame)")
-        identity.name = "Paste source identity and inert trigger"
-        identity.lifetime = .keepAlways
-        add(identity)
-        var pastePermissionWasHandled = false
-        let monitor = addUIInterruptionMonitor(withDescription: "Paste from the UI test runner") { alert in
-            let alertLabel = alert.label
-            let text = alert.staticTexts.allElementsBoundByIndex.map(\.label)
-            let diagnostic = "Expected runner: \(runner)\nAlert label: \(alertLabel)\nStatic text: \(text)"
-            let received = XCTAttachment(string: diagnostic)
-            received.name = "Received paste interruption"
-            received.lifetime = .keepAlways
-            self.add(received)
-            print(diagnostic)
-            guard alertLabel.contains(runner) || text.contains(where: { $0.contains(runner) }) else { return false }
-            let allow = alert.buttons.matching(NSPredicate(format: "label IN %@", ["Allow Paste", "ペーストを許可"])).firstMatch
-            guard allow.exists else { return false }
-            allow.tap()
-            pastePermissionWasHandled = true
-            return true
-        }
-        defer { removeUIInterruptionMonitor(monitor) }
-        editor.typeKey("v", modifierFlags: .command)
-        // Remote paste permission may appear just after the key event. Only the inert title
-        // receives retry taps; no source/selection or app-control interaction is replayed.
-        for _ in 0 ..< 4 {
-            titlePoint.tap()
-            if pastePermissionWasHandled {
-                break
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-        }
-        let permission = XCTAttachment(string: "Expected paste prompt handled: \(pastePermissionWasHandled)")
-        permission.name = "Paste interruption monitor outcome"
-        permission.lifetime = .keepAlways
-        add(permission)
-        let pasted = assertSource(editor, equals: replacement)
-        XCTAssertEqual(pasted.map { Array($0.utf8) }, Array(replacement.utf8))
+        editor.typeText(replacement)
+        let entered = assertSource(editor, equals: replacement)
+        XCTAssertEqual(entered.map { Array($0.utf8) }, Array(replacement.utf8))
         let done = app.buttons[japanese ? "完了" : "Done"]
         if done.exists && done.isHittable {
             done.tap()
