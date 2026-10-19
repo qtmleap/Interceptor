@@ -54,6 +54,7 @@ public enum JavaScriptLimits {
     public static let maxResultDepth = 32
     public static let maxActions = 2
     public static let maxManifestBytes = 32 * 1024
+    public static let maxPackageBytes = 256 * 1024
 }
 
 /// One admitted invocation. Owns the native cancel token for exactly its lifetime: the token is
@@ -105,22 +106,22 @@ public final class JavaScriptExecutor: @unchecked Sendable {
               configJSON.count <= JavaScriptLimits.maxConfigBytes else {
             throw JavaScriptExecutionError.invalidInput
         }
-        return try await admitAndRun(source: source, hookName: hook.functionName, event: eventJSON, config: configJSON, manifest: nil)
+        return try await admitAndRun(input: Data(source.utf8), hookName: hook.functionName, event: eventJSON, config: configJSON, isV2: false)
     }
 
-    private func admitAndRun(source: String, hookName: String, event: Data, config: Data, manifest: Data?) async throws -> Data {
+    private func admitAndRun(input: Data, hookName: String, event: Data, config: Data, isV2: Bool) async throws -> Data {
         if Task.isCancelled { throw JavaScriptExecutionError.cancelled }
         guard let job = Job() else { throw JavaScriptExecutionError.internalFailure }
         guard admit(job) else {
             job.finish()
             throw JavaScriptExecutionError.busy
         }
-        let sourceBytes = Array(source.utf8)
+        let sourceBytes = Array(input)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
                 queue.async {
                     let outcome = Result { try Self.execute(job: job, source: sourceBytes, hook: hookName,
-                                                           event: event, config: config, manifest: manifest) }
+                                                           event: event, config: config, isV2: isV2) }
                     // Release admission before resuming so the caller can immediately run again.
                     self.release(job)
                     continuation.resume(with: outcome)
@@ -132,21 +133,17 @@ public final class JavaScriptExecutor: @unchecked Sendable {
     }
 
 
-    /// Four-phase HTTP lifecycle entry (`qjs_run_v2`). Same admission, limits and fresh-VM guarantees
-    /// as `run`; `manifestJSON` (<= 32 KiB) is the full strict schemaVersion 2 manifest and `eventJSON` the public
-    /// envelope. The C entry revalidates both and filters the callback views by the manifest read grants.
-    public func runV2(source: String, hook: JavaScriptHook, eventJSON: Data, configJSON: Data, manifestJSON: Data) async throws -> Data {
-        guard hook.isLifecyclePhase,
-              source.utf8.count <= JavaScriptLimits.maxSourceBytes,
+    /// Evaluates only the source selected by the full strict schema 2 package and raw event.
+    /// The native C boundary independently validates every file, route, reference and grant.
+    public func runV2(packageJSON: Data, hook: JavaScriptHook, eventJSON: Data, configJSON: Data) async throws -> Data {
+        guard hook.isLifecyclePhase, !packageJSON.isEmpty,
+              packageJSON.count <= JavaScriptLimits.maxPackageBytes,
               eventJSON.count <= JavaScriptLimits.maxEventBytes,
-              configJSON.count <= JavaScriptLimits.maxConfigBytes,
-              manifestJSON.count <= JavaScriptLimits.maxManifestBytes else {
+              configJSON.count <= JavaScriptLimits.maxConfigBytes else {
             throw JavaScriptExecutionError.invalidInput
         }
-        return try await admitAndRun(source: source, hookName: hook.functionName, event: eventJSON, config: configJSON,
-                                     manifest: manifestJSON)
+        return try await admitAndRun(input: packageJSON, hookName: hook.functionName, event: eventJSON, config: configJSON, isV2: true)
     }
-
 
     /// Cancels the currently admitted invocation, if any. Idle calls must not affect later runs.
     public func cancel() {
@@ -171,14 +168,11 @@ public final class JavaScriptExecutor: @unchecked Sendable {
         lock.unlock()
     }
 
-    private static func execute(job: Job, source: [UInt8], hook: String, event: Data, config: Data, manifest: Data?) throws -> Data {
+    private static func execute(job: Job, source: [UInt8], hook: String, event: Data, config: Data, isV2: Bool) throws -> Data {
         // Run strict parsing on the worker queue, before JS can discard duplicate keys.
         do {
             guard case .object = try JSONValue(parsing: event),
                   case .object = try JSONValue(parsing: config) else {
-                throw JavaScriptExecutionError.invalidInput
-            }
-            if let manifest, case .object = try JSONValue(parsing: manifest) {} else if manifest != nil {
                 throw JavaScriptExecutionError.invalidInput
             }
         } catch { throw JavaScriptExecutionError.invalidInput }
@@ -198,13 +192,10 @@ public final class JavaScriptExecutor: @unchecked Sendable {
                 config.withUnsafeBytes { cfg in
                     let evp = ev.baseAddress?.assumingMemoryBound(to: UInt8.self)
                     let cfgp = cfg.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                    guard let manifest else {
-                        return qjs_run(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count)
+                    if isV2 {
+                        return qjs_run_v2(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count)
                     }
-                    return manifest.withUnsafeBytes { man in
-                        qjs_run_v2(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count,
-                                   man.baseAddress?.assumingMemoryBound(to: UInt8.self), man.count)
-                    }
+                    return qjs_run(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count)
                 }
             }
         }

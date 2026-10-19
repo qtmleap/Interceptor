@@ -183,8 +183,30 @@ public actor AutomationStore {
     public func editSource(of revisionID: String, to source: String) throws -> InstalledRevision {
         try transact { cat in
             guard let parent = cat.revision(id: revisionID) else { throw AutomationError.unknownRevision }
-            guard parent.package.source != source else { throw AutomationError.noChange }
+            guard parent.package.source?.utf8.elementsEqual(source.utf8) != true else { throw AutomationError.noChange }
             let edited = try parent.package.replacingSource(source)
+            return try add(InstalledRevision(package: edited, provenance: Provenance(origin: .localEdit(parent: parent.package.revision), trustAtImport: nil), enabled: false), to: &cat)
+        }
+    }
+
+    /// Edits one named schema 2 source. Other files and the complete manifest are preserved.
+    public func editSource(of revisionID: String, file: String, to source: String) throws -> InstalledRevision {
+        try transact { cat in
+            guard let parent = cat.revision(id: revisionID) else { throw AutomationError.unknownRevision }
+            guard let previous = parent.package.sourceFiles[file] else { throw AutomationError.invalidManifest }
+            guard !previous.utf8.elementsEqual(source.utf8) else { throw AutomationError.noChange }
+            let edited = try parent.package.replacingSource(source, file: file)
+            return try add(InstalledRevision(package: edited, provenance: Provenance(origin: .localEdit(parent: parent.package.revision), trustAtImport: nil), enabled: false), to: &cat)
+        }
+    }
+
+    /// Saves all routed files in one revision, preserving the complete manifest and parent history.
+    public func editSources(of revisionID: String, to files: [String: String]) throws -> InstalledRevision {
+        try transact { cat in
+            guard let parent = cat.revision(id: revisionID) else { throw AutomationError.unknownRevision }
+            guard parent.package.manifest.schemaVersion == 2 else { throw AutomationError.invalidManifest }
+            guard parent.package.sourceFiles.count != files.count || !files.allSatisfy({ path, source in parent.package.sourceFiles[path]?.utf8.elementsEqual(source.utf8) == true }) else { throw AutomationError.noChange }
+            let edited = try parent.package.replacingSources(files)
             return try add(InstalledRevision(package: edited, provenance: Provenance(origin: .localEdit(parent: parent.package.revision), trustAtImport: nil), enabled: false), to: &cat)
         }
     }

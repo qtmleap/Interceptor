@@ -14,9 +14,9 @@ final class PluginActivationStoreTests: XCTestCase {
     private func package(_ id: UUID = UUID(), source: String = "// inactive until approved") throws -> PluginPackage {
         let json = """
         {"manifest":{"schemaVersion":2,"id":"\(id.uuidString)","name":"Test","version":"1.0.0",
-        "matches":[{"hosts":["example.com"]}],
+        "matches":[{"hosts":["example.com"],"methods":["GET"],"path":{"kind":"exact","value":"/"},"hooks":{"request":{"onEnter":"hooks/example.com/GET.js"}}}],
         "read":{"metadata":["method","host","path","status"],"headers":[],"queryKeys":[],"body":{"mode":"json"}},
-        "write":{"requestBody":true,"responseBody":true},"endpointBindings":[],"settings":{}},"source":"\(source)"}
+        "write":{"requestBody":true,"responseBody":true},"endpointBindings":[],"settings":{}},"sourceFiles":{"hooks/example.com/GET.js":"\(source)"}}
         """
         return try PluginPackage.validate(Data(json.utf8))
     }

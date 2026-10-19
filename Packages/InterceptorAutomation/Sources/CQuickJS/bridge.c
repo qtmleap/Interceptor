@@ -56,7 +56,7 @@ void qjs_cancel_token_free(QJSCancelToken *token) {
 
 typedef struct { char *s; size_t n; } Str;
 
-// Canonical form of one match: string sets are sorted and duplicate-free so equality is exact.
+// One exact route and its four optional native-selected source references.
 typedef struct {
     Str *hosts;
     size_t nhosts;
@@ -67,10 +67,13 @@ typedef struct {
     Str path;
     int has_status;
     int lo, hi;
+    Str hooks[4];   // request enter/leave, response enter/leave source references
 } Match;
 
+typedef struct { Str name, code; int referenced; } SourceFile;
+
 typedef struct {
-    int match;      // index of the declared manifest match this registration equals
+    int match;      // native-selected route index
     JSValue cb;     // callback for the invoked phase, or JS_UNDEFINED
 } Reg;
 
@@ -90,6 +93,10 @@ typedef struct RunState {
     int phase_kind;      // 0 enter, 1 leave
     int ndecl;           // declared manifest matches parsed so far
     Match decl[MAX_REGS];
+    SourceFile files[64];
+    int nfiles;
+    int selected_route;
+    unsigned expected_phases, registered_phases;
     // v2 only: manifest read grants (header names lowercased), applied while building the event views.
     unsigned read_meta;  // 1 method, 2 host, 4 status, 8 path
     Str *rd_headers;
@@ -981,15 +988,14 @@ cleanup:
 // MARK: v2: four HTTP lifecycle phases
 //
 // `qjs_run_v2` shares the limits, allocator, scanner and result serializer above. In addition:
-//  * `Interceptor.attach(match, callbacks)` is a native function installed before user code. Every
+//  * `Interceptor.attach(callbacks)` is a native function installed before user code. Every
 //    registration is read with own-data-property descriptors only (no getters, no Proxy, no
-//    prototype lookups) and must equal one match declared in the manifest, otherwise the whole
-//    execution fails, even if the script catches the TypeError. All registrations are checked while
-//    the source is evaluated, before any callback is invoked.
-//  * Matching uses the UNFILTERED request method/host/path and response status of the public event
-//    envelope and the declared match, never
-//    anything the script can influence. Only callbacks of the invoked phase whose declared match
-//    accepts the identity are called, each with (own leg, config).
+//    prototype lookups) and binds to the native-selected route. The registered phase union must
+//    equal every manifest phase referencing the selected file. Invalid and late registrations
+//    remain sticky even if user code catches the TypeError.
+//  * Matching uses the UNFILTERED request method/host/path and requested phase. No match evaluates
+//    no code; ambiguity rejects before evaluation. The selected file runs in one fresh VM, then
+//    only callbacks of the invoked phase run, each with (own leg, config).
 //  * The only possible mutation is the JSON `body` of the invoked leg, for an enter phase whose
 //    write grant is declared in the manifest. The final tree is compared with the canonical form
 //    of the original tree; an unchanged tree yields no mutation at all.
@@ -1008,6 +1014,7 @@ static void match_free(Match *m) {
     strs_free(m->hosts, m->nhosts);
     strs_free(m->methods, m->nmethods);
     str_free(&m->path);
+    for (int i = 0; i < 4; i++) str_free(&m->hooks[i]);
     memset(m, 0, sizeof(*m));
 }
 
@@ -1017,19 +1024,6 @@ static int str_cmp(const void *a, const void *b) {
     int c = n ? memcmp(x->s, y->s, n) : 0;
     if (c) return c;
     return x->n < y->n ? -1 : (x->n > y->n);
-}
-
-static int strs_equal(const Str *a, size_t an, const Str *b, size_t bn) {
-    if (an != bn) return 0;
-    for (size_t i = 0; i < an; i++) if (str_cmp(&a[i], &b[i]) != 0) return 0;
-    return 1;
-}
-
-static int match_equal(const Match *a, const Match *b) {
-    return strs_equal(a->hosts, a->nhosts, b->hosts, b->nhosts) && a->has_methods == b->has_methods &&
-           strs_equal(a->methods, a->nmethods, b->methods, b->nmethods) && a->path_kind == b->path_kind &&
-           (a->path_kind == 0 || str_cmp(&a->path, &b->path) == 0) && a->has_status == b->has_status &&
-           (!a->has_status || (a->lo == b->lo && a->hi == b->hi));
 }
 
 // Enumerable own data property; takes ownership of *out. Never invokes accessors.
@@ -1139,37 +1133,57 @@ static int get_str_set(RunState *st, JSContext *ctx, JSValueConst arr, size_t ma
     return 1;
 }
 
-// {hosts, methods?, path?:{kind,value}, status?:{min,max}} -> canonical Match. On failure `m` is freed.
+// Source keys are bounded, safe relative ASCII POSIX paths, independent of route conditions.
+static int source_path_ok(const Str *s) {
+    if (!s->n || s->n > 256) return 0;
+    size_t start = 0;
+    for (size_t i = 0; i <= s->n; i++) {
+        if (i == s->n || s->s[i] == '/') {
+            size_t n = i - start;
+            if (!n || (n == 1 && s->s[start] == '.') || (n == 2 && s->s[start] == '.' && s->s[start + 1] == '.')) return 0;
+            start = i + 1;
+        } else {
+            unsigned char c = s->s[i];
+            if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '.' || c == '_' || c == '~')) return 0;
+        }
+    }
+    return 1;
+}
+
 static int parse_match(RunState *st, JSContext *ctx, JSValueConst obj, Match *m) {
-    static const char *const mk[] = {"hosts", "methods", "path", "status"};
+    static const char *const mk[] = {"hosts", "methods", "path", "hooks"};
     static const char *const pk[] = {"kind", "value"};
-    static const char *const sk[] = {"min", "max"};
-    JSValue f[4], p[2], s[2];
-    int ok = 0;
+    static const char *const legs[] = {"request", "response"};
+    static const char *const phases[] = {"onEnter", "onLeave"};
+    JSValue f[4], p[2], h[2];
+    int ok = 0, count = 0;
     memset(m, 0, sizeof(*m));
-    if (!read_obj(st, ctx, obj, mk, 4, 1u, f)) return 0;
-    if (!get_str_set(st, ctx, f[0], 32, &m->hosts, &m->nhosts)) goto done;
-    for (size_t i = 0; i < m->nhosts; i++) if (m->hosts[i].n == 0 || m->hosts[i].n > 253) goto done;
-    if (!JS_IsUndefined(f[1])) {
-        m->has_methods = 1;
-        if (!get_str_set(st, ctx, f[1], 16, &m->methods, &m->nmethods)) goto done;
+    if (!read_obj(st, ctx, obj, mk, 4, 15u, f)) return 0;
+    if (!get_str_set(st, ctx, f[0], 1, &m->hosts, &m->nhosts)) goto done;
+    m->has_methods = 1;
+    if (!get_str_set(st, ctx, f[1], 1, &m->methods, &m->nmethods)) goto done;
+    if (!read_obj(st, ctx, f[2], pk, 2, 3u, p)) goto done;
+    int good = str_eq(ctx, p[0], "exact") && get_str(ctx, p[1], &m->path, 1024);
+    JS_FreeValue(ctx, p[0]); JS_FreeValue(ctx, p[1]);
+    if (!good) goto done;
+    m->path_kind = 1;
+    if (!read_obj(st, ctx, f[3], legs, 2, 0u, h)) goto done;
+    good = 1;
+    for (int l = 0; l < 2 && good; l++) {
+        if (JS_IsUndefined(h[l])) continue;
+        JSValue refs[2];
+        if (!read_obj(st, ctx, h[l], phases, 2, 0u, refs)) { good = 0; break; }
+        int leg_count = 0;
+        for (int k = 0; k < 2 && good; k++) {
+            if (JS_IsUndefined(refs[k])) continue;
+            good = get_str(ctx, refs[k], &m->hooks[l * 2 + k], 256) && source_path_ok(&m->hooks[l * 2 + k]);
+            leg_count++; count++;
+        }
+        JS_FreeValue(ctx, refs[0]); JS_FreeValue(ctx, refs[1]);
+        if (!leg_count) good = 0;
     }
-    if (!JS_IsUndefined(f[2])) {
-        if (!read_obj(st, ctx, f[2], pk, 2, 3u, p)) goto done;
-        int good = (str_eq(ctx, p[0], "exact") || str_eq(ctx, p[0], "prefix")) && get_str(ctx, p[1], &m->path, 1024);
-        if (good) m->path_kind = str_eq(ctx, p[0], "exact") ? 1 : 2;
-        JS_FreeValue(ctx, p[0]);
-        JS_FreeValue(ctx, p[1]);
-        if (!good) goto done;
-    }
-    if (!JS_IsUndefined(f[3])) {
-        if (!read_obj(st, ctx, f[3], sk, 2, 3u, s)) goto done;
-        int good = get_int(s[0], &m->lo) && get_int(s[1], &m->hi) && m->lo >= 100 && m->hi <= 599 && m->lo <= m->hi;
-        JS_FreeValue(ctx, s[0]);
-        JS_FreeValue(ctx, s[1]);
-        if (!good) goto done;
-        m->has_status = 1;
-    }
+    JS_FreeValue(ctx, h[0]); JS_FreeValue(ctx, h[1]);
+    if (!good || !count) goto done;
     ok = 1;
 done:
     for (int i = 0; i < 4; i++) JS_FreeValue(ctx, f[i]);
@@ -1208,36 +1222,35 @@ static JSValue js_attach(JSContext *ctx, JSValueConst this_val, int argc, JSValu
     static const char *const hk[] = {"onEnter", "onLeave"};
     (void)this_val;
     RunState *st = JS_GetContextOpaque(ctx);
-    Match m;
     JSValue legs[2], cb = JS_UNDEFINED;
-    int have_match = 0, ok = 0, idx = -1;
+    unsigned phases = 0;
+    int ok = 0;
     legs[0] = legs[1] = JS_UNDEFINED;
-    if (!st || st->sealed || argc != 2 || st->nregs >= MAX_REGS) goto done;
-    if (!parse_match(st, ctx, argv[0], &m)) goto done;
-    have_match = 1;
-    for (int i = 0; i < st->ndecl; i++) if (match_equal(&st->decl[i], &m)) { idx = i; break; }
-    if (idx < 0) goto done;
-    if (!read_obj(st, ctx, argv[1], ck, 2, 0u, legs)) goto done;
+    if (!st || st->sealed || argc != 1 || st->nregs >= MAX_REGS) goto done;
+    if (!read_obj(st, ctx, argv[0], ck, 2, 0u, legs)) goto done;
     for (int l = 0; l < 2; l++) {
         if (JS_IsUndefined(legs[l])) continue;
         JSValue h[2];
         if (!read_obj(st, ctx, legs[l], hk, 2, 0u, h)) goto done;
-        int good = (JS_IsUndefined(h[0]) || JS_IsFunction(ctx, h[0])) && (JS_IsUndefined(h[1]) || JS_IsFunction(ctx, h[1]));
+        int good = 1;
+        for (int k = 0; k < 2; k++) {
+            if (JS_IsUndefined(h[k])) continue;
+            if (!JS_IsFunction(ctx, h[k])) good = 0;
+            else phases |= 1u << (l * 2 + k);
+        }
         if (good && l == st->phase_leg) cb = JS_DupValue(ctx, h[st->phase_kind]);
-        JS_FreeValue(ctx, h[0]);
-        JS_FreeValue(ctx, h[1]);
+        JS_FreeValue(ctx, h[0]); JS_FreeValue(ctx, h[1]);
         if (!good) goto done;
     }
-    st->regs[st->nregs].match = idx;
+    if (phases & ~st->expected_phases) goto done;
+    st->registered_phases |= phases;
+    st->regs[st->nregs].match = st->selected_route;
     st->regs[st->nregs].cb = cb;
     cb = JS_UNDEFINED;
     st->nregs++;
     ok = 1;
 done:
-    if (have_match) match_free(&m);
-    JS_FreeValue(ctx, legs[0]);
-    JS_FreeValue(ctx, legs[1]);
-    JS_FreeValue(ctx, cb);
+    JS_FreeValue(ctx, legs[0]); JS_FreeValue(ctx, legs[1]); JS_FreeValue(ctx, cb);
     if (ok) return JS_UNDEFINED;
     if (st) st->attach_failed = 1;
     return JS_ThrowTypeError(ctx, "invalid Interceptor.attach");
@@ -1246,7 +1259,7 @@ done:
 static int install_interceptor(JSContext *ctx) {
     JSValue global = JS_GetGlobalObject(ctx);
     JSValue ns = JS_NewObject(ctx);
-    JSValue fn = JS_NewCFunction(ctx, js_attach, "attach", 2);
+    JSValue fn = JS_NewCFunction(ctx, js_attach, "attach", 1);
     int ok = !JS_IsException(ns) && !JS_IsException(fn) &&
              JS_DefinePropertyValueStr(ctx, ns, "attach", fn, JS_PROP_ENUMERABLE) > 0;   // read-only, fixed
     fn = JS_UNDEFINED;
@@ -1587,6 +1600,50 @@ done:
     return ok;
 }
 
+// Validate every decoded source and all references, including files that will never evaluate.
+static int load_package(RunState *st, JSContext *ctx, JSValueConst root, int *write_request, int *write_response) {
+    static const char *const keys[] = {"manifest", "sourceFiles"};
+    JSValue f[2];
+    if (!read_obj(st, ctx, root, keys, 2, 3u, f)) return 0;
+    int ok = 0;
+    Buf manifest = {NULL, 0, 0, 0};
+    if (!serialize_value(st, ctx, f[0], 1, 32, QJS_MAX_MANIFEST_BYTES, &manifest)) goto done;
+    free(manifest.p); manifest.p = NULL;
+    if (!load_manifest(st, ctx, f[0], write_request, write_response)) goto done;
+    if (JS_GetClassID(f[1]) != st->cls_object) goto done;
+    JSPropertyEnum *tab;
+    uint32_t count;
+    if (JS_GetOwnPropertyNames(ctx, &tab, &count, f[1], JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) goto done;
+    int good = count >= 1 && count <= 64;
+    size_t total = 0;
+    for (uint32_t i = 0; i < count && good; i++) {
+        SourceFile *file = &st->files[st->nfiles++];
+        JSValue key = JS_AtomToValue(ctx, tab[i].atom), code = JS_UNDEFINED;
+        good = get_str(ctx, key, &file->name, 256) && source_path_ok(&file->name) &&
+               own_data(ctx, f[1], tab[i].atom, &code) && get_str(ctx, code, &file->code, 128u * 1024u);
+        JS_FreeValue(ctx, key); JS_FreeValue(ctx, code);
+        total += file->code.n;
+        if (total > 128u * 1024u) good = 0;
+    }
+    JS_FreePropertyEnum(ctx, tab, count);
+    if (!good) goto done;
+    for (int i = 0; i < st->ndecl; i++) for (int p = 0; p < 4; p++) {
+        Str *ref = &st->decl[i].hooks[p];
+        if (!ref->s) continue;
+        int found = 0;
+        for (int j = 0; j < st->nfiles; j++) if (str_cmp(ref, &st->files[j].name) == 0) {
+            found = 1; st->files[j].referenced = 1; break;
+        }
+        if (!found) goto done;
+    }
+    for (int i = 0; i < st->nfiles; i++) if (!st->files[i].referenced) goto done;
+    ok = 1;
+done:
+    free(manifest.p);
+    JS_FreeValue(ctx, f[0]); JS_FreeValue(ctx, f[1]);
+    return ok;
+}
+
 // MARK: immutable views
 //
 // Everything a callback receives is frozen natively before user code exists (own properties become
@@ -1828,13 +1885,13 @@ static int v2_setup_failure(const RunState *st) {
 }
 
 QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
-                     const uint8_t *source, size_t source_len,
+                     const uint8_t *package_json, size_t package_len,
                      const char *hook,
                      const uint8_t *event_json, size_t event_len,
-                     const uint8_t *config_json, size_t config_len,
-                     const uint8_t *manifest_json, size_t manifest_len) {
+                     const uint8_t *config_json, size_t config_len) {
     QJSResult res = {QJS_INTERNAL, NULL, 0};
-    uint8_t *src = NULL, *ev = NULL, *cfg = NULL, *man = NULL;
+    uint8_t *src = NULL, *ev = NULL, *cfg = NULL, *package = NULL;
+    size_t source_len = 0;
     JSRuntime *rt = NULL;
     JSContext *ctx = NULL;
     JSValue evv = JS_UNDEFINED, cfgv = JS_UNDEFINED, manv = JS_UNDEFINED, legv = JS_UNDEFINED;
@@ -1858,26 +1915,20 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
     st.phase_leg = leg;
     st.phase_kind = kind;
 
-    if (!source || source_len == 0 || source_len > limits->max_source_bytes ||
+    if (!package_json || package_len == 0 || package_len > QJS_MAX_PACKAGE_BYTES ||
         !event_json || event_len == 0 || event_len > limits->max_event_bytes ||
-        !config_json || config_len == 0 || config_len > limits->max_config_bytes ||
-        !manifest_json || manifest_len == 0 || manifest_len > QJS_MAX_MANIFEST_BYTES) {
-        res.status = QJS_INVALID_INPUT;
-        return res;
-    }
-    if (memchr(source, 0, source_len) != NULL || !utf8_valid(source, source_len)) {
+        !config_json || config_len == 0 || config_len > limits->max_config_bytes) {
         res.status = QJS_INVALID_INPUT;
         return res;
     }
     if (budget_exceeded(&st)) { res.status = st.stop; return res; }
-    src = copy_z(source, source_len);
     ev = copy_z(event_json, event_len);
     cfg = copy_z(config_json, config_len);
-    man = copy_z(manifest_json, manifest_len);
-    if (!src || !ev || !cfg || !man) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
-    if (!json_check(ev, event_len, 64) || !json_check(cfg, config_len, 64) || !json_check(man, manifest_len, 32) ||
+    package = copy_z(package_json, package_len);
+    if (!ev || !cfg || !package) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
+    if (!json_check(ev, event_len, 64) || !json_check(cfg, config_len, 64) || !json_check(package, package_len, 64) ||
         !v2_safe_integer_tokens(ev, event_len) || !v2_safe_integer_tokens(cfg, config_len) ||
-        !v2_safe_integer_tokens(man, manifest_len)) {
+        !v2_safe_integer_tokens(package, package_len)) {
         status = QJS_INVALID_INPUT;
         goto cleanup;
     }
@@ -1909,18 +1960,45 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
     JS_SetContextOpaque(ctx, &st);
 
     // Manifest, event and config are parsed and validated natively before user code exists.
-    manv = JS_ParseJSON(ctx, (const char *)man, manifest_len, "<manifest>");
+    manv = JS_ParseJSON(ctx, (const char *)package, package_len, "<package>");
     if (JS_IsException(manv)) { status = classify_exception(ctx, &st, QJS_INVALID_INPUT); goto cleanup; }
     evv = JS_ParseJSON(ctx, (const char *)ev, event_len, "<event>");
     if (JS_IsException(evv)) { status = classify_exception(ctx, &st, QJS_INVALID_INPUT); goto cleanup; }
     cfgv = JS_ParseJSON(ctx, (const char *)cfg, config_len, "<config>");
     if (JS_IsException(cfgv)) { status = classify_exception(ctx, &st, QJS_INVALID_INPUT); goto cleanup; }
 
-    if (!load_manifest(&st, ctx, manv, &write_request, &write_response)) { status = v2_setup_failure(&st); goto cleanup; }
+    if (!load_package(&st, ctx, manv, &write_request, &write_response)) { status = v2_setup_failure(&st); goto cleanup; }
     st.body_writable = kind == 0 && (leg == 0 ? write_request : write_response);
     if (!freeze_tree(&st, ctx, cfgv, 1, 0)) { status = v2_setup_failure(&st); goto cleanup; }
     have_id = 1;   // ident_free tolerates a partially filled identity
     if (!load_event(&st, ctx, evv, hook, leg == 1, &id, &legv)) { status = v2_setup_failure(&st); goto cleanup; }
+
+    // Select from the raw identity and requested phase before evaluating any source.
+    int candidates = 0, phase = leg * 2 + kind, selected_file = -1;
+    for (int i = 0; i < st.ndecl; i++) {
+        if (st.decl[i].hooks[phase].s && match_accepts(&st.decl[i], &id, leg == 1)) {
+            st.selected_route = i; candidates++;
+        }
+    }
+    if (candidates > 1) { status = QJS_INVALID_INPUT; goto cleanup; }
+    if (!candidates) {
+        if (budget_exceeded(&st)) { status = st.stop; goto cleanup; }
+        const char *empty = "{\"actions\":[]}";
+        size_t len = strlen(empty);
+        if (len > limits->max_result_bytes) { status = QJS_INVALID_RESULT; goto cleanup; }
+        res.data = copy_z((const uint8_t *)empty, len);
+        if (!res.data) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
+        res.length = len; status = QJS_OK; goto cleanup;
+    }
+    Str *selected = &st.decl[st.selected_route].hooks[phase];
+    for (int i = 0; i < st.nfiles; i++) if (str_cmp(selected, &st.files[i].name) == 0) selected_file = i;
+    if (selected_file < 0) { status = QJS_INVALID_INPUT; goto cleanup; }
+    for (int i = 0; i < st.ndecl; i++) for (int p = 0; p < 4; p++)
+        if (st.decl[i].hooks[p].s && str_cmp(selected, &st.decl[i].hooks[p]) == 0) st.expected_phases |= 1u << p;
+    source_len = st.files[selected_file].code.n;
+    if (source_len > limits->max_source_bytes) { status = QJS_INVALID_INPUT; goto cleanup; }
+    src = copy_z((const uint8_t *)st.files[selected_file].code.s, source_len);
+    if (!src) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
 
     // Canonical form of the original body of the invoked leg (the only thing a callback may change).
     if (kind == 0 && (leg == 0 ? write_request : write_response)) {
@@ -1943,7 +2021,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
         if (JS_IsException(completion)) { status = classify_exception(ctx, &st, QJS_SCRIPT_ERROR); goto cleanup; }
         JS_FreeValue(ctx, completion);
         st.sealed = 1;
-        if (st.attach_failed) { status = st.stop ? st.stop : QJS_SCRIPT_ERROR; goto cleanup; }
+        if (st.attach_failed || st.registered_phases != st.expected_phases) { status = st.stop ? st.stop : QJS_SCRIPT_ERROR; goto cleanup; }
     }
 
     {
@@ -1960,7 +2038,6 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
         b_str(&v.out, "{\"actions\":[");
         for (int i = 0; i < st.nregs && ok; i++) {
             if (!JS_IsFunction(ctx, st.regs[i].cb)) continue;
-            if (!match_accepts(&st.decl[st.regs[i].match], &id, leg == 1)) continue;
             JSValueConst argv[2];
             argv[0] = legv;
             argv[1] = cfgv;
@@ -1970,6 +2047,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
                 free(v.out.p);
                 goto cleanup;
             }
+            if (st.attach_failed) { JS_FreeValue(ctx, ret); free(v.out.p); status = QJS_SCRIPT_ERROR; goto cleanup; }
             if (!JS_IsUndefined(ret)) ok = emit_actions(&v, ret);
             JS_FreeValue(ctx, ret);
         }
@@ -2042,7 +2120,8 @@ cleanup:
     free(src);
     free(ev);
     free(cfg);
-    free(man);
+    free(package);
+    for (int i = 0; i < st.nfiles; i++) { str_free(&st.files[i].name); str_free(&st.files[i].code); }
     res.status = status;
     return res;
 }

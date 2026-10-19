@@ -5,8 +5,8 @@ import AutomationCore
 /// Four dotted HTTP lifecycle phases through the real shared C runtime (`qjs_run_v2`).
 final class HTTPHooksRuntimeTests: XCTestCase, @unchecked Sendable {
     private let endpoint = "11111111-1111-1111-1111-111111111111"
-    private let match = #"{"hosts":["api.example.com"],"methods":["POST"],"path":{"kind":"exact","value":"/search"}}"#
-    private let attachMatch = #"{hosts:["api.example.com"],methods:["POST"],path:{kind:"exact",value:"/search"}}"#
+    private let match = #"{"hosts":["api.example.com"],"methods":["POST"],"path":{"kind":"exact","value":"/search"},"hooks":{"request":{"onEnter":"hooks/api.example.com/search/POST.js","onLeave":"hooks/api.example.com/search/POST.js"},"response":{"onEnter":"hooks/api.example.com/search/POST.js","onLeave":"hooks/api.example.com/search/POST.js"}}}"#
+    private let file = "hooks/api.example.com/search/POST.js"
     private let config = Data(#"{"limit":5}"#.utf8)
 
     private let manifestID = "22222222-2222-4222-8222-222222222222"
@@ -29,8 +29,11 @@ final class HTTPHooksRuntimeTests: XCTestCase, @unchecked Sendable {
 
     private func run(_ source: String, _ hook: JavaScriptHook, event: Data? = nil, manifest: Data? = nil,
                      executor: JavaScriptExecutor = JavaScriptExecutor()) async throws -> [String: Any] {
-        let data = try await executor.runV2(source: source, hook: hook, eventJSON: event ?? self.event(), configJSON: config,
-                                            manifestJSON: manifest ?? self.manifest())
+        let code = try JSONValue.string(source).jsonString()
+        let manifestText = String(decoding: manifest ?? self.manifest(), as: UTF8.self)
+        let packageText = "{\"manifest\":\(manifestText),\"sourceFiles\":{\"\(file)\":\(code)}}"
+        let package = Data(packageText.utf8)
+        let data = try await executor.runV2(packageJSON: package, hook: hook, eventJSON: event ?? self.event(), configJSON: config)
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
@@ -43,7 +46,15 @@ final class HTTPHooksRuntimeTests: XCTestCase, @unchecked Sendable {
     }
 
     private func attach(_ request: String = "", _ response: String = "") -> String {
-        "Interceptor.attach(\(attachMatch), {request:{\(request)},response:{\(response)}});"
+        func complete(_ handlers: String) -> String {
+            var all = handlers
+            for phase in ["onEnter", "onLeave"] where !handlers.contains(phase) {
+                if !all.isEmpty { all += "," }
+                all += phase + "(){}"
+            }
+            return all
+        }
+        return "Interceptor.attach({request:{\(complete(request))},response:{\(complete(response))}});"
     }
 
     private func marker(_ name: String) -> String { "{actions:[{type:'webhook',endpointId:'\(endpoint)',json:{ran:'\(name)'}}]}" }
@@ -124,45 +135,27 @@ final class HTTPHooksRuntimeTests: XCTestCase, @unchecked Sendable {
         }
     }
 
-    func testPrefixAndStatusMatching() async throws {
-        let m = manifest(matches: #"{"hosts":["api.example.com"],"path":{"kind":"prefix","value":"/search"},"status":{"min":500,"max":599}}"#)
-        let src = "Interceptor.attach({hosts:['api.example.com'],path:{kind:'prefix',value:'/search'},status:{min:500,max:599}},{response:{onEnter(){throw new Error('no');}}});"
-        let r = try await run(src, .responseEnter, manifest: m)  // status 200 is outside 500...599
-        XCTAssertEqual((r["actions"] as? [Any])?.count, 0)
-        let ev = event(path: "/search/x", status: 503)
-        await expectError(.scriptError, src, .responseEnter, event: ev, manifest: m)
+    func testPrefixStatusAndMultipleHostMethodSelectorsAreRejected() async {
+        for route in [
+            #"{"hosts":["api.example.com"],"methods":["POST"],"path":{"kind":"prefix","value":"/search"},"hooks":{"request":{"onEnter":"hooks/api.example.com/search/POST.js"}}}"#,
+            #"{"hosts":["api.example.com"],"methods":["POST"],"path":{"kind":"exact","value":"/search"},"status":{"min":200,"max":299},"hooks":{"request":{"onEnter":"hooks/api.example.com/search/POST.js"}}}"#,
+            #"{"hosts":["api.example.com","b.example.com"],"methods":["POST"],"path":{"kind":"exact","value":"/search"},"hooks":{"request":{"onEnter":"hooks/api.example.com/search/POST.js"}}}"#,
+            #"{"hosts":["api.example.com"],"methods":["POST","GET"],"path":{"kind":"exact","value":"/search"},"hooks":{"request":{"onEnter":"hooks/api.example.com/search/POST.js"}}}"#
+        ] { await expectError(.invalidInput, attach("onEnter(){}"), manifest: manifest(matches: route)) }
     }
 
-    // MARK: declared-match enforcement (all registrations, before any callback)
-
-    func testUndeclaredRegistrationFailsBeforeAnyCallback() async {
+    func testTwoArgumentAttachIsRejectedBeforeAnyCallback() async {
         let src = attach("onEnter(){ return \(marker("a")); }") + "Interceptor.attach({hosts:['evil.example.com']},{request:{onEnter(){}}});"
         await expectError(.scriptError, src)
-        await expectError(.scriptError, src, .responseLeave)
-    }
-
-    func testUndeclaredFieldsOrWidenedMatchesAreRejected() async {
-        for widened in ["{hosts:['api.example.com']}",
-                        "{hosts:['api.example.com','b.example.com'],methods:['POST'],path:{kind:'exact',value:'/search'}}",
-                        "{hosts:['api.example.com'],methods:['POST'],path:{kind:'prefix',value:'/search'}}",
-                        "{hosts:['api.example.com'],methods:['POST','GET'],path:{kind:'exact',value:'/search'}}",
-                        "{hosts:['api.example.com'],methods:['POST'],path:{kind:'exact',value:'/search'},status:{min:100,max:599}}",
-                        "{hosts:['api.example.com'],methods:['POST'],path:{kind:'exact',value:'/search'},extra:1}",
-                        "{}", "null", "[]", "'api.example.com'"] {
-            await expectError(.scriptError, "Interceptor.attach(\(widened),{request:{onEnter(){}}});")
-        }
     }
 
     func testSwallowedAttachFailureStillFailsExecution() async {
-        let src = "try { Interceptor.attach({hosts:['evil.example.com']},{request:{onEnter(){}}}); } catch (e) {}" + attach("onEnter(){}")
+        let src = "try { Interceptor.attach({},{}); } catch (e) {}" + attach("onEnter(){}")
         await expectError(.scriptError, src)
     }
 
-    func testReorderedFieldsAndFieldOrderStillEqualDeclaredMatch() async throws {
-        let m = manifest(matches: #"{"hosts":["b.example.com","api.example.com"],"methods":["POST","PUT"]}"#)
-        let src = "Interceptor.attach({methods:['PUT','POST'],hosts:['api.example.com','b.example.com']},{request:{onEnter(){return \(marker("ok"));}}});"
-        let r = try await run(src, .requestEnter, manifest: m)
-        XCTAssertEqual((r["actions"] as? [Any])?.count, 1)
+    func testSwallowedLateAttachFailureDiscardsMutationAndActions() async {
+        await expectError(.scriptError, attach("onEnter(r){r.body.limit=1;try{Interceptor.attach({});}catch(e){}return \(marker("late"));}"))
     }
 
     func testSameMatchMayBeReusedAndMaxSixteenRegistrations() async throws {
@@ -173,12 +166,12 @@ final class HTTPHooksRuntimeTests: XCTestCase, @unchecked Sendable {
     }
 
     func testMalformedAttachArgumentsFail() async {
-        for bad in ["Interceptor.attach()", "Interceptor.attach(\(attachMatch))", "Interceptor.attach(\(attachMatch), null)",
-                    "Interceptor.attach(\(attachMatch), {request:{onEnter:1}})", "Interceptor.attach(\(attachMatch), {request:{onFoo(){}}})",
-                    "Interceptor.attach(\(attachMatch), {other:{}})", "Interceptor.attach(\(attachMatch), {request:null})",
-                    "Interceptor.attach(\(attachMatch), {get request(){return {};}})",
-                    "Interceptor.attach(new Proxy(\(attachMatch),{}), {})",
-                    "Interceptor.attach(\(attachMatch), {request:{get onEnter(){return function(){};}}})"] {
+        for bad in ["Interceptor.attach()", "Interceptor.attach(null)", "Interceptor.attach({}, {})",
+                    "Interceptor.attach({request:{onEnter:1}})", "Interceptor.attach({request:{onFoo(){}}})",
+                    "Interceptor.attach({other:{}})", "Interceptor.attach({request:null})",
+                    "Interceptor.attach({get request(){throw new Error('getter');}})",
+                    "Interceptor.attach(new Proxy({request:{onEnter(){}}},{ownKeys(){while(true){}}}))",
+                    "Interceptor.attach({request:{get onEnter(){while(true){}}}})"] {
             await expectError(.scriptError, bad)
         }
     }

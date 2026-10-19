@@ -3,7 +3,7 @@ import XCTest
 
 /// Schema 2 (four HTTP lifecycle hooks) manifest validation through the existing PluginPackage.validate entry.
 final class HTTPHooksManifestTests: XCTestCase {
-    private static let match = #"{"hosts":["api.example.com"],"methods":["POST"],"path":{"kind":"exact","value":"/search"}}"#
+    private static let match = #"{"hosts":["api.example.com"],"methods":["POST"],"path":{"kind":"exact","value":"/search"},"hooks":{"request":{"onEnter":"selected.js"}}}"#
     private static let read = #"{"metadata":["method","host"],"headers":["x-a"],"queryKeys":["q"],"body":{"mode":"json"}}"#
     private static let write = #"{"requestBody":true,"responseBody":false}"#
 
@@ -15,7 +15,7 @@ final class HTTPHooksManifestTests: XCTestCase {
         ]
         if let omit { fields.removeAll { $0.hasPrefix(#""\#(omit)""#) } }
         let manifest = "{" + fields.joined(separator: ",") + extra + "}"
-        return Data(#"{"manifest":\#(manifest),"source":"Interceptor.attach({hosts:[\"api.example.com\"]},{});"}"#.utf8)
+        return Data(#"{"manifest":\#(manifest),"sourceFiles":{"selected.js":"Interceptor.attach({request:{onEnter(){}}});"}}"#.utf8)
     }
 
     private func accepts(_ data: Data, line: UInt = #line) {
@@ -33,14 +33,14 @@ final class HTTPHooksManifestTests: XCTestCase {
 
     func testMatchesBoundsAndShape() {
         accepts(v2(matches: "[\(Self.match)]"))
-        accepts(v2(matches: "[" + Array(repeating: #"{"hosts":["a.com"]}"#, count: 16).joined(separator: ",") + "]"))
+        accepts(v2(matches: "[" + Array(repeating: Self.match, count: 16).joined(separator: ",") + "]"))
         rejects(v2(matches: "[]"))
         rejects(v2(matches: "[" + Array(repeating: #"{"hosts":["a.com"]}"#, count: 17).joined(separator: ",") + "]"))
         rejects(v2(matches: #"[{"hosts":["A.com"]}]"#))
         rejects(v2(matches: #"[{"hosts":["a.com"],"methods":["post"]}]"#))
         rejects(v2(matches: #"[{"hosts":["a.com"],"path":{"kind":"glob","value":"/*"}}]"#))
         rejects(v2(matches: #"[{"hosts":["a.com"],"bogus":1}]"#))
-        accepts(v2(matches: #"[{"hosts":["a.com"],"status":{"min":200,"max":299}}]"#))
+        rejects(v2(matches: #"[{"hosts":["a.com"],"status":{"min":200,"max":299}}]"#))
         rejects(v2(matches: #"[{"hosts":["a.com"],"status":{"min":300,"max":200}}]"#))
     }
 
@@ -73,9 +73,8 @@ final class HTTPHooksManifestTests: XCTestCase {
         rejects(v2(extra: #","bogus":1"#))
     }
 
-    func testV2PublicManifestAPI() throws {
-        let m = try PluginPackage.validate(v2(matches: #"[{"hosts":["api.example.com","b.example.com"],"methods":["POST"],"path":{"kind":"prefix","value":"/v1"},"status":{"min":200,"max":299}}]"#,
-                                              write: #"{"requestBody":true,"responseBody":true}"#)).manifest
+    func testV2PublicManifestAPIAndExactRouting() throws {
+        let m = try PluginPackage.validate(v2(write: #"{"requestBody":true,"responseBody":true}"#)).manifest
         XCTAssertEqual(m.schemaVersion, 2)
         XCTAssertTrue(m.writeRequestBody)
         XCTAssertTrue(m.writeResponseBody)
@@ -83,28 +82,28 @@ final class HTTPHooksManifestTests: XCTestCase {
         XCTAssertEqual(m.read.body, .json)
         XCTAssertEqual(m.endpointBindings, ["alert"])
         let match = try XCTUnwrap(m.matches.first)
-        XCTAssertEqual(match.hosts, ["api.example.com", "b.example.com"])
+        XCTAssertEqual(match.hosts, ["api.example.com"])
         XCTAssertEqual(match.methods, ["POST"])
-        XCTAssertEqual(match.path, .prefix("/v1"))
-        XCTAssertEqual(match.status, 200...299)
-        XCTAssertEqual(match.json.objectValue?["hosts"]?.arrayValue?.count, 2)
-        XCTAssertTrue(match.matches(method: "POST", host: "b.example.com", path: "/v1/x", status: 204))
-        XCTAssertTrue(match.matches(method: "POST", host: "b.example.com", path: "/v1", status: 200))
-        XCTAssertFalse(match.matches(method: "GET", host: "b.example.com", path: "/v1/x", status: 204))
-        XCTAssertFalse(match.matches(method: "POST", host: "c.example.com", path: "/v1/x", status: 204))
-        XCTAssertFalse(match.matches(method: "POST", host: "b.example.com", path: "/v2", status: 204))
-        XCTAssertFalse(match.matches(method: "POST", host: "b.example.com", path: "/v1/x", status: 404))
-        XCTAssertFalse(match.matches(method: "POST", host: "b.example.com", path: "/v1/x", status: nil))
-    }
-
-    func testExactAndOptionalFieldsMatch() throws {
-        let m = try PluginPackage.validate(v2()).manifest
-        let match = m.matches[0]
+        XCTAssertEqual(match.path, .exact("/search"))
+        XCTAssertNil(match.status)
+        XCTAssertEqual(match.hooks, ["request.onEnter": "selected.js"])
         XCTAssertTrue(match.matches(method: "POST", host: "api.example.com", path: "/search", status: nil))
         XCTAssertFalse(match.matches(method: "POST", host: "api.example.com", path: "/search/", status: nil))
         XCTAssertFalse(match.matches(method: "POST", host: "API.example.com", path: "/search", status: nil))
-        let open = try PluginPackage.validate(v2(matches: #"[{"hosts":["a.com"]}]"#)).manifest.matches[0]
-        XCTAssertTrue(open.matches(method: "DELETE", host: "a.com", path: "/anything", status: 500))
+        XCTAssertFalse(match.matches(method: "GET", host: "api.example.com", path: "/search", status: 200))
+        XCTAssertFalse(match.matches(method: "POST", host: "b.example.com", path: "/search", status: 200))
+    }
+
+    func testV2RequiresExactHostMethodPathAndHooks() {
+        for omitted in ["hosts", "methods", "path", "hooks"] {
+            var route = try! JSONSerialization.jsonObject(with: Data(Self.match.utf8)) as! [String: Any]
+            route[omitted] = nil
+            let json = String(decoding: try! JSONSerialization.data(withJSONObject: [route]), as: UTF8.self)
+            rejects(v2(matches: json))
+        }
+        rejects(v2(matches: "[" + Self.match.replacingOccurrences(of: "exact", with: "prefix") + "]"))
+        rejects(v2(matches: "[" + Self.match.replacingOccurrences(of: #"["POST"]"#, with: #"["POST","GET"]"#) + "]"))
+        rejects(v2(matches: "[" + Self.match.replacingOccurrences(of: #"["api.example.com"]"#, with: #"["api.example.com","b.com"]"#) + "]"))
     }
 
     func testV1ManifestHasNoMatchesOrWrites() throws {

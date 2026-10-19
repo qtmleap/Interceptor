@@ -62,20 +62,17 @@ QJSResult qjs_run(QJSCancelToken *token, const QJSLimits *limits,
 /// Maximum accepted manifest size for `qjs_run_v2`.
 #define QJS_MAX_MANIFEST_BYTES (32u * 1024u)
 
-/// Four-phase HTTP lifecycle entry. Same arguments as `qjs_run` followed by the FULL strict schemaVersion 2
-/// manifest bytes (unknown/missing fields, schema 1/3 and partial manifests are QJS_INVALID_INPUT). `hook` must be
-/// one of "request.onEnter", "request.onLeave", "response.onEnter", "response.onLeave".
-/// The event is the public envelope `{id?,phase?,exchangeID?,time?,request,response?}` (no caller identity).
-/// Matching uses the unfiltered request method/host/path and response status; callbacks then receive their own
-/// leg filtered by read.metadata/headers/queryKeys/body.mode, plus config. On QJS_OK the data is
-/// `{"actions":[...]}` plus optional `"mutation":{"body":<JSON>}` (authorized enter phase only).
-/// Legacy `qjs_run` is unchanged.
+#define QJS_MAX_PACKAGE_BYTES (256u * 1024u)
+
+/// Four-phase HTTP lifecycle entry. `package_json` is exactly {manifest,sourceFiles} for schema 2.
+/// Validates the entire package before matching the raw event and requested phase. Zero matches
+/// return empty actions without evaluation; ambiguity is invalid input. Only the selected source
+/// evaluates, with native one-argument Interceptor.attach(callbacks) bound to that route.
 QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
-                     const uint8_t *source, size_t source_len,
+                     const uint8_t *package_json, size_t package_len,
                      const char *hook,
                      const uint8_t *event_json, size_t event_len,
-                     const uint8_t *config_json, size_t config_len,
-                     const uint8_t *manifest_json, size_t manifest_len);
+                     const uint8_t *config_json, size_t config_len);
 
 void qjs_result_free(QJSResult *result);
 
