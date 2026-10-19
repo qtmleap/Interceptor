@@ -249,6 +249,9 @@ final class AutomationUITests: XCTestCase {
             selectSourceFile(Self.secondaryFile, app: app)
             assertSource(editor, equals: secondEdit)
             attach(app, "Multi-file drafts retained \(locale)")
+            XCTAssertTrue(app.buttons["script.save"].isEnabled)
+            app.buttons["script.save"].tap()
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "saving dismisses the source keyboard before reviewing guidance")
             let guidance = app.descendants(matching: .any).matching(identifier: "script.saveGuidance").firstMatch
             reach(guidance, in: form)
             if !visibleFormFrame(form).contains(guidance.frame) {
@@ -257,8 +260,6 @@ final class AutomationUITests: XCTestCase {
             }
             XCTAssertTrue(visibleFormFrame(form).contains(guidance.frame), "the complete save and reapproval guidance must be visible")
             attach(app, "Multi-file save guidance \(locale)")
-            XCTAssertTrue(app.buttons["script.save"].isEnabled)
-            app.buttons["script.save"].tap()
             let run = reach(app.buttons["script.run"], in: form)
             let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: run)
             XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)

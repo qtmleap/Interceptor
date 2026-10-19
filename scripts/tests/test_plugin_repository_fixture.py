@@ -143,14 +143,22 @@ class PluginRepositoryFixtureTests(unittest.TestCase):
             server = fixture.FixtureServer({'/package.json': body}, tls)
             try:
                 context = fixture.ssl.create_default_context(cafile=str(tls / 'ca.pem'))
-                for path in ('/package.json', '/package.json?runToken=secret-query', '/missing'):
+                for expected_count, path in enumerate(('/package.json', '/package.json?runToken=secret-query', '/missing'), 1):
                     request = fixture.urllib.request.Request(server.base_url + path, headers={'Authorization': 'Bearer secret-header'})
                     try:
                         with fixture.urllib.request.urlopen(request, context=context, timeout=5) as response:
                             response.read()
                     except fixture.urllib.error.HTTPError as error:
-                        error.close()
-                entries = server.diagnostics.snapshot()['entries']
+                        with error:
+                            error.read()
+                    # Response delivery can precede bookkeeping. Complete each handler before
+                    # starting the next request so the ordered assertion also stays deterministic.
+                    deadline = fixture.time.monotonic() + 5
+                    entries = server.diagnostics.snapshot()['entries']
+                    while len(entries) < expected_count and fixture.time.monotonic() < deadline:
+                        fixture.time.sleep(0.02)
+                        entries = server.diagnostics.snapshot()['entries']
+                    self.assertEqual(len(entries), expected_count, 'request handler diagnostics did not complete')
             finally:
                 server.close()
             self.assertEqual([(e['path'], e['status']) for e in entries],
