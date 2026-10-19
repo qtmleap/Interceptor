@@ -30,7 +30,7 @@ struct ScriptDetailView: View {
             }
             Section {
                 if session.isV2 {
-                    Picker("AUTO_SOURCE", selection: $session.selectedSourceFile) {
+                    Picker("AUTO_SOURCE_FILE", selection: $session.selectedSourceFile) {
                         ForEach(session.sourceFileNames, id: \.self) { file in
                             Text(verbatim: file).tag(Optional(file))
                         }
@@ -41,7 +41,7 @@ struct ScriptDetailView: View {
                 if let key = session.saveErrorKey {
                     Text(LocalizedStringKey(key)).foregroundStyle(AutomationStatusColor.error)
                 }
-            } header: { Text("AUTO_SOURCE") } footer: { Text("AUTO_SAVE_FOOTER") }
+            } header: { Text("AUTO_SOURCE") } footer: { Text(LocalizedStringKey(session.isV2 ? "AUTO_SAVE_PACKAGE_FOOTER" : "AUTO_SAVE_FOOTER")) }
             Section {
                 if session.isV2 {
                     Picker("AUTO_HOOK", selection: $session.hook) {
@@ -99,9 +99,18 @@ struct ScriptDetailView: View {
                     Task { await session.activate(expectedGeneration: generation) }
                 }
             }
+            .accessibilityIdentifier("script.confirmActivation")
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("AUTO_ACTIVATE_CONFIRM_MESSAGE") + Text(verbatim: "\n" + session.revision.package.revision)
+            Text(verbatim: session.revision.package.manifest.name + "\n")
+                + Text("AUTO_TARGET_HOSTS") + Text(verbatim: ": " + declaredHosts + "\n")
+                + Text("AUTO_ACTIVATION_DATA") + Text(verbatim: " " + declaredData + "\n")
+                + Text(LocalizedStringKey(session.revision.package.manifest.writeRequestBody ? "AUTO_WRITE_REQUEST" : "AUTO_NO_WRITE_REQUEST"))
+                + Text(verbatim: "\n")
+                + Text(LocalizedStringKey(session.revision.package.manifest.writeResponseBody ? "AUTO_WRITE_RESPONSE" : "AUTO_NO_WRITE_RESPONSE"))
+                + Text(verbatim: "\n") + Text("AUTO_WEBHOOK_FOOTER")
+                + Text(verbatim: "\n") + Text("AUTO_ACTIVATE_CONFIRM_MESSAGE")
+                + Text(verbatim: "\n" + session.revision.package.revision)
         }
         .onDisappear { session.leave() }
         .tint(Color("PluginAccent"))
@@ -129,17 +138,22 @@ struct ScriptDetailView: View {
         } header: { Text("AUTO_LIVE") } footer: {
             VStack(alignment: .leading, spacing: 6) {
                 Text("AUTO_ACTIVATION_SCOPE")
-                Text(verbatim: Array(Set(session.revision.package.manifest.matches.flatMap(\.hosts))).sorted().joined(separator: ", "))
+                Text(verbatim: declaredHosts)
                 Text("AUTO_ACTIVATION_DATA")
                 Text(verbatim: declaredData)
                 Text(LocalizedStringKey(session.revision.package.manifest.writeRequestBody ? "AUTO_WRITE_REQUEST" : "AUTO_NO_WRITE_REQUEST"))
                 Text(LocalizedStringKey(session.revision.package.manifest.writeResponseBody ? "AUTO_WRITE_RESPONSE" : "AUTO_NO_WRITE_RESPONSE"))
+                Text("AUTO_WEBHOOK_FOOTER")
                 Text("AUTO_ACTIVATION_CONNECTION")
                 if let key = session.activationErrorKey {
                     Text(LocalizedStringKey(key)).foregroundStyle(AutomationStatusColor.error).accessibilityIdentifier("script.activationError")
                 }
             }
         }
+    }
+
+    private var declaredHosts: String {
+        Array(Set(session.revision.package.manifest.matches.flatMap(\.hosts))).sorted().joined(separator: ", ")
     }
 
     private var declaredData: String {

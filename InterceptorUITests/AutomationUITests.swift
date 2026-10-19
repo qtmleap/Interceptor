@@ -102,7 +102,7 @@ final class AutomationUITests: XCTestCase {
             XCTAssertTrue(approve.isEnabled)
             attach(app, "Hooks live approval scope \(locale)")
             approve.tap()
-            let confirm = app.buttons[japanese ? "このリビジョンを承認" : "Approve Revision"]
+            let confirm = app.buttons["script.confirmActivation"]
             XCTAssertTrue(confirm.waitForExistence(timeout: 5))
             attach(app, "Hooks exact revision confirmation \(locale)")
             confirm.tap()
@@ -153,7 +153,7 @@ final class AutomationUITests: XCTestCase {
             let locale = japanese ? "ja" : "en"
             let app = launch(japanese: japanese, suite: suite)
             defer { app.terminate() }
-            openFixturePackage("Multi-file hooks", repositoryURL: repositoryURL, app: app, japanese: japanese)
+            guard openFixturePackage("Multi-file hooks", repositoryURL: repositoryURL, app: app, japanese: japanese) else { return }
             let review = app.collectionViews["repo.script.list"]
             for (file, marker) in [(Self.secondaryFile, "SECONDARY HOOK FILE"), (Self.primaryFile, "PRIMARY HOOK FILE")] {
                 let source = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", marker)).firstMatch
@@ -375,7 +375,8 @@ private extension AutomationUITests {
     }
 
     @MainActor
-    func openFixturePackage(_ name: String, repositoryURL: URL, app: XCUIApplication, japanese: Bool) {
+    @discardableResult
+    func openFixturePackage(_ name: String, repositoryURL: URL, app: XCUIApplication, japanese: Bool) -> Bool {
         openPlugins(app, japanese: japanese)
         app.buttons["plugins.add"].tap()
         app.buttons["plugins.addRepository"].tap()
@@ -397,7 +398,23 @@ private extension AutomationUITests {
         let entry = app.buttons["repo.entry." + name]
         XCTAssertTrue(entry.waitForExistence(timeout: 5), "the repository fixture must include " + name)
         entry.tap()
-        XCTAssertTrue(app.collectionViews["repo.script.list"].waitForExistence(timeout: 10))
+        let author = app.descendants(matching: .any).matching(identifier: "script.author").firstMatch
+        let repositoryError = app.staticTexts["repo.script.error"]
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            author.exists || repositoryError.exists
+        }, object: nil)
+        let outcome = XCTWaiter.wait(for: [loaded], timeout: 20)
+        if repositoryError.exists {
+            captureSourceFailure(app, name: "Repository package failed to load")
+            XCTFail("Repository package fetch failed: " + name + ": " + repositoryError.label)
+            return false
+        }
+        guard outcome == .completed, author.exists else {
+            captureSourceFailure(app, name: "Repository package loading timed out")
+            XCTFail("Verified package metadata must load before source review: " + name)
+            return false
+        }
+        return true
     }
 
     @MainActor

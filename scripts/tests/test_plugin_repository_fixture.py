@@ -95,6 +95,112 @@ class PluginRepositoryFixtureTests(unittest.TestCase):
             self.assertTrue(record['privateKeysRemoved'])
             self.assertFalse((work / 'private-tls').exists())
 
+    def test_recorder_is_bounded_and_keeps_only_allowlisted_paths(self):
+        recorder = fixture.RequestDiagnostics({'/repository.json'}, limit=200)
+        for index in range(250):
+            recorder.record('/repository.json?token=secret-%d' % index if index % 2 else '/repository.json', 200, 10, 0.01)
+        snapshot = recorder.snapshot()
+        self.assertEqual(len(snapshot['entries']), 200)
+        self.assertEqual(snapshot['limit'], 200)
+        self.assertEqual(snapshot['dropped'], 50)
+        self.assertEqual(snapshot['total'], 250)
+        self.assertEqual({entry['path'] for entry in snapshot['entries']}, {'/repository.json', '<unlisted>'})
+        self.assertNotIn('secret', json.dumps(snapshot))
+        self.assertEqual(fixture.RequestDiagnostics(set()).snapshot()['limit'], 200)
+
+    def test_recorder_is_thread_safe_and_snapshot_is_detached(self):
+        recorder = fixture.RequestDiagnostics({'/a'}, limit=200)
+        def work():
+            for _ in range(100):
+                recorder.record('/a', 200, 1, 0.0)
+        threads = [fixture.threading.Thread(target=work) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        snapshot = recorder.snapshot()
+        self.assertEqual(snapshot['total'], 800)
+        self.assertEqual(len(snapshot['entries']), 200)
+        self.assertEqual(snapshot['dropped'], 600)
+        snapshot['entries'].clear()
+        self.assertEqual(len(recorder.snapshot()['entries']), 200)
+
+    def test_recorder_stores_only_safe_exception_type(self):
+        recorder = fixture.RequestDiagnostics({'/a'})
+        recorder.record('/a', None, 3, 0.5, error=ValueError('Authorization: Bearer secret-token'))
+        entry = recorder.snapshot()['entries'][0]
+        self.assertEqual(entry['error'], 'ValueError')
+        self.assertEqual(entry['status'], None)
+        self.assertEqual(entry['bytes'], 3)
+        self.assertEqual(entry['elapsedSeconds'], 0.5)
+        self.assertNotIn('secret', json.dumps(entry))
+        self.assertEqual(set(entry), {'path', 'status', 'bytes', 'elapsedSeconds', 'error'})
+
+    def test_server_records_completed_requests_without_query_or_headers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            tls = fixture.make_tls(Path(temporary))
+            body = b'{"ok":true}'
+            server = fixture.FixtureServer({'/package.json': body}, tls)
+            try:
+                context = fixture.ssl.create_default_context(cafile=str(tls / 'ca.pem'))
+                for path in ('/package.json', '/package.json?runToken=secret-query', '/missing'):
+                    request = fixture.urllib.request.Request(server.base_url + path, headers={'Authorization': 'Bearer secret-header'})
+                    try:
+                        fixture.urllib.request.urlopen(request, context=context, timeout=5).read()
+                    except fixture.urllib.error.HTTPError:
+                        pass
+                entries = server.diagnostics.snapshot()['entries']
+            finally:
+                server.close()
+            self.assertEqual([(e['path'], e['status']) for e in entries],
+                             [('/package.json', 200), ('<unlisted>', 404), ('<unlisted>', 404)])
+            self.assertEqual(entries[0]['bytes'], len(body))
+            self.assertGreaterEqual(entries[0]['elapsedSeconds'], 0)
+            self.assertNotIn('secret', json.dumps(entries))
+
+    def test_server_records_tls_handshake_failure_type_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            tls = fixture.make_tls(Path(temporary))
+            server = fixture.FixtureServer({'/package.json': b'{}'}, tls)
+            try:
+                with socket.create_connection(('127.0.0.1', server.port), timeout=5) as raw:
+                    raw.sendall(b'GET /package.json?secret=plain HTTP/1.1\r\nAuthorization: secret-plain\r\n\r\n')
+                    raw.settimeout(5)
+                    try:
+                        raw.recv(1)
+                    except OSError:
+                        pass
+                deadline = fixture.time.monotonic() + 5
+                while not server.diagnostics.snapshot()['entries'] and fixture.time.monotonic() < deadline:
+                    fixture.time.sleep(0.02)
+                entries = server.diagnostics.snapshot()['entries']
+            finally:
+                server.close()
+            self.assertEqual(len(entries), 1)
+            self.assertEqual(entries[0]['path'], '<unlisted>')
+            self.assertIsNone(entries[0]['status'])
+            self.assertIn('SSL', entries[0]['error'])
+            self.assertNotIn('secret', json.dumps(entries))
+
+    def test_main_persists_request_diagnostics_on_success_and_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary) / 'success'
+            with patch.object(sys, 'argv', [str(SCRIPT), '--self-test', '--work-dir', str(work)]), patch.object(fixture.signal, 'signal'):
+                self.assertEqual(fixture.main(), 0)
+            requests = json.loads((work / 'fixture-run.json').read_text())['requests']
+            self.assertEqual(requests['limit'], 200)
+            self.assertIn(('/__interceptor_fixture', 200), [(e['path'], e['status']) for e in requests['entries']])
+            self.assertEqual([e['status'] for e in requests['entries'] if e['path'] == '<unlisted>'], [404, 404, 404])
+            failed = Path(temporary) / 'failure'
+            with patch.object(sys, 'argv', [str(SCRIPT), '--self-test', '--work-dir', str(failed)]), \
+                    patch.object(fixture, 'check_ready', side_effect=fixture.ReadinessError('not ready', {})), patch.object(fixture.signal, 'signal'):
+                with self.assertRaises(RuntimeError):
+                    fixture.main()
+            record = json.loads((failed / 'fixture-run.json').read_text())
+            self.assertEqual(record['requests']['entries'], [])
+            self.assertTrue(record['serverStopped'])
+            self.assertTrue(record['privateKeysRemoved'])
+
     def ownership(self, root, before):
         device_set = root / 'devices'
         device_set.mkdir()

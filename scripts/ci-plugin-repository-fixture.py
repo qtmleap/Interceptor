@@ -135,14 +135,40 @@ authorityKeyIdentifier=keyid
     return tls
 
 
+class RequestDiagnostics:
+    """Bounded, thread-safe request log: allowlisted path, status, size, timing, exception class only."""
+    def __init__(self, allowed, limit=200):
+        self.allowed = frozenset(allowed)
+        self.limit = limit
+        self.lock = threading.Lock()
+        self.entries = []
+        self.total = 0
+
+    def record(self, path, status, size, elapsed, error=None):
+        entry = {'path': path if path in self.allowed else '<unlisted>', 'status': status, 'bytes': size,
+                 'elapsedSeconds': round(elapsed, 3), 'error': type(error).__name__ if error is not None else None}
+        with self.lock:
+            self.total += 1
+            if len(self.entries) < self.limit:
+                self.entries.append(entry)
+
+    def snapshot(self):
+        with self.lock:
+            return {'limit': self.limit, 'total': self.total, 'dropped': self.total - len(self.entries),
+                    'entries': [dict(entry) for entry in self.entries]}
+
+
 class FixtureServer:
     def __init__(self, files, tls):
+        diagnostics = self.diagnostics = RequestDiagnostics(files)
         # Explicit bytes only: no filesystem traversal, directory listing, source tree or key serving.
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
+                started = time.monotonic()
                 body = files.get(self.path)
                 if body is None:
                     self.send_error(404)
+                    diagnostics.record(self.path, 404, 0, time.monotonic() - started)
                     return
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -150,6 +176,7 @@ class FixtureServer:
                 self.send_header('Cache-Control', 'no-store')
                 self.end_headers()
                 self.wfile.write(body)
+                diagnostics.record(self.path, 200, len(body), time.monotonic() - started)
 
             def log_message(self, *args):
                 pass
@@ -157,6 +184,18 @@ class FixtureServer:
         class Server(http.server.ThreadingHTTPServer):
             daemon_threads = True
             block_on_close = False
+
+            def finish_request(self, request, client_address):
+                started = time.monotonic()
+                try:
+                    super().finish_request(request, client_address)
+                except Exception as error:
+                    # TLS handshake/read failures surface here; keep the class name only.
+                    diagnostics.record('<unlisted>', None, 0, time.monotonic() - started, error=error)
+                    raise
+
+            def handle_error(self, request, client_address):
+                pass
 
             def get_request(self):
                 connection, address = super().get_request()
@@ -380,6 +419,7 @@ def main():
                     server.close()
                     record['serverStopped'] = True
             finally:
+                record['requests'] = server.diagnostics.snapshot() if server else RequestDiagnostics(()).snapshot()
                 # Keychain has no individual root-removal command. The existing owned-device
                 # cleanup deletes this disposable simulator after the worker group has stopped.
                 if (work / 'private-tls').exists():

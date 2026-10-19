@@ -2068,13 +2068,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Imported and edited scripts stay inactive. Review and approve each exact revision to use its hooks on captured traffic. Synthetic tests and webhook intents never send data."
+            "value" : "Add a repository or import a script, review its contents, and try it with sample data. Approve the content you want to use, then start or reconnect capture for its target hosts. Adding or importing alone never enables a script."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "読み込み・編集したスクリプトは、個別に承認するまで通信に適用されません。対象と読み取り内容を確認してから承認してください。サンプルテストやWebhookアクションが外部へデータを送ることはありません。"
+            "value" : "リポジトリの追加やファイルの読み込み後、スクリプトの内容を確認し、テスト用データで動作を試せます。実通信で使う内容を承認してから、対象ホストのキャプチャを開始または再接続してください。追加や読み込みだけでは実行されません。"
           }
         }
       }
@@ -2532,13 +2532,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The publisher cannot be confirmed. Anyone who controls this server could change its scripts. Add only if you trust it."
+            "value" : "The publisher cannot be confirmed. The server's administrators can change the scripts it distributes. Add only if you trust the source. Adding a repository does not enable scripts on live traffic; review and approve them separately."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "発行元を確認できません。このサーバーを管理する人は誰でもスクリプトを変更できます。信頼できる場合のみ追加してください。"
+            "value" : "発行元を確認できません。配信元の管理者は、公開するスクリプトを変更できます。信頼できる配信元の場合のみ追加してください。追加だけでは実通信に適用されません。使用するスクリプトの内容は、別途確認して承認してください。"
           }
         }
       }
@@ -2548,13 +2548,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unsigned – publisher cannot be confirmed"
+            "value" : "Unsigned (publisher unverified)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未署名—発行元を確認できません"
+            "value" : "未署名（発行元未確認）"
           }
         }
       }
@@ -2596,13 +2596,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local edit – not from a publisher"
+            "value" : "Locally edited content"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ローカル編集—発行元とは無関係"
+            "value" : "ローカルで編集した内容"
           }
         }
       }
@@ -2612,13 +2612,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local file – publisher unknown"
+            "value" : "Local file (publisher unverified)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ローカルファイル—発行元不明"
+            "value" : "ローカルファイル（発行元未確認）"
           }
         }
       }
@@ -2740,13 +2740,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Declared matching rules. Only explicitly configured capture hosts can produce hooks."
+            "value" : "These rules select which captured requests the script can process. They do not enable capture. Add the host to your capture targets separately."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "対象条件の宣言です。キャプチャ対象に設定済みのホストでのみ実行できます。"
+            "value" : "スクリプトを実行する通信の条件です。この条件だけでは通信をキャプチャしません。対象ホストを別途キャプチャ対象に追加してください。"
           }
         }
       }
@@ -3188,13 +3188,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synthetic test"
+            "value" : "Test with sample data"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "合成データでのテスト"
+            "value" : "テスト用データでの実行"
           }
         }
       }
@@ -3252,13 +3252,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synthetic event (JSON)"
+            "value" : "Test event (JSON)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "合成イベント（JSON）"
+            "value" : "テスト用イベント（JSON）"
           }
         }
       }
@@ -3268,13 +3268,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synthetic config (JSON)"
+            "value" : "Test configuration (JSON)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "合成設定（JSON）"
+            "value" : "テスト用設定（JSON）"
           }
         }
       }
@@ -3284,13 +3284,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Run Synthetic Test"
+            "value" : "Run Test"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "合成データでテスト"
+            "value" : "テストを実行"
           }
         }
       }
@@ -3300,13 +3300,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uses only the data above, never saved captures. Actions are shown, not sent."
+            "value" : "Runs only with the sample data above, without HTTP traffic or saved captures. Webhook actions are previewed, not sent. A successful test does not approve the script for live traffic."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上のデータのみを使い、保存済みキャプチャは使いません。アクションは表示のみで送信されません。"
+            "value" : "上のテスト用データだけで実行し、HTTP通信や保存済みキャプチャは使いません。Webhookアクションは内容を表示するだけで送信しません。テストが成功しても、実通信での使用は承認されません。"
           }
         }
       }
@@ -3348,13 +3348,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not sent"
+            "value" : "No external delivery (test)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未送信"
+            "value" : "外部送信なし（テスト）"
           }
         }
       }
@@ -3989,13 +3989,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Live HTTP hooks"
+            "value" : "Use on live traffic"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "通信への適用"
+            "value" : "実通信での使用"
           }
         }
       }
@@ -4006,13 +4006,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This revision"
+            "value" : "Current content"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このリビジョン"
+            "value" : "現在の内容"
           }
         }
       }
@@ -4040,7 +4040,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inactive"
+            "value" : "Not approved"
           }
         },
         "ja" : {
@@ -4057,13 +4057,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Approve This Revision…"
+            "value" : "Approve for Live Traffic…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このリビジョンを承認…"
+            "value" : "実通信での使用を承認…"
           }
         }
       }
@@ -4091,13 +4091,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Approve this exact revision?"
+            "value" : "Approve this script content?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このリビジョンを承認しますか？"
+            "value" : "この内容を実通信で使うことを承認しますか？"
           }
         }
       }
@@ -4108,13 +4108,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Approve Revision"
+            "value" : "Approve Use"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このリビジョンを承認"
+            "value" : "使用を承認"
           }
         }
       }
@@ -4125,13 +4125,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Allow the data access and JSON changes described above for this exact revision. Capture consent is also required. Revision:"
+            "value" : "Approval stops the current capture connection. Reconnect manually to use this content. Approval does not start capture; capture consent is also required. Revision ID:"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上に記載されたデータの読み取りとJSONの変更を、このリビジョンに許可します。別途、通信キャプチャへの同意も必要です。リビジョン："
+            "value" : "承認すると現在のキャプチャ接続が停止します。この内容を使うには手動で再接続してください。承認だけではキャプチャは始まりません。通信キャプチャへの同意も必要です。リビジョンID："
           }
         }
       }
@@ -4142,13 +4142,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Runs locally on captured HTTPS traffic for these hosts. It cannot add capture targets."
+            "value" : "Runs on this device only for captured HTTPS traffic matching these hosts. Approval applies to the current content; changed content needs separate approval."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "次のホストのHTTPS通信をキャプチャする場合に、端末内で実行します。キャプチャ対象のホストは追加しません。"
+            "value" : "次のホストに一致する、キャプチャ中のHTTPS通信に対して端末内で実行します。承認は現在の内容に対するものです。変更後の内容を使うには、改めて承認してください。"
           }
         }
       }
@@ -4159,13 +4159,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This script receives the declared data below. Webhook actions remain intents; nothing is delivered."
+            "value" : "Data this script can read from matching traffic:"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このスクリプトは、以下の宣言されたデータを読み取れます。Webhookアクションは送信予定として扱い、外部へ送信しません。"
+            "value" : "対象通信から読み取れるデータ："
           }
         }
       }
@@ -4244,13 +4244,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Approving or revoking a script, or saving/deleting any script that supports live hooks, stops the current capture connection. Reconnect manually to apply approved revisions. It does not add capture hosts or start capture."
+            "value" : "Approving, revoking, saving or deleting a script with live hooks stops the current capture connection. Reconnect manually to apply approvals. These operations do not add capture targets or start capture."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "承認・承認の取り消し、または通信に適用できるスクリプトの保存・削除を行うと、現在のキャプチャ接続が停止します。承認したリビジョンを適用するには、手動で再接続してください。キャプチャ対象の追加や接続の開始は行いません。"
+            "value" : "承認・承認の取り消し、実通信用スクリプトの保存・削除を行うと、現在のキャプチャ接続が停止します。承認した内容を適用するには、手動で再接続してください。キャプチャ対象の追加や接続の開始は行いません。"
           }
         }
       }
@@ -4295,13 +4295,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "JSON body preview"
+            "value" : "JSON body after the test"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "JSON本文のプレビュー"
+            "value" : "テスト後のJSON本文"
           }
         }
       }
@@ -4312,13 +4312,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Validated test result"
+            "value" : "Test completed"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "テスト結果を確認済み"
+            "value" : "テスト完了"
           }
         }
       }
@@ -4455,6 +4455,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通信キャプチャへの同意が取り消されたため、キャプチャを停止しました。"
+          }
+        }
+      }
+    },
+    "AUTO_SOURCE_FILE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File to edit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集するファイル"
+          }
+        }
+      }
+    },
+    "AUTO_WEBHOOK_FOOTER" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Webhook actions are not sent, including on live traffic. A test can show their contents."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実通信でもWebhookアクションは外部へ送信しません。送信予定の内容はテストで確認できます。"
+          }
+        }
+      }
+    },
+    "AUTO_SAVE_PACKAGE_FOOTER" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch files with the file picker. Saving keeps all file edits together as a new revision and retains the original. Unsaved edits do not affect live traffic. Review and approve the saved content separately; saving does not run it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイル名を選ぶと編集対象を切り替えられます。保存すると、全ファイルの編集内容をまとめた新しいリビジョンが作られ、元の内容も残ります。保存前の編集は実通信に反映されません。保存した内容を実通信で使うには、別途確認して承認してください。保存だけでは実行されません。"
           }
         }
       }
