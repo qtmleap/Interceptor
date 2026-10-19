@@ -185,11 +185,47 @@ class FixtureServer:
             raise RuntimeError('Owned fixture server did not stop')
 
 
+class ReadinessError(RuntimeError):
+    """Readiness timeout carrying bounded, non-sensitive diagnostics."""
+    def __init__(self, message, diagnostics):
+        super().__init__(message)
+        self.diagnostics = diagnostics
+
+
+def describe_error(error):
+    # Short owned-loopback error details; no environment values or key material.
+    info = {'type': type(error).__name__}
+    inner = error.reason if isinstance(error, urllib.error.URLError) else error
+    info['reason'] = type(inner).__name__
+    info['message'] = str(inner)[:200]
+    for source, key in (('errno', 'errno'), ('verify_code', 'verifyCode'), ('verify_message', 'verifyMessage'), ('reason', 'sslReason')):
+        value = getattr(inner, source, None)
+        if isinstance(value, int) and not isinstance(value, bool):
+            info[key] = value
+        elif isinstance(value, str):
+            info[key] = value[:200]
+    return info
+
+
+def tls_metadata():
+    info = {'pythonVersion': sys.version.split()[0], 'opensslVersion': getattr(ssl, 'OPENSSL_VERSION', None)}
+    try:
+        info['opensslPath'] = shutil.which('openssl')
+    except Exception:
+        pass
+    return info
+
+
 def check_ready(server, tls, expected):
     context = ssl.create_default_context(cafile=str(tls / 'ca.pem'))
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=context))
-    deadline = time.monotonic() + 5
+    started = time.monotonic()
+    deadline = started + 5
+    attempts = 0
+    recent = []
+    last = None
     while True:
+        attempts += 1
         try:
             with opener.open(server.base_url + '/__interceptor_fixture', timeout=1) as response:
                 actual = response.read(4096)
@@ -201,8 +237,17 @@ def check_ready(server, tls, expected):
         except (OSError, urllib.error.URLError) as error:
             if isinstance(error, urllib.error.URLError) and isinstance(error.reason, InterruptedError):
                 raise error.reason
-            if time.monotonic() >= deadline:
-                raise RuntimeError('Owned HTTPS fixture did not become ready')
+            last = describe_error(error)
+            recent = (recent + [last['type'] + '/' + last['reason']])[-5:]
+            now = time.monotonic()
+            if now >= deadline:
+                thread = getattr(server, 'thread', None)
+                diagnostics = {'attempts': attempts, 'lastError': last, 'recentErrorTypes': recent,
+                               'elapsedSeconds': round(now - started, 3),
+                               'serverThreadAlive': thread.is_alive() if thread is not None else None,
+                               'tls': tls_metadata()}
+                raise ReadinessError('Owned HTTPS fixture did not become ready after %d attempts; last error %s/%s'
+                                     % (attempts, last['type'], last['reason']), diagnostics) from error
             time.sleep(0.05)
 
 
@@ -318,6 +363,12 @@ def main():
         record['interrupted'] = error.args[0]
         record['exit'] = 128 + error.args[0]
         return record['exit']
+    except Exception as error:
+        record['exit'] = 1
+        record['failure'] = {'type': type(error).__name__, 'message': str(error)[:500]}
+        if isinstance(error, ReadinessError):
+            record['diagnostics'] = error.diagnostics
+        raise
     finally:
         for signum in (signal.SIGINT, signal.SIGTERM):
             signal.signal(signum, signal.SIG_IGN)

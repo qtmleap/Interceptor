@@ -46,6 +46,55 @@ class PluginRepositoryFixtureTests(unittest.TestCase):
             finally:
                 server.close()
 
+    def test_persistent_readiness_failure_keeps_cause_and_bounded_diagnostics(self):
+        server = type('Server', (), {'base_url': 'https://localhost:1'})()
+        verify = fixture.ssl.SSLCertVerificationError(1, 'certificate verify failed: hostname mismatch')
+        verify.verify_code, verify.verify_message = 5, 'hostname mismatch'
+        errors = [fixture.urllib.error.URLError(ConnectionRefusedError(61, 'refused'))] * 6 + [fixture.urllib.error.URLError(verify)]
+        clock = iter([0] * 7 + [6])
+        with patch.object(fixture.ssl, 'create_default_context', return_value=None), \
+                patch.object(fixture.urllib.request.OpenerDirector, 'open', side_effect=errors), \
+                patch.object(fixture.time, 'monotonic', side_effect=lambda: next(clock)), \
+                patch.object(fixture.time, 'sleep'):
+            with self.assertRaises(RuntimeError) as raised:
+                fixture.check_ready(server, Path('/unused'), b'nonce')
+        error = raised.exception
+        self.assertIsInstance(error.__cause__, fixture.urllib.error.URLError)
+        self.assertIs(error.__cause__.reason, verify)
+        info = error.diagnostics
+        self.assertEqual(info['attempts'], 7)
+        self.assertEqual(info['lastError']['type'], 'URLError')
+        self.assertEqual(info['lastError']['reason'], 'SSLCertVerificationError')
+        self.assertEqual(info['lastError']['verifyCode'], 5)
+        self.assertEqual(info['lastError']['verifyMessage'], 'hostname mismatch')
+        self.assertEqual(len(info['recentErrorTypes']), 5)
+        self.assertEqual(info['recentErrorTypes'][-2], 'URLError/ConnectionRefusedError')
+        self.assertEqual(info['recentErrorTypes'][-1], 'URLError/SSLCertVerificationError')
+        self.assertEqual(info['elapsedSeconds'], 6)
+        self.assertIn('7 attempts', str(error))
+        self.assertIn('SSLCertVerificationError', str(error))
+
+    def test_string_readiness_reason_is_retained_and_bounded(self):
+        info = fixture.describe_error(fixture.urllib.error.URLError('x' * 500))
+        self.assertEqual(info['reason'], 'str')
+        self.assertEqual(info['message'], 'x' * 200)
+
+    def test_main_records_failure_exit_and_diagnostics_and_still_cleans_up(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary) / 'run'
+            failure = fixture.ReadinessError('not ready', {'attempts': 3})
+            with patch.object(sys, 'argv', [str(SCRIPT), '--self-test', '--work-dir', str(work)]), \
+                    patch.object(fixture, 'check_ready', side_effect=failure), patch.object(fixture.signal, 'signal'):
+                with self.assertRaisesRegex(RuntimeError, 'not ready'):
+                    fixture.main()
+            record = json.loads((work / 'fixture-run.json').read_text())
+            self.assertEqual(record['exit'], 1)
+            self.assertEqual(record['diagnostics'], {'attempts': 3})
+            self.assertEqual(record['failure'], {'type': 'ReadinessError', 'message': 'not ready'})
+            self.assertTrue(record['serverStopped'])
+            self.assertTrue(record['privateKeysRemoved'])
+            self.assertFalse((work / 'private-tls').exists())
+
     def ownership(self, root, before):
         device_set = root / 'devices'
         device_set.mkdir()
