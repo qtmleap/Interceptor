@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="568" viewBox="0 0 760 568" role="img" aria-labelledby="title desc">
+  <title id="title">通信と4つのHookの位置</title>
+  <desc id="desc">未実装の設計案。リクエストはクライアントからInterceptorを経由してサーバーへ、レスポンスは逆向きに流れます。onEnterでは転送前の内容を変更でき、onLeaveは転送後の後処理です。</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif; }
+    .code { font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; font-weight: 500; }
+  </style>
+  <defs>
+    <marker id="forward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#8cb8ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></marker>
+    <marker id="after" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#a5b1c2" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></marker>
+  </defs>
+  <rect width="760" height="568" rx="16" fill="#1b1b1f"/>
+  <rect x="216" y="24" width="328" height="490" rx="18" fill="#22252c" stroke="#373e49"/>
+  <text x="380" y="64" text-anchor="middle" font-size="23" font-weight="650" fill="#edf1f7">Interceptor</text>
+  <text x="380" y="87" text-anchor="middle" font-size="13" fill="#a5b1c2">条件が一致した通信のHookを実行</text>
+  <path d="M240 108 H520" stroke="#373e49"/>
+  <text x="102" y="61" text-anchor="middle" font-size="18" font-weight="600" fill="#edf1f7">クライアント</text>
+  <text x="102" y="84" text-anchor="middle" font-size="13" fill="#a5b1c2">元のアプリ</text>
+  <text x="658" y="61" text-anchor="middle" font-size="18" font-weight="600" fill="#edf1f7">サーバー</text>
+  <path d="M102 108 V496 M658 108 V496" stroke="#3c4553" stroke-width="1.5" stroke-dasharray="3 7"/>
+
+  <rect x="42" y="130" width="120" height="28" rx="6" fill="#1b1b1f"/>
+  <text x="102" y="150" text-anchor="middle" font-size="15" font-weight="600" fill="#8cb8ff">リクエスト</text>
+  <path d="M102 184 H252 M508 184 H658" fill="none" stroke="#8cb8ff" stroke-width="2.5" marker-end="url(#forward)"/>
+  <circle cx="102" cy="184" r="4" fill="#8cb8ff"/>
+  <text x="589" y="170" text-anchor="middle" font-size="13" fill="#a5b1c2">送信</text>
+  <path d="M530 184 V278 H508" fill="none" stroke="#a5b1c2" stroke-width="1.8" stroke-dasharray="4 5" stroke-linejoin="round" marker-end="url(#after)"/>
+  <circle cx="530" cy="184" r="3" fill="#a5b1c2"/>
+
+    <g transform="translate(252 146)">
+      <rect width="256" height="76" rx="12" fill="#25344f" stroke="#5275aa"/>
+      <circle cx="25" cy="27" r="12" fill="#8cb8ff"/>
+      <text x="25" y="31" text-anchor="middle" font-size="12" font-weight="650" fill="#1b1b1f">1</text>
+      <text class="code" x="47" y="33" font-size="17" fill="#8cb8ff">request.onEnter</text>
+      <text x="47" y="58" font-size="15" fill="#a5b1c2">送信前・内容を変更</text>
+    </g>
+
+    <g transform="translate(252 240)">
+      <rect width="256" height="76" rx="12" fill="#2a2e37" stroke="#373e49"/>
+      <circle cx="25" cy="27" r="12" fill="#303744"/>
+      <text x="25" y="31" text-anchor="middle" font-size="12" font-weight="650" fill="#edf1f7">2</text>
+      <text class="code" x="47" y="33" font-size="17" fill="#edf1f7">request.onLeave</text>
+      <text x="47" y="58" font-size="15" fill="#a5b1c2">送信後・後処理</text>
+    </g>
+
+  <path d="M240 329 H520" stroke="#373e49"/>
+  <rect x="598" y="324" width="120" height="28" rx="6" fill="#1b1b1f"/>
+  <text x="658" y="344" text-anchor="middle" font-size="15" font-weight="600" fill="#8cb8ff">レスポンス</text>
+  <path d="M658 380 H508 M252 380 H102" fill="none" stroke="#8cb8ff" stroke-width="2.5" marker-end="url(#forward)"/>
+  <circle cx="658" cy="380" r="4" fill="#8cb8ff"/>
+  <text x="175" y="366" text-anchor="middle" font-size="13" fill="#a5b1c2">返却</text>
+  <path d="M232 380 V474 H252" fill="none" stroke="#a5b1c2" stroke-width="1.8" stroke-dasharray="4 5" stroke-linejoin="round" marker-end="url(#after)"/>
+  <circle cx="232" cy="380" r="3" fill="#a5b1c2"/>
+
+    <g transform="translate(252 342)">
+      <rect width="256" height="76" rx="12" fill="#25344f" stroke="#5275aa"/>
+      <circle cx="25" cy="27" r="12" fill="#8cb8ff"/>
+      <text x="25" y="31" text-anchor="middle" font-size="12" font-weight="650" fill="#1b1b1f">3</text>
+      <text class="code" x="47" y="33" font-size="17" fill="#8cb8ff">response.onEnter</text>
+      <text x="47" y="58" font-size="15" fill="#a5b1c2">返却前・内容を変更</text>
+    </g>
+
+    <g transform="translate(252 436)">
+      <rect width="256" height="76" rx="12" fill="#2a2e37" stroke="#373e49"/>
+      <circle cx="25" cy="27" r="12" fill="#303744"/>
+      <text x="25" y="31" text-anchor="middle" font-size="12" font-weight="650" fill="#edf1f7">4</text>
+      <text class="code" x="47" y="33" font-size="17" fill="#edf1f7">response.onLeave</text>
+      <text x="47" y="58" font-size="15" fill="#a5b1c2">返却後・後処理</text>
+    </g>
+
+  <path d="M36 542 H60" stroke="#8cb8ff" stroke-width="2.5"/>
+  <text x="69" y="547" font-size="13" fill="#a5b1c2">通信の流れ</text>
+  <path d="M178 542 H202" stroke="#a5b1c2" stroke-width="1.8" stroke-dasharray="4 5"/>
+  <text x="211" y="547" font-size="13" fill="#a5b1c2">転送後の処理</text>
+  <text x="724" y="547" text-anchor="end" font-size="12" fill="#a5b1c2">設計案・未実装</text>
+</svg>

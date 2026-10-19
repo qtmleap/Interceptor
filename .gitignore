@@ -188,3 +188,8 @@ Packages/*
 !Packages/InterceptorAutomation/**
 Packages/InterceptorAutomation/.build/
 Packages/InterceptorAutomation/.swiftpm/
+
+# VitePress documentation (Bun)
+node_modules/
+docs/site/.vitepress/cache/
+docs/site/.vitepress/dist/
