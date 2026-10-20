@@ -34,17 +34,17 @@ final class AutomationUITests: XCTestCase {
             let approve = reach(app.buttons["script.activate"], in: form)
             XCTAssertTrue(approve.exists, "v2 live approval is separate from importing")
             attach(app, "Live approval section \(locale)")
-            let viewer = sourceViewer(app)
-            reach(viewer, in: form)
-            XCTAssertTrue(viewer.waitForExistence(timeout: 5))
-            let original = viewer.value as? String
-            XCTAssertFalse(original?.isEmpty ?? true, "the imported source must be shown")
-            assertSourceIsReadOnly(viewer, app: app)
             XCTAssertFalse(app.buttons["script.save"].exists, "the app has no source save action")
             XCTAssertFalse(app.descendants(matching: .any)["script.saveGuidance"].exists)
             let footer = reach(app.descendants(matching: .any).matching(identifier: "script.sourceReadOnly").firstMatch, in: form)
             XCTAssertTrue(footer.exists)
-            attach(app, "Script detail read-only source \(locale)")
+            attach(app, "Script detail source row \(locale)")
+            let viewer = openSource(app)
+            let original = viewer.value as? String
+            XCTAssertFalse(original?.isEmpty ?? true, "the imported source must be shown")
+            assertSourceIsReadOnly(viewer, app: app)
+            attach(app, "Script detail full-screen read-only source \(locale)")
+            closeSource(app)
 
             let picker = reachAbove(app.buttons["script.hook"], in: form)
             picker.tap()
@@ -60,7 +60,8 @@ final class AutomationUITests: XCTestCase {
             XCTAssertTrue(app.staticTexts["script.validated"].exists)
             XCTAssertFalse(app.staticTexts["script.error"].exists)
             let preview = reach(app.staticTexts["script.bodyPreview"], in: form)
-            XCTAssertEqual(preview.label, #"{"limit":5}"#)
+            assertJSON(preview.label, equals: #"{"limit":5}"#)
+            XCTAssertTrue(preview.label.contains("\n  "), "result JSON is formatted for reading")
             attach(app, "Synthetic test result read-only \(locale)")
 
             app.terminate()
@@ -71,13 +72,12 @@ final class AutomationUITests: XCTestCase {
             XCTAssertEqual(rows.count, 1, "viewing and running create no new revision")
             attach(reopened, "Plugins after relaunch read-only \(locale)")
             rows.element(boundBy: 0).tap()
-            let reopenedViewer = sourceViewer(reopened)
-            reach(reopenedViewer, in: reopened.collectionViews["script.form"])
-            XCTAssertTrue(reopenedViewer.waitForExistence(timeout: 5))
+            let reopenedViewer = openSource(reopened)
             XCTAssertEqual((reopenedViewer.value as? String).map { Array($0.utf8) }, original.map { Array($0.utf8) },
                            "the approved source bytes persist unchanged")
             XCTAssertFalse(reopened.buttons["script.save"].exists)
             attach(reopened, "Source after relaunch read-only \(locale)")
+            closeSource(reopened)
             reopened.terminate()
         }
     }
@@ -154,7 +154,7 @@ final class AutomationUITests: XCTestCase {
                 XCTAssertFalse(emptyAlert.exists, "dismissing keeps the result and nothing re-presents it")
                 if phase.hasSuffix("onEnter") {
                     let preview = reach(app.staticTexts["script.bodyPreview"], in: form)
-                    XCTAssertEqual(preview.label, phase.hasPrefix("request") ? #"{"limit":5}"# : #"{"maintenance":true}"#)
+                    assertJSON(preview.label, equals: phase.hasPrefix("request") ? #"{"limit":5}"# : #"{"maintenance":true}"#)
                 } else {
                     XCTAssertFalse(app.staticTexts["script.bodyPreview"].exists)
                 }
@@ -224,14 +224,22 @@ final class AutomationUITests: XCTestCase {
             defer { app.terminate() }
             guard openFixturePackage("Multi-file hooks", repositoryURL: repositoryURL, app: app, japanese: japanese) else { return }
             let review = app.collectionViews["repo.script.list"]
+            let repoViewer = openSource(app, repository: true)
             for (file, marker) in [(Self.secondaryFile, "SECONDARY HOOK FILE"), (Self.primaryFile, "PRIMARY HOOK FILE")] {
-                let source = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", marker)).firstMatch
-                reach(source, in: review)
-                XCTAssertTrue(source.exists, "every package source file must be reviewable: \(file)")
-                source.tap()
+                selectSourceFile(file, app: app, repository: true)
+                let shown = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    (repoViewer.value as? String)?.contains(marker) == true
+                }, object: nil)
+                XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 5), .completed, "every package source file must be reviewable: \(file)")
+                repoViewer.tap()
                 XCTAssertFalse(app.keyboards.firstMatch.exists, "repository sources remain read-only")
                 attach(app, "Multi-file source review \(marker) \(locale)")
             }
+            selectSourceFile(Self.secondaryFile, app: app, repository: true)
+            closeSource(app, repository: true)
+            let repositoryReopened = openSource(app, repository: true)
+            assertSource(repositoryReopened, equals: Self.secondarySource)
+            closeSource(app, repository: true)
             reach(app.buttons["repo.import"], in: review).tap()
             XCTAssertTrue(app.otherElements["repo.imported"].waitForExistence(timeout: 5)
                 || app.staticTexts[japanese ? "取り込みました（無効）" : "Imported (disabled)"].waitForExistence(timeout: 3))
@@ -242,8 +250,8 @@ final class AutomationUITests: XCTestCase {
             script.tap()
             attach(app, "Multi-file installed read-only source before selection \(locale)")
             let form = app.collectionViews["script.form"]
-            let viewer = sourceViewer(app)
-            selectSourceFile(Self.primaryFile, app: app, fromTop: true)
+            let viewer = openSource(app)
+            selectSourceFile(Self.primaryFile, app: app)
             assertSource(viewer, equals: Self.primarySource)
             assertSourceIsReadOnly(viewer, app: app)
             XCTAssertFalse(app.buttons["script.save"].exists, "the app has no source save action")
@@ -253,6 +261,11 @@ final class AutomationUITests: XCTestCase {
             assertSource(viewer, equals: Self.secondarySource)
             assertSourceIsReadOnly(viewer, app: app)
             attach(app, "Multi-file secondary read-only source \(locale)")
+            closeSource(app)
+            XCTAssertTrue(app.buttons["script.openSource"].label.contains(Self.secondaryFile), "the row shows the selected file")
+            let reopenedSelection = openSource(app)
+            assertSource(reopenedSelection, equals: Self.secondarySource)
+            closeSource(app)
             let approve = reachAbove(app.buttons["script.activate"], in: form)
             XCTAssertTrue(approve.isEnabled, "viewing a file never makes the package unapproved")
             let run = reach(app.buttons["script.run"], in: form)
@@ -260,7 +273,7 @@ final class AutomationUITests: XCTestCase {
             run.tap()
             let preview = reach(app.staticTexts["script.bodyPreview"], in: form)
             XCTAssertTrue(preview.waitForExistence(timeout: 5))
-            XCTAssertEqual(preview.label, #"{"limit":5}"#, "the event selects the primary file while the viewer shows the secondary file")
+            assertJSON(preview.label, equals: #"{"limit":5}"#, "the event selects the primary file while the viewer shows the secondary file")
             attach(app, "Multi-file read-only package dispatch \(locale)")
             app.terminate()
             let reopened = launch(japanese: japanese, suite: suite)
@@ -270,14 +283,68 @@ final class AutomationUITests: XCTestCase {
             XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5))
             XCTAssertEqual(rows.count, 1, "viewing creates no child revision")
             rows.element(boundBy: 0).tap()
-            let reopenedViewer = sourceViewer(reopened)
-            selectSourceFile(Self.primaryFile, app: reopened, fromTop: true)
+            let reopenedViewer = openSource(reopened)
+            selectSourceFile(Self.primaryFile, app: reopened)
             assertSource(reopenedViewer, equals: Self.primarySource)
             selectSourceFile(Self.secondaryFile, app: reopened)
             assertSource(reopenedViewer, equals: Self.secondarySource)
             XCTAssertFalse(reopened.buttons["script.save"].exists)
             attach(reopened, "Multi-file read-only source after relaunch \(locale)")
+            closeSource(reopened)
         }
+    }
+
+    @MainActor
+    func testJSONInputsFormatAfterEditingAndBeforeRunning() {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = launch(japanese: false, suite: "Interceptor.UITests.\(UUID().uuidString)")
+        defer { app.terminate() }
+        openPlugins(app, japanese: false)
+        app.buttons["plugins.add"].tap()
+        app.buttons["plugins.createExample"].tap()
+        let script = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "plugins.script.")).firstMatch
+        XCTAssertTrue(script.waitForExistence(timeout: 5))
+        script.tap()
+        let form = app.collectionViews["script.form"]
+        let event = reach(app.textViews["script.event"], in: form)
+        let compact = #"{"id":"00000000-0000-4000-8000-000000000002","phase":"request.onEnter","request":{"method":"POST","host":"example.com","path":"/synthetic","headers":{},"body":{"limit":20}}}"#
+        guard replaceJSONInput(event, with: compact, app: app) else { return }
+        let config = reach(app.textViews["script.config"], in: form)
+        config.tap()
+        let eventFormatted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            (event.value as? String)?.contains("\n  ") == true
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [eventFormatted], timeout: 5), .completed, "switching editors formats the one that lost focus")
+        assertJSON(event.value as? String ?? "", equals: compact)
+        let compactConfig = #"{"settings":{"limit":1.0e+2},"endpoints":{}}"#
+        guard replaceJSONInput(config, with: compactConfig, app: app) else { return }
+        let done = app.buttons["script.inputDone"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        done.tap()
+        let configFormatted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            (config.value as? String)?.contains("\n  ") == true
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [configFormatted], timeout: 5), .completed)
+        XCTAssertTrue((config.value as? String)?.contains("1.0e+2") == true)
+        let invalid = #"{"request":"#
+        reachAbove(event, in: form)
+        guard replaceJSONInput(event, with: invalid, app: app) else { return }
+        done.tap()
+        XCTAssertEqual(event.value as? String, invalid, "incomplete JSON remains exactly as entered")
+        guard replaceJSONInput(event, with: compact, app: app) else { return }
+        reach(app.buttons["script.run"], in: form).tap()
+        let preview = reach(app.staticTexts["script.bodyPreview"], in: form)
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        assertJSON(preview.label, equals: #"{"limit":5}"#)
+        XCTAssertTrue(preview.label.contains("\n  "))
+        XCTAssertFalse(app.staticTexts["script.error"].exists)
+        attach(app, "Automatically formatted JSON result en")
+        let source = openSource(app)
+        assertSourceIsReadOnly(source, app: app)
+        closeSource(app)
+        reach(preview, in: form)
+        assertJSON(preview.label, equals: #"{"limit":5}"#, "opening the source preserves the completed result")
     }
 
     @MainActor
@@ -311,6 +378,26 @@ final class AutomationUITests: XCTestCase {
 }
 
 private extension AutomationUITests {
+    @MainActor
+    func replaceJSONInput(_ field: XCUIElement, with text: String, app: XCUIApplication) -> Bool {
+        field.tap()
+        field.press(forDuration: 1.2)
+        let menuItem = app.menuItems["Select All"]
+        let button = app.buttons["Select All"]
+        if menuItem.waitForExistence(timeout: 2) {
+            menuItem.tap()
+        } else if button.waitForExistence(timeout: 2) {
+            button.tap()
+        } else {
+            captureSourceFailure(app, name: "JSON select-all action missing")
+            XCTFail("The native edit menu must select the complete JSON input")
+            return false
+        }
+        field.typeText(text)
+        XCTAssertEqual(field.value as? String, text, "typing itself must not reformat JSON")
+        return true
+    }
+
     @MainActor
     func verifyRepositoryScriptDetails(japanese: Bool) async throws {
         guard let repositoryURL = await repositoryFixtureURLIfReady() else {
@@ -362,8 +449,7 @@ private extension AutomationUITests {
         attach(app, "Repository script integrity \(japanese ? "ja" : "en")")
         XCTAssertFalse(app.buttons["repo.imported"].exists, "navigation must not import")
         attach(app, "Repository script detail \(japanese ? "ja" : "en")")
-        let source = app.scrollViews["repo.script.source"].textViews.firstMatch
-        reach(source, in: app.collectionViews["repo.script.list"])
+        let source = openSource(app, repository: true)
         XCTAssertTrue(source.waitForExistence(timeout: 5), "JavaScript is a selectable native code viewer")
         XCTAssertTrue((source.value as? String)?.contains("function onRequest") == true)
         source.tap()
@@ -374,16 +460,17 @@ private extension AutomationUITests {
             app.scrollViews["repo.script.source"].swipeUp()
             attach(app, "Repository JavaScript scrolled to final line \(japanese ? "ja" : "en")")
         }
+        closeSource(app, repository: true)
         app.navigationBars["Request summary"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(entry.waitForExistence(timeout: 5))
         let alternate = app.buttons["repo.entry.Response details"]
         if alternate.exists {
             alternate.tap()
             XCTAssertTrue(app.navigationBars["Response details"].waitForExistence(timeout: 5))
-            let alternateSource = app.scrollViews["repo.script.source"].textViews.firstMatch
-            reach(alternateSource, in: app.collectionViews["repo.script.list"])
+            let alternateSource = openSource(app, repository: true)
             XCTAssertEqual(alternateSource.value as? String, "function onRequest(event, config) { return { actions: [] }; }\n")
             attach(app, "Different repository script source \(japanese ? "ja" : "en")")
+            closeSource(app, repository: true)
             app.navigationBars["Response details"].buttons.element(boundBy: 0).tap()
             XCTAssertTrue(entry.waitForExistence(timeout: 5))
         }
@@ -475,18 +562,47 @@ private extension AutomationUITests {
         return true
     }
 
+    /// Chooses a file in the open full-screen reader. The picker lives in the reader's navigation bar.
     @MainActor
-    func selectSourceFile(_ file: String, app: XCUIApplication, fromTop: Bool = false) {
-        let form = app.collectionViews["script.form"]
-        let picker = fromTop ? reach(app.buttons["script.sourceFile"], in: form) : reachAbove(app.buttons["script.sourceFile"], in: form)
+    func selectSourceFile(_ file: String, app: XCUIApplication, repository: Bool = false) {
+        let picker = app.buttons[repository ? "repo.script.sourceFile" : "script.sourceFile"]
         XCTAssertTrue(picker.waitForExistence(timeout: 5))
         picker.tap()
         let item = app.buttons[file]
         XCTAssertTrue(item.waitForExistence(timeout: 5))
         item.tap()
-        let viewer = sourceViewer(app)
-        reach(viewer, in: form)
-        XCTAssertTrue(viewer.exists)
+    }
+
+    /// Compares parsed JSON: the preview is laid out for reading, the value is what matters.
+    func assertJSON(_ label: String, equals expected: String, _ message: String = "", file: StaticString = #filePath, line: UInt = #line) {
+        let actual = try? JSONSerialization.jsonObject(with: Data(label.utf8), options: [.fragmentsAllowed]) as? NSObject
+        let wanted = try? JSONSerialization.jsonObject(with: Data(expected.utf8), options: [.fragmentsAllowed]) as? NSObject
+        XCTAssertNotNil(actual, "the preview must be valid JSON: \(label)", file: file, line: line)
+        XCTAssertEqual(actual, wanted, message, file: file, line: line)
+    }
+
+    /// Opens the full-screen reader from the installed detail or repository review and returns its viewer.
+    @MainActor
+    @discardableResult
+    func openSource(_ app: XCUIApplication, repository: Bool = false) -> XCUIElement {
+        let form = app.collectionViews[repository ? "repo.script.list" : "script.form"]
+        let open = reach(app.buttons[repository ? "repo.script.openSource" : "script.openSource"], in: form)
+        XCTAssertTrue(open.isEnabled)
+        open.tap()
+        let close = app.buttons[repository ? "repo.script.closeSource" : "script.closeSource"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "the full-screen reader needs an explicit Done")
+        let viewer = repository ? app.scrollViews["repo.script.source"].textViews.firstMatch : sourceViewer(app)
+        XCTAssertTrue(viewer.waitForExistence(timeout: 5))
+        XCTAssertTrue(viewer.frame.height > app.frame.height * 0.5, "the source fills the screen: \(viewer.frame)")
+        return viewer
+    }
+
+    @MainActor
+    func closeSource(_ app: XCUIApplication, repository: Bool = false) {
+        let close = app.buttons[repository ? "repo.script.closeSource" : "script.closeSource"]
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.collectionViews[repository ? "repo.script.list" : "script.form"].waitForExistence(timeout: 5))
     }
 
     @MainActor

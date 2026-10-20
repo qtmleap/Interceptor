@@ -4,7 +4,16 @@ import Foundation
 
 /// Clearly synthetic request/response event and config for the dry run. Never derived from saved captures.
 enum SyntheticFixture {
+    /// Already laid out by `JSONPrettyPrinter`, so focusing and leaving an editor never changes it.
     static func eventJSON(for hook: JavaScriptHook) -> String {
+        JSONPrettyPrinter.format(rawEventJSON(for: hook), maxBytes: JavaScriptLimits.maxEventBytes)
+    }
+
+    static var configJSON: String {
+        JSONPrettyPrinter.format(rawConfigJSON, maxBytes: JavaScriptLimits.maxConfigBytes)
+    }
+
+    private static func rawEventJSON(for hook: JavaScriptHook) -> String {
         switch hook {
             case .requestEnter, .requestLeave, .responseEnter, .responseLeave:
                 let response = hook == .responseEnter || hook == .responseLeave
@@ -39,7 +48,7 @@ enum SyntheticFixture {
         }
     }
 
-    static var configJSON: String {
+    private static var rawConfigJSON: String {
         "{\n  \"endpoints\": { \"preview\": \"\(AutomationTemplate.previewEndpointID.uuidString)\" }\n}"
     }
 }

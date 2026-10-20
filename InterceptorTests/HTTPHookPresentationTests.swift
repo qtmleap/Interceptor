@@ -179,6 +179,80 @@ final class HTTPHookPresentationTests: XCTestCase {
         XCTAssertEqual(session.runState, .idle)
     }
 
+    func testInitialInputsAreFormattedAndFormattingThemKeepsTheResult() async throws {
+        let (session, runner) = try await templateSession()
+        XCTAssertEqual(session.eventText, JSONPrettyPrinter.format(session.eventText, maxBytes: JavaScriptLimits.maxEventBytes))
+        XCTAssertEqual(session.configText, JSONPrettyPrinter.format(session.configText, maxBytes: JavaScriptLimits.maxConfigBytes))
+        try await finishRun(session, runner, Data(#"{"actions":[],"mutation":{"body":{"limit":5}}}"#.utf8))
+        let finished = session.runState
+        session.formatInputs()
+        XCTAssertEqual(session.runState, finished, "already formatted inputs must not clear the result")
+        XCTAssertEqual(session.bodyPreview, #"{"limit":5}"#, "stored preview bytes stay compact")
+    }
+
+    func testFormattingRunsOnEditEndAndBeforeRunButNeverOnInvalidText() async throws {
+        let (session, runner) = try await templateSession()
+        session.eventText = #"{"id":"x","request":{"body":{"limit":20}}}"#
+        session.formatInputs()
+        XCTAssertEqual(session.eventText, "{\n  \"id\": \"x\",\n  \"request\": {\n    \"body\": {\n      \"limit\": 20\n    }\n  }\n}")
+        let invalid = #"{"id":"#
+        session.eventText = invalid
+        session.formatInputs()
+        XCTAssertEqual(session.eventText, invalid)
+        session.eventText = SyntheticFixture.eventJSON(for: session.hook)
+        session.configText = "{ \"endpoints\" : { } }"
+        session.run()
+        XCTAssertEqual(session.configText, "{\n  \"endpoints\": {}\n}", "run formats first")
+        _ = await waitUntil { runner.isWaiting }
+        XCTAssertTrue(session.isRunning)
+        runner.finish(.success(Data(#"{"actions":[]}"#.utf8)))
+        _ = await waitUntil { !session.isRunning }
+    }
+
+    func testFormattingNeverMutatesInputsWhileRunning() async throws {
+        let (session, runner) = try await templateSession()
+        session.run()
+        _ = await waitUntil { runner.isWaiting }
+        XCTAssertTrue(session.isRunning)
+        let before = (session.eventText, session.configText)
+        session.formatInputs()
+        XCTAssertEqual(session.eventText, before.0)
+        XCTAssertEqual(session.configText, before.1)
+        XCTAssertTrue(session.isRunning, "formatting must not cancel a pending run")
+        session.formatInput(.event)
+        session.formatInput(.config)
+        XCTAssertTrue(session.isRunning)
+        runner.finish(.success(Data(#"{"actions":[]}"#.utf8)))
+        _ = await waitUntil { !session.isRunning }
+    }
+
+    func testFormattingOneEditorLeavesTheFocusedEditorUntouched() async throws {
+        let (session, _) = try await templateSession()
+        session.eventText = #"{"id":"x"}"#
+        session.configText = #"{"settings":{"x":1}}"#
+        let config = session.configText
+        session.formatInput(.event)
+        XCTAssertEqual(session.eventText, "{\n  \"id\": \"x\"\n}")
+        XCTAssertEqual(session.configText, config)
+        session.formatInput(.config)
+        XCTAssertTrue(session.configText.contains("\n  "))
+    }
+
+    func testSelectedSourceFileSurvivesWithoutChoosingRuntimeSourceOrCancellingRun() async throws {
+        let (session, _, runner) = try await multiFileSession()
+        session.run()
+        _ = await waitUntil { runner.isWaiting }
+        let bytes = session.revision.package.bytes
+        session.selectedSourceFile = session.sourceFileNames.last
+        XCTAssertTrue(session.isRunning, "browsing source never cancels a pending dry run")
+        XCTAssertEqual(runner.runs.first?.packageJSON, bytes)
+        XCTAssertEqual(runner.cancelCount, 0)
+        runner.finish(.success(Data(#"{"actions":[]}"#.utf8)))
+        _ = await waitUntil { !session.isRunning }
+        XCTAssertEqual(session.selectedSourceFile, session.sourceFileNames.last)
+        XCTAssertFalse(session.isDirty)
+    }
+
     private func finishRun(_ session: ScriptSession, _ runner: FakeScriptRunner, _ data: Data) async throws {
         session.run()
         let started = await waitUntil { runner.isWaiting }

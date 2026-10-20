@@ -38,6 +38,29 @@ final class PluginSourceViewerTests: XCTestCase {
         }
     }
 
+    func testFullScreenViewerKeepsExactBytesDoesNotWrapAndStaysReadOnly() throws {
+        let original = "// " + String(repeating: "long ", count: 200) + "\r\nconst é = 1;\r\n"
+        let host = UIHostingController(rootView: PluginSourceViewer(source: original, identifier: "plugin.source", fillsAvailableSpace: true))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 800))
+        let previousKey = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows).first(where: \.isKeyWindow)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil; previousKey?.makeKey() }
+        host.view.layoutIfNeeded()
+        let mounted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.findViewer(in: host.view)?.text.utf8.elementsEqual(original.utf8) == true
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [mounted], timeout: 5), .completed)
+        let viewer = try XCTUnwrap(findViewer(in: host.view))
+        XCTAssertFalse(viewer.isEditable)
+        XCTAssertTrue(viewer.isSelectable)
+        XCTAssertTrue(viewer.showLineNumbers)
+        XCTAssertFalse(viewer.isLineWrappingEnabled, "long lines scroll horizontally")
+        XCTAssertGreaterThan(viewer.bounds.height, 320, "the full-screen viewer fills the offered space")
+        XCTAssertEqual(viewer.accessibilityIdentifier, "plugin.source")
+    }
+
     private func findViewer(in view: UIView) -> TextView? {
         if let viewer = view as? TextView {
             return viewer

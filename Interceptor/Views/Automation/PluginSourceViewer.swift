@@ -6,24 +6,33 @@ import TreeSitterJavaScriptRunestone
 struct PluginSourceViewer: View {
     private let sourceUTF8: [UInt8]
     private let identifier: String
+    private let fillsAvailableSpace: Bool
     @ScaledMetric(relativeTo: .body) private var lineHeight: CGFloat = 17 * 1.3
 
-    init(source: String, identifier: String = "repo.script.source") {
+    /// The default is the compact, wrapping viewer. `fillsAvailableSpace` is the full-screen reader: it takes
+    /// all offered space and does not wrap, so long lines scroll horizontally.
+    init(source: String, identifier: String = "repo.script.source", fillsAvailableSpace: Bool = false) {
         sourceUTF8 = Array(source.utf8)
         self.identifier = identifier
+        self.fillsAvailableSpace = fillsAvailableSpace
     }
 
     var body: some View {
-        // Approximate natural height by newline count, bounded so short scripts stay compact and large ones scroll.
-        let lines = CGFloat(sourceUTF8.reduce(1) { $1 == 0x0A ? $0 + 1 : $0 })
-        let height = min(max(lines * lineHeight + 24, 120), 320)
-        PluginSourceViewerRepresentable(sourceUTF8: sourceUTF8, identifier: identifier).frame(height: height)
+        if fillsAvailableSpace {
+            PluginSourceViewerRepresentable(sourceUTF8: sourceUTF8, identifier: identifier, wraps: false)
+        } else {
+            // Approximate natural height by newline count, bounded so short scripts stay compact and large ones scroll.
+            let lines = CGFloat(sourceUTF8.reduce(1) { $1 == 0x0A ? $0 + 1 : $0 })
+            let height = min(max(lines * lineHeight + 24, 120), 320)
+            PluginSourceViewerRepresentable(sourceUTF8: sourceUTF8, identifier: identifier, wraps: true).frame(height: height)
+        }
     }
 }
 
 private struct PluginSourceViewerRepresentable: UIViewRepresentable {
     let sourceUTF8: [UInt8]
     let identifier: String
+    let wraps: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -35,7 +44,7 @@ private struct PluginSourceViewerRepresentable: UIViewRepresentable {
         view.isSelectable = true
         view.showLineNumbers = true
         view.lineSelectionDisplayType = .disabled
-        view.isLineWrappingEnabled = true
+        view.isLineWrappingEnabled = wraps
         view.lineHeightMultiplier = 1.3
         view.textContainerInset = UIEdgeInsets(top: 12, left: 0, bottom: 12, right: 0)
         view.backgroundColor = .secondarySystemGroupedBackground

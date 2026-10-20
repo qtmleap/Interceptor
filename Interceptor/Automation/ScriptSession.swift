@@ -9,6 +9,7 @@ import Observation
 @MainActor @Observable
 final class ScriptSession {
     enum RunState: Equatable { case idle, running, finished([ValidatedAction]), failed(String) }
+    enum JSONInput: Hashable { case event, config }
 
     private(set) var revision: InstalledRevision
     private(set) var runState = RunState.idle
@@ -122,7 +123,8 @@ final class ScriptSession {
         if revision.package.manifest.schemaVersion == 2 {
             hook = .requestEnter
             eventText = SyntheticFixture.eventJSON(for: .requestEnter)
-            configText = (try? JSONValue.object(["settings": revision.package.manifest.settings, "endpoints": .object([:])]).jsonString()) ?? "{}"
+            let config = (try? JSONValue.object(["settings": revision.package.manifest.settings, "endpoints": .object([:])]).jsonString()) ?? "{}"
+            configText = JSONPrettyPrinter.format(config, maxBytes: JavaScriptLimits.maxConfigBytes)
         }
     }
 
@@ -190,8 +192,24 @@ final class ScriptSession {
         invalidateResult()
     }
 
+    /// Lays out valid JSON object inputs. Called when editing ends and before a run, never per keystroke,
+    /// and never while a run owns the current inputs. Unchanged text keeps the result.
+    func formatInputs() {
+        formatInput(.event)
+        formatInput(.config)
+    }
+
+    func formatInput(_ input: JSONInput) {
+        guard !isRunning else { return }
+        switch input {
+            case .event: eventText = JSONPrettyPrinter.format(eventText, maxBytes: JavaScriptLimits.maxEventBytes)
+            case .config: configText = JSONPrettyPrinter.format(configText, maxBytes: JavaScriptLimits.maxConfigBytes)
+        }
+    }
+
     func run() {
         guard canRun else { return }
+        formatInputs()
         guard let event = Self.boundedJSON(eventText, max: JavaScriptLimits.maxEventBytes) else {
             runState = .failed("AUTO_ERR_EVENT_INVALID"); return
         }
