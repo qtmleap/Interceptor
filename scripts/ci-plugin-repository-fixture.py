@@ -170,8 +170,24 @@ class RequestDiagnostics:
                     'entries': [dict(entry) for entry in self.entries]}
 
 
+def valid_port(value):
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 65535:
+        raise ValueError('Fixture port must be an integer in 0..65535')
+    return value
+
+
+def port_argument(text):
+    if not text.isascii() or not text.isdigit():
+        raise argparse.ArgumentTypeError('port must be an integer in 0..65535')
+    try:
+        return valid_port(int(text))
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error))
+
+
 class FixtureServer:
-    def __init__(self, files, tls):
+    def __init__(self, files, tls, port=0):
+        port = valid_port(port)
         diagnostics = self.diagnostics = RequestDiagnostics(files)
         # Explicit bytes only: no filesystem traversal, directory listing, source tree or key serving.
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -219,7 +235,7 @@ class FixtureServer:
                 connection.settimeout(5)
                 return connection, address
 
-        self.server = Server(('127.0.0.1', 0), Handler)
+        self.server = Server(('127.0.0.1', port), Handler)
         try:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -347,6 +363,8 @@ def main():
     parser.add_argument('--device-set', type=Path, default=os.environ.get('CI_SIMULATOR_DEVICE_SET'))
     parser.add_argument('--simulators-before', type=Path)
     parser.add_argument('--simulator-host', type=Path)
+    parser.add_argument('--port', type=port_argument, default=0,
+                        help='loopback HTTPS port; 0 (default) selects a free port, an occupied port fails')
     parser.add_argument('--verify-fixtures', action='store_true')
     parser.add_argument('--self-test', action='store_true')
     parser.add_argument('command', nargs=argparse.REMAINDER)
@@ -389,7 +407,7 @@ def main():
         for path, raw in files.items():
             (public / path[1:]).write_bytes(raw)
         tls = make_tls(work)
-        server = FixtureServer(files, tls)
+        server = FixtureServer(files, tls, options.port)
         record.update({'repositoryURL': server.base_url + '/repository.json', 'runToken': token,
                        'packageDigest': package_digest, 'publicFiles': {name: digest(raw) for name, raw in files.items()}})
         context = check_ready(server, tls, files['/__interceptor_fixture'])

@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.request
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -298,6 +299,63 @@ class PluginRepositoryFixtureTests(unittest.TestCase):
                     fixture.main()
             self.assertFalse((work / 'private-tls').exists())
             self.assertTrue(json.loads((work / 'fixture-run.json').read_text())['privateKeysRemoved'])
+
+    def reserved_free_port(self):
+        with socket.socket() as probe:
+            probe.bind(('127.0.0.1', 0))
+            return probe.getsockname()[1]
+
+    def test_explicit_port_serves_real_https_response(self):
+        port = self.reserved_free_port()
+        with tempfile.TemporaryDirectory() as temporary:
+            tls = fixture.make_tls(Path(temporary))
+            server = fixture.FixtureServer({'/__interceptor_fixture': b'nonce'}, tls, port=port)
+            try:
+                self.assertEqual(server.port, port)
+                self.assertEqual(server.base_url, 'https://localhost:' + str(port))
+                context = fixture.check_ready(server, tls, b'nonce')
+                with urllib.request.urlopen(server.base_url + '/__interceptor_fixture', context=context, timeout=5) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(response.read(), b'nonce')
+            finally:
+                server.close()
+
+    def test_occupied_port_fails_and_preserves_original_listener(self):
+        with tempfile.TemporaryDirectory() as temporary, socket.socket() as occupied:
+            tls = fixture.make_tls(Path(temporary))
+            occupied.bind(('127.0.0.1', 0))
+            occupied.listen(1)
+            port = occupied.getsockname()[1]
+            with self.assertRaises(OSError):
+                fixture.FixtureServer({'/x': b'x'}, tls, port=port)
+            self.assertEqual(occupied.getsockname(), ('127.0.0.1', port))
+            occupied.settimeout(2)
+            with socket.create_connection(('127.0.0.1', port), timeout=2):
+                occupied.accept()[0].close()
+
+    def test_constructor_rejects_invalid_ports(self):
+        for bad in (-1, 65536, True, False, 1.0, '80', None):
+            with self.subTest(port=bad), self.assertRaises(ValueError):
+                fixture.FixtureServer({}, Path('unused'), port=bad)
+
+    def test_cli_rejects_invalid_ports(self):
+        for bad in ('-1', '65536', 'abc', '', '1.5', ' 80', '٣'):
+            with self.subTest(port=bad):
+                completed = subprocess.run([sys.executable, str(SCRIPT), '--self-test', '--port', bad],
+                                           capture_output=True, text=True, timeout=20)
+                self.assertEqual(completed.returncode, 2, completed.stderr)
+                self.assertIn('port', completed.stderr)
+
+    def test_cli_explicit_port_is_used_in_repository_url(self):
+        port = self.reserved_free_port()
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary) / 'run'
+            completed = subprocess.run([sys.executable, str(SCRIPT), '--self-test', '--port', str(port), '--work-dir', str(work)],
+                                       capture_output=True, text=True, timeout=20)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            record = json.loads((work / 'fixture-run.json').read_text())
+            self.assertEqual(record['repositoryURL'], 'https://localhost:%d/repository.json' % port)
+            self.assertTrue(record['serverStopped'])
 
     def test_real_https_allowlist_and_owned_cleanup_without_simulator(self):
         with tempfile.TemporaryDirectory() as temporary:
