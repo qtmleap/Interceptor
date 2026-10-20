@@ -11,71 +11,73 @@ final class AutomationUITests: XCTestCase {
     }
 
     @MainActor
-    func testCreateEditRunAndReopenPersistsInEnglishAndJapanese() {
+    func testCreateViewRunAndReopenPersistsInEnglishAndJapanese() {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
         defer { XCUIDevice.shared.orientation = .portrait }
         for japanese in [false, true] {
             let suite = "Interceptor.UITests.\(UUID().uuidString)"
+            let locale = japanese ? "ja" : "en"
             let app = launch(japanese: japanese, suite: suite)
             defer { app.terminate() }
             openPlugins(app, japanese: japanese)
-            attach(app, "Plugins empty \(japanese ? "ja" : "en")")
+            attach(app, "Plugins empty \(locale)")
 
             app.buttons["plugins.add"].tap()
             app.buttons["plugins.createExample"].tap()
             let script = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "plugins.script.")).firstMatch
             XCTAssertTrue(script.waitForExistence(timeout: 5))
-            attach(app, "Plugins with example \(japanese ? "ja" : "en")")
+            attach(app, "Plugins with example \(locale)")
 
             script.tap()
-            let approve = reach(app.buttons["script.activate"], in: app.collectionViews["script.form"])
+            let form = app.collectionViews["script.form"]
+            let approve = reach(app.buttons["script.activate"], in: form)
             XCTAssertTrue(approve.exists, "v2 live approval is separate from importing")
-            attach(app, "Live approval section \(japanese ? "ja" : "en")")
-            let editor = sourceEditor(app)
-            reach(editor, in: app.collectionViews["script.form"])
-            XCTAssertTrue(editor.waitForExistence(timeout: 5))
-            XCTAssertFalse(app.buttons["script.save"].isEnabled, "no edit yet")
-            let replacement = editedHookSource(requestLimit: 7, maintenance: true)
-            replaceSource(editor, with: replacement, app: app, japanese: japanese)
-            XCTAssertTrue(app.buttons["script.save"].isEnabled)
-            app.buttons["script.save"].tap()
-            let run = reach(app.buttons["script.run"], in: app.collectionViews["script.form"])
-            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: run)
-            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
-            attach(app, "Script detail after local edit \(japanese ? "ja" : "en")")
+            attach(app, "Live approval section \(locale)")
+            let viewer = sourceViewer(app)
+            reach(viewer, in: form)
+            XCTAssertTrue(viewer.waitForExistence(timeout: 5))
+            let original = viewer.value as? String
+            XCTAssertFalse(original?.isEmpty ?? true, "the imported source must be shown")
+            assertSourceIsReadOnly(viewer, app: app)
+            XCTAssertFalse(app.buttons["script.save"].exists, "the app has no source save action")
+            XCTAssertFalse(app.descendants(matching: .any)["script.saveGuidance"].exists)
+            let footer = reach(app.descendants(matching: .any).matching(identifier: "script.sourceReadOnly").firstMatch, in: form)
+            XCTAssertTrue(footer.exists)
+            attach(app, "Script detail read-only source \(locale)")
 
+            let picker = reachAbove(app.buttons["script.hook"], in: form)
+            picker.tap()
+            let choice = app.buttons["request.onEnter"]
+            XCTAssertTrue(choice.waitForExistence(timeout: 5))
+            choice.tap()
+            let run = reach(app.buttons["script.run"], in: form)
+            XCTAssertTrue(run.isEnabled, "an unchanged source is always runnable")
+            XCTAssertTrue(app.textViews["script.event"].exists || reach(app.textViews["script.event"], in: form).exists,
+                          "dry-run inputs stay editable")
             run.tap()
-            reach(app.staticTexts["script.validated"], in: app.collectionViews["script.form"])
+            reach(app.staticTexts["script.validated"], in: form)
             XCTAssertTrue(app.staticTexts["script.validated"].exists)
             XCTAssertFalse(app.staticTexts["script.error"].exists)
-            let preview = reach(app.staticTexts["script.bodyPreview"], in: app.collectionViews["script.form"])
-            XCTAssertEqual(preview.label, #"{"limit":7}"#)
-            attach(app, "Synthetic test result \(japanese ? "ja" : "en")")
+            let preview = reach(app.staticTexts["script.bodyPreview"], in: form)
+            XCTAssertEqual(preview.label, #"{"limit":5}"#)
+            attach(app, "Synthetic test result read-only \(locale)")
 
             app.terminate()
             let reopened = launch(japanese: japanese, suite: suite)
             openPlugins(reopened, japanese: japanese)
             let rows = reopened.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "plugins.script."))
             XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5))
-            XCTAssertEqual(rows.count, 2, "original and local-edit revisions persist")
-            attach(reopened, "Plugins after relaunch \(japanese ? "ja" : "en")")
-            var foundEditedChild = false
-            for index in 0 ..< 2 {
-                rows.element(boundBy: index).tap()
-                let reopenedEditor = sourceEditor(reopened)
-                reach(reopenedEditor, in: reopened.collectionViews["script.form"])
-                XCTAssertTrue(reopenedEditor.waitForExistence(timeout: 5))
-                if (reopenedEditor.value as? String)?.utf8.elementsEqual(replacement.utf8) == true {
-                    assertSource(reopenedEditor, equals: replacement)
-                    XCTAssertFalse(reopened.buttons["script.save"].isEnabled)
-                    attach(reopened, "Edited source after relaunch \(japanese ? "ja" : "en")")
-                    foundEditedChild = true
-                    break
-                }
-                reopened.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
-            }
-            XCTAssertTrue(foundEditedChild, "the exact edited source must persist in the child revision")
+            XCTAssertEqual(rows.count, 1, "viewing and running create no new revision")
+            attach(reopened, "Plugins after relaunch read-only \(locale)")
+            rows.element(boundBy: 0).tap()
+            let reopenedViewer = sourceViewer(reopened)
+            reach(reopenedViewer, in: reopened.collectionViews["script.form"])
+            XCTAssertTrue(reopenedViewer.waitForExistence(timeout: 5))
+            XCTAssertEqual((reopenedViewer.value as? String).map { Array($0.utf8) }, original.map { Array($0.utf8) },
+                           "the approved source bytes persist unchanged")
+            XCTAssertFalse(reopened.buttons["script.save"].exists)
+            attach(reopened, "Source after relaunch read-only \(locale)")
             reopened.terminate()
         }
     }
@@ -106,7 +108,7 @@ final class AutomationUITests: XCTestCase {
             XCTAssertTrue(confirm.waitForExistence(timeout: 5))
             let approvalForm = app.collectionViews["script.approvalForm"]
             XCTAssertTrue(approvalForm.waitForExistence(timeout: 5))
-            XCTAssertEqual(confirm.label, japanese ? "使用を承認" : "Approve Use")
+            XCTAssertEqual(confirm.label, "OK")
             let cancelApproval = app.buttons.matching(identifier: "script.cancelActivation").firstMatch
             XCTAssertTrue(cancelApproval.isHittable)
             attach(app, "Hooks exact revision confirmation \(locale)")
@@ -136,9 +138,20 @@ final class AutomationUITests: XCTestCase {
                 let run = reach(app.buttons["script.run"], in: form)
                 XCTAssertTrue(run.isEnabled)
                 run.tap()
+                let emptyAlert = app.alerts.firstMatch
+                if phase.hasSuffix("onLeave") {
+                    XCTAssertTrue(emptyAlert.waitForExistence(timeout: 5), "a run that returns nothing explains itself")
+                    XCTAssertEqual(emptyAlert.label, japanese ? "テスト完了" : "Test completed")
+                    if phase == "request.onLeave" {
+                        attach(app, "Hooks empty result alert \(locale)")
+                    }
+                    emptyAlert.buttons["OK"].tap()
+                    XCTAssertTrue(emptyAlert.waitForNonExistence(timeout: 5))
+                }
                 let result = reach(app.staticTexts["script.validated"], in: form)
                 XCTAssertTrue(result.waitForExistence(timeout: 5))
                 XCTAssertFalse(app.staticTexts["script.error"].exists)
+                XCTAssertFalse(emptyAlert.exists, "dismissing keeps the result and nothing re-presents it")
                 if phase.hasSuffix("onEnter") {
                     let preview = reach(app.staticTexts["script.bodyPreview"], in: form)
                     XCTAssertEqual(preview.label, phase.hasPrefix("request") ? #"{"limit":5}"# : #"{"maintenance":true}"#)
@@ -197,7 +210,7 @@ final class AutomationUITests: XCTestCase {
     /// The tracked CI fixture wrapper supplies an owned HTTPS URL, nonce and simulator UUID.
     /// Fixture-dependent tests fail when setup is missing or belongs to another run/device.
     @MainActor
-    func testMultiFileEditingSwitchesSavesAndReopensInEnglishAndJapanese() async {
+    func testMultiFileViewingSwitchesAndReopensInEnglishAndJapanese() async {
         continueAfterFailure = false
         guard let repositoryURL = await repositoryFixtureURLIfReady() else {
             XCTFail("Run scripts/ci-plugin-repository-fixture.py around this test command on its selected disposable simulator")
@@ -227,70 +240,43 @@ final class AutomationUITests: XCTestCase {
             let script = app.buttons["plugins.script.Multi-file hooks"]
             XCTAssertTrue(script.waitForExistence(timeout: 5))
             script.tap()
-            attach(app, "Multi-file installed editor before selection \(locale)")
-            let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "Multi-file installed editor hierarchy \(locale)"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-            let firstEdit = editedHookSource(requestLimit: 7, maintenance: true)
-            let secondEdit = editedHookSource(requestLimit: 17, maintenance: false)
-            let editor = sourceEditor(app)
-            selectSourceFile(Self.primaryFile, app: app, fromTop: true)
-            assertSource(editor, equals: Self.primarySource)
-            replaceSource(editor, with: firstEdit, app: app, japanese: japanese)
+            attach(app, "Multi-file installed read-only source before selection \(locale)")
             let form = app.collectionViews["script.form"]
-            let approve = reachAbove(app.buttons["script.activate"], in: form)
-            XCTAssertFalse(approve.isEnabled, "an unsaved file must block live approval")
-            selectSourceFile(Self.secondaryFile, app: app, fromTop: true)
-            assertSource(editor, equals: Self.secondarySource)
-            replaceSource(editor, with: secondEdit, app: app, japanese: japanese)
-            selectSourceFile(Self.primaryFile, app: app)
-            assertSource(editor, equals: firstEdit)
+            let viewer = sourceViewer(app)
+            selectSourceFile(Self.primaryFile, app: app, fromTop: true)
+            assertSource(viewer, equals: Self.primarySource)
+            assertSourceIsReadOnly(viewer, app: app)
+            XCTAssertFalse(app.buttons["script.save"].exists, "the app has no source save action")
+            XCTAssertFalse(app.descendants(matching: .any)["script.saveGuidance"].exists)
+            attach(app, "Multi-file primary read-only source \(locale)")
             selectSourceFile(Self.secondaryFile, app: app)
-            assertSource(editor, equals: secondEdit)
-            attach(app, "Multi-file drafts retained \(locale)")
-            XCTAssertTrue(app.buttons["script.save"].isEnabled)
-            app.buttons["script.save"].tap()
-            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "saving dismisses the source keyboard before reviewing guidance")
-            let guidance = app.descendants(matching: .any).matching(identifier: "script.saveGuidance").firstMatch
-            reach(guidance, in: form)
-            if !visibleFormFrame(form).contains(guidance.frame) {
-                form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.8))
-                    .press(forDuration: 0.05, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.6)))
-            }
-            XCTAssertTrue(visibleFormFrame(form).contains(guidance.frame), "the complete save and reapproval guidance must be visible")
-            attach(app, "Multi-file save guidance \(locale)")
+            assertSource(viewer, equals: Self.secondarySource)
+            assertSourceIsReadOnly(viewer, app: app)
+            attach(app, "Multi-file secondary read-only source \(locale)")
+            let approve = reachAbove(app.buttons["script.activate"], in: form)
+            XCTAssertTrue(approve.isEnabled, "viewing a file never makes the package unapproved")
             let run = reach(app.buttons["script.run"], in: form)
-            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: run)
-            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
+            XCTAssertTrue(run.isEnabled)
             run.tap()
             let preview = reach(app.staticTexts["script.bodyPreview"], in: form)
             XCTAssertTrue(preview.waitForExistence(timeout: 5))
-            XCTAssertEqual(preview.label, #"{"limit":7}"#, "the event selects the primary file while the editor shows the secondary file")
-            attach(app, "Multi-file saved package dispatch \(locale)")
+            XCTAssertEqual(preview.label, #"{"limit":5}"#, "the event selects the primary file while the viewer shows the secondary file")
+            attach(app, "Multi-file read-only package dispatch \(locale)")
             app.terminate()
             let reopened = launch(japanese: japanese, suite: suite)
             defer { reopened.terminate() }
             openPlugins(reopened, japanese: japanese)
             let rows = reopened.buttons.matching(identifier: "plugins.script.Multi-file hooks")
-            XCTAssertEqual(rows.count, 2, "one save creates one child revision and retains its parent")
-            var foundEditedChild = false
-            for index in 0 ..< 2 {
-                rows.element(boundBy: index).tap()
-                selectSourceFile(Self.primaryFile, app: reopened, fromTop: true)
-                let reopenedEditor = sourceEditor(reopened)
-                reach(reopenedEditor, in: reopened.collectionViews["script.form"])
-                if (reopenedEditor.value as? String)?.utf8.elementsEqual(firstEdit.utf8) == true {
-                    selectSourceFile(Self.secondaryFile, app: reopened)
-                    assertSource(reopenedEditor, equals: secondEdit)
-                    XCTAssertFalse(reopened.buttons["script.save"].isEnabled)
-                    attach(reopened, "Multi-file edited revision after relaunch \(locale)")
-                    foundEditedChild = true
-                    break
-                }
-                reopened.navigationBars["Multi-file hooks"].buttons.element(boundBy: 0).tap()
-            }
-            XCTAssertTrue(foundEditedChild, "both edited source files must persist in the same child revision")
+            XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5))
+            XCTAssertEqual(rows.count, 1, "viewing creates no child revision")
+            rows.element(boundBy: 0).tap()
+            let reopenedViewer = sourceViewer(reopened)
+            selectSourceFile(Self.primaryFile, app: reopened, fromTop: true)
+            assertSource(reopenedViewer, equals: Self.primarySource)
+            selectSourceFile(Self.secondaryFile, app: reopened)
+            assertSource(reopenedViewer, equals: Self.secondarySource)
+            XCTAssertFalse(reopened.buttons["script.save"].exists)
+            attach(reopened, "Multi-file read-only source after relaunch \(locale)")
         }
     }
 
@@ -498,31 +484,40 @@ private extension AutomationUITests {
         let item = app.buttons[file]
         XCTAssertTrue(item.waitForExistence(timeout: 5))
         item.tap()
-        let editor = sourceEditor(app)
-        reach(editor, in: form)
-        XCTAssertTrue(editor.exists)
+        let viewer = sourceViewer(app)
+        reach(viewer, in: form)
+        XCTAssertTrue(viewer.exists)
     }
 
     @MainActor
-    func sourceEditor(_ app: XCUIApplication) -> XCUIElement {
+    func sourceViewer(_ app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: "plugin.source").firstMatch.textViews.firstMatch
     }
 
     @MainActor
     @discardableResult
-    func assertSource(_ editor: XCUIElement, equals text: String) -> String? {
+    func assertSource(_ viewer: XCUIElement, equals text: String) -> String? {
         let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            guard editor.exists else { return false }
-            return (editor.value as? String)?.utf8.elementsEqual(text.utf8) == true
+            guard viewer.exists else { return false }
+            return (viewer.value as? String)?.utf8.elementsEqual(text.utf8) == true
         }, object: nil)
         let result = XCTWaiter.wait(for: [changed], timeout: 5)
         guard result == .completed else {
             captureSourceFailure(XCUIApplication(), name: "Source update did not become visible")
-            XCTFail("Expected exact source bytes in the visible editor")
+            XCTFail("Expected exact source bytes in the visible viewer")
             return nil
         }
-        guard editor.exists else { return nil }
-        return editor.value as? String
+        guard viewer.exists else { return nil }
+        return viewer.value as? String
+    }
+
+    /// The source must be selectable text only: tapping it never shows the keyboard or changes the bytes.
+    @MainActor
+    func assertSourceIsReadOnly(_ viewer: XCUIElement, app: XCUIApplication) {
+        let before = (viewer.value as? String).map { Array($0.utf8) }
+        viewer.tap()
+        XCTAssertFalse(app.keyboards.firstMatch.waitForExistence(timeout: 1), "the source viewer never shows the keyboard")
+        XCTAssertEqual((viewer.value as? String).map { Array($0.utf8) }, before, "tapping never changes the source")
     }
 
     @MainActor
@@ -533,51 +528,6 @@ private extension AutomationUITests {
         diagnostic.name = name + " diagnostic"
         diagnostic.lifetime = .keepAlways
         add(diagnostic)
-    }
-
-    /// UI lifecycle typing uses one line; SDK source review and native byte regressions remain multiline.
-    func editedHookSource(requestLimit: Int, maintenance: Bool) -> String {
-        "Interceptor.attach({" +
-            "request:{onEnter(req,cfg){req.body.limit=\(requestLimit);},onLeave(req,cfg){}}," +
-            "response:{onEnter(res,cfg){res.body.maintenance=\(maintenance);},onLeave(res,cfg){}}});"
-    }
-
-    @MainActor
-    func replaceSource(_ editor: XCUIElement, with replacement: String, app: XCUIApplication, japanese: Bool) {
-        guard !replacement.contains(where: \.isNewline) else {
-            return XCTFail("Lifecycle source input must stay on one line; multiline byte updates have native coverage")
-        }
-        editor.tap()
-        let introduction = app.otherElements["UIContinuousPathIntroductionView"]
-        if introduction.waitForExistence(timeout: 2) {
-            introduction.buttons.firstMatch.tap()
-            XCTAssertTrue(introduction.waitForNonExistence(timeout: 3))
-            editor.tap()
-        }
-        editor.doubleTap()
-        let selectAll = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == %@", japanese ? "すべてを選択" : "Select All")).firstMatch
-        if japanese && !selectAll.waitForExistence(timeout: 1) {
-            for label in ["戻る", "進む"] {
-                for _ in 0 ..< 4 {
-                    if selectAll.exists {
-                        break
-                    }
-                    let button = app.buttons[label]
-                    guard button.exists && button.isEnabled else { break }
-                    button.tap()
-                }
-            }
-        }
-        XCTAssertTrue(selectAll.waitForExistence(timeout: 3), app.debugDescription)
-        selectAll.tap()
-        editor.typeText(replacement)
-        let entered = assertSource(editor, equals: replacement)
-        XCTAssertEqual(entered.map { Array($0.utf8) }, Array(replacement.utf8))
-        let done = app.buttons[japanese ? "完了" : "Done"]
-        if done.exists && done.isHittable {
-            done.tap()
-        }
     }
 
     @MainActor

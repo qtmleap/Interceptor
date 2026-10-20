@@ -44,13 +44,9 @@ struct ScriptDetailView: View {
                     }
                     .pickerStyle(.menu).accessibilityIdentifier("script.sourceFile")
                 }
-                PluginSourceEditor(text: $session.source).frame(minHeight: 260)
-                if let key = session.saveErrorKey {
-                    Text(LocalizedStringKey(key)).foregroundStyle(AutomationStatusColor.error)
-                }
+                PluginSourceViewer(source: session.source, identifier: "plugin.source")
             } header: { Text("AUTO_SOURCE") } footer: {
-                Text(LocalizedStringKey(session.isV2 ? "AUTO_SAVE_PACKAGE_FOOTER" : "AUTO_SAVE_FOOTER"))
-                    .accessibilityIdentifier("script.saveGuidance")
+                Text("AUTO_SOURCE_READ_ONLY").accessibilityIdentifier("script.sourceReadOnly")
             }
             Section {
                 if session.isV2 {
@@ -76,9 +72,6 @@ struct ScriptDetailView: View {
                             .accessibilityIdentifier("script.cancel")
                     }
                 }
-                if session.isDirty {
-                    Text("AUTO_SAVE_BEFORE_RUN").font(.footnote).foregroundStyle(.secondary)
-                }
             } header: { Text("AUTO_DRY_RUN") } footer: { Text("AUTO_SYNTHETIC_FOOTER") }
             Section { result }
         }
@@ -87,14 +80,6 @@ struct ScriptDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("AUTO_SAVE_SHORT") {
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                    Task { await session.saveAsLocalEdit() }
-                }
-                .disabled(!session.canSave)
-                .accessibilityIdentifier("script.save")
-            }
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
                 Button("AUTO_KEYBOARD_DONE") {
@@ -105,6 +90,14 @@ struct ScriptDetailView: View {
         .task { await session.refreshActivation() }
         .sheet(item: $approvalReview) { review in
             approvalSheet(review)
+        }
+        .alert("AUTO_TEST_COMPLETE", isPresented: Binding(
+            get: { session.emptyResultNotice != nil },
+            set: { if !$0 { session.dismissEmptyResultNotice() } },
+        )) {
+            Button("AUTO_ALERT_OK") {}
+        } message: {
+            Text("AUTO_TEST_NO_CHANGES")
         }
         .onDisappear { session.leave() }
         .tint(Color("PluginAccent"))
@@ -132,13 +125,6 @@ struct ScriptDetailView: View {
             }
         } header: { Text("AUTO_LIVE") } footer: {
             VStack(alignment: .leading, spacing: 6) {
-                Text("AUTO_ACTIVATION_SCOPE")
-                Text(verbatim: declaredHosts)
-                Text("AUTO_ACTIVATION_DATA")
-                Text(verbatim: declaredData)
-                Text(LocalizedStringKey(session.revision.package.manifest.writeRequestBody ? "AUTO_WRITE_REQUEST" : "AUTO_NO_WRITE_REQUEST"))
-                Text(LocalizedStringKey(session.revision.package.manifest.writeResponseBody ? "AUTO_WRITE_RESPONSE" : "AUTO_NO_WRITE_RESPONSE"))
-                Text("AUTO_WEBHOOK_FOOTER")
                 Text("AUTO_ACTIVATION_CONNECTION")
                 if approvalStale {
                     Text("AUTO_ACTIVATION_STALE").foregroundStyle(AutomationStatusColor.error).accessibilityIdentifier("script.activationError")
@@ -174,11 +160,7 @@ struct ScriptDetailView: View {
                         Text(LocalizedStringKey(manifest.writeResponseBody ? "AUTO_APPROVAL_CAN_CHANGE" : "AUTO_APPROVAL_CANNOT_CHANGE"))
                     }
                 } footer: {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(LocalizedStringKey(manifest.writeRequestBody ? "AUTO_WRITE_REQUEST" : "AUTO_NO_WRITE_REQUEST"))
-                        Text(LocalizedStringKey(manifest.writeResponseBody ? "AUTO_WRITE_RESPONSE" : "AUTO_NO_WRITE_RESPONSE"))
-                        Text("AUTO_ALERT_WEBHOOK")
-                    }
+                    Text("AUTO_ALERT_WEBHOOK")
                 }
                 Section {
                     if fields.isEmpty {
@@ -267,19 +249,6 @@ struct ScriptDetailView: View {
         return fields
     }
 
-    private var declaredHosts: String {
-        Array(Set(session.revision.package.manifest.matches.flatMap(\.hosts))).sorted().joined(separator: ", ")
-    }
-
-    private var declaredData: String {
-        let read = session.revision.package.manifest.read
-        var fields = read.metadata + read.headers.map { "header: " + $0 } + read.queryKeys.map { "query: " + $0 }
-        if read.body == .json {
-            fields.append(String(localized: "AUTO_JSON_BODY"))
-        }
-        return fields.isEmpty ? String(localized: "AUTO_READ_NONE") : fields.joined(separator: ", ")
-    }
-
     private func jsonEditor(_ title: LocalizedStringKey, text: Binding<String>, id: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.footnote).foregroundStyle(.secondary)
@@ -301,7 +270,7 @@ struct ScriptDetailView: View {
                     Text(verbatim: preview).font(.system(.footnote, design: .monospaced)).textSelection(.enabled)
                         .accessibilityIdentifier("script.bodyPreview")
                 }
-                if actions.isEmpty {
+                if actions.isEmpty, session.bodyPreview == nil {
                     Text("AUTO_NO_ACTIONS").foregroundStyle(.secondary)
                 }
                 ForEach(actions) { action in

@@ -2068,13 +2068,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add a repository or import a script, review its contents, and try it with sample data. Approve the content you want to use, then start or reconnect capture for its target hosts. Adding or importing alone never enables a script."
+            "value" : "Test imported scripts, then approve the content to use on live traffic."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リポジトリの追加やファイルの読み込み後、スクリプトの内容を確認し、テスト用データで動作を試せます。実通信で使う内容を承認してから、対象ホストのキャプチャを開始または再接続してください。追加や読み込みだけでは実行されません。"
+            "value" : "追加したスクリプトをテストし、実通信で使う内容を承認できます。"
           }
         }
       }
@@ -2740,13 +2740,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "These rules select which captured requests the script can process. They do not enable capture. Add the host to your capture targets separately."
+            "value" : "These rules select traffic. Add the host to your capture targets separately."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "スクリプトを実行する通信の条件です。この条件だけでは通信をキャプチャしません。対象ホストを別途キャプチャ対象に追加してください。"
+            "value" : "実行する通信の条件です。対象ホストはキャプチャ対象に別途追加してください。"
           }
         }
       }
@@ -3124,13 +3124,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Imported and saved revisions stay inactive until separately approved. Legacy scripts support synthetic tests only."
+            "value" : "Live traffic requires approval. Legacy scripts support tests only."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "読み込み・保存したリビジョンは、個別に承認するまで通信に適用されません。旧形式のスクリプトはサンプルデータでのテストのみ利用できます。"
+            "value" : "承認するまで実通信には適用されません。旧形式はテスト専用です。"
           }
         }
       }
@@ -3147,38 +3147,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ローカル編集として保存"
-          }
-        }
-      }
-    },
-    "AUTO_SAVE_FOOTER" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Saving creates a new revision and keeps the original. It does not run the script."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存すると新しいリビジョンが作られ、元のリビジョンは残ります。スクリプトは実行されません。"
-          }
-        }
-      }
-    },
-    "AUTO_SAVE_BEFORE_RUN" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save the edit before testing."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "テストの前に編集を保存してください。"
           }
         }
       }
@@ -3300,13 +3268,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Runs only with the sample data above, without HTTP traffic or saved captures. Webhook actions are previewed, not sent. A successful test does not approve the script for live traffic."
+            "value" : "Runs with sample data, without applying changes to live traffic or sending data."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上のテスト用データだけで実行し、HTTP通信や保存済みキャプチャは使いません。Webhookアクションは内容を表示するだけで送信しません。テストが成功しても、実通信での使用は承認されません。"
+            "value" : "テスト用データで実行します。実通信への適用や外部への送信は行いません。"
           }
         }
       }
@@ -3355,6 +3323,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外部送信なし（テスト）"
+          }
+        }
+      }
+    },
+    "AUTO_TEST_COMPLETE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test completed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト完了"
+          }
+        }
+      }
+    },
+    "AUTO_TEST_NO_CHANGES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No JSON changes or actions were returned."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSONの変更やアクションはありません。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_OK" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
           }
         }
       }
@@ -3951,22 +3967,6 @@
         }
       }
     },
-    "AUTO_SAVE_SHORT" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存"
-          }
-        }
-      }
-    },
     "AUTO_KEYBOARD_DONE" : {
       "localizations" : {
         "en" : {
@@ -4108,13 +4108,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Approve Use"
+            "value" : "OK"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用を承認"
+            "value" : "OK"
           }
         }
       }
@@ -4244,13 +4244,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Approving, revoking, saving or deleting a script with live hooks stops the current capture connection. To apply approvals, turn on Status in Interceptor → Settings → VPN Settings. These operations do not add capture targets or start capture."
+            "value" : "Changing approval or deleting stops capture. Restart it in Settings → VPN Settings."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "承認・承認の取り消し、実通信用スクリプトの保存・削除を行うと、現在のキャプチャ接続が停止します。承認した内容を適用するにはInterceptorの「設定」→「VPN設定」の「接続状態」をオンにしてください。キャプチャ対象の追加や接続の開始は行いません。"
+            "value" : "承認の変更や削除でキャプチャが停止します。再開は「設定」→「VPN設定」から行えます。"
           }
         }
       }
@@ -4603,18 +4603,18 @@
         }
       }
     },
-    "AUTO_SAVE_PACKAGE_FOOTER" : {
+    "AUTO_SOURCE_READ_ONLY" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Switch files with the file picker. Saving keeps all file edits together as a new revision and retains the original. Unsaved edits do not affect live traffic. Review and approve the saved content separately; saving does not run it."
+            "value" : "Source is read-only. Make changes in your development environment."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ファイル名を選ぶと編集対象を切り替えられます。保存すると、全ファイルの編集内容をまとめた新しいリビジョンが作られ、元の内容も残ります。保存前の編集は実通信に反映されません。保存した内容を実通信で使うには、別途確認して承認してください。保存だけでは実行されません。"
+            "value" : "ソースは閲覧専用です。変更は開発環境で行います。"
           }
         }
       }
@@ -4656,13 +4656,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Approving stops the current capture connection. To use this script, turn on Status in Interceptor → Settings → VPN Settings. Approval does not start capture; capture consent is required separately."
+            "value" : "Approval stops capture. To restart, allow traffic capture and turn on Status in Settings → VPN Settings."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "承認すると、現在のキャプチャ接続が停止します。使用するにはInterceptorの「設定」→「VPN設定」の「接続状態」をオンにしてください。承認だけでは接続は始まらず、キャプチャへの同意も必要です。"
+            "value" : "承認するとキャプチャが停止します。再開するには通信キャプチャに同意し、「設定」→「VPN設定」の「接続状態」をオンにしてください。"
           }
         }
       }
@@ -4800,7 +4800,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Only captured traffic matching a method, host and exact path is selected. These rules do not add capture targets."
+            "value" : "Only captured traffic matching the listed method, host and path is selected. These rules do not add capture targets."
           }
         },
         "ja" : {

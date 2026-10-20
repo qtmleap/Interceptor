@@ -1,6 +1,7 @@
 import AutomationCore
 import AutomationRuntime
 @testable import Interceptor
+import Observation
 import XCTest
 
 @MainActor
@@ -139,6 +140,65 @@ final class HTTPHookPresentationTests: XCTestCase {
         XCTAssertNil(session.saveError)
         XCTAssertNotEqual(session.revision.package.revision, parent.package.revision)
         XCTAssertFalse(session.isDirty)
+    }
+
+    func testEmptyResultNoticeIsPerRunAndOnlyForNoEffect() async throws {
+        let (session, runner) = try await templateSession()
+        let empty = Data(#"{"actions":[]}"#.utf8)
+        try await finishRun(session, runner, Data(#"{"actions":[],"mutation":{"body":{"limit":5}}}"#.utf8))
+        XCTAssertEqual(session.bodyPreview, #"{"limit":5}"#)
+        XCTAssertNil(session.emptyResultNotice, "a body mutation is a real result")
+        try await finishRun(session, runner, empty)
+        let first = try XCTUnwrap(session.emptyResultNotice)
+        session.dismissEmptyResultNotice()
+        XCTAssertNil(session.emptyResultNotice)
+        XCTAssertEqual(session.runState, .finished([]), "dismissing keeps the result")
+        try await finishRun(session, runner, empty)
+        XCTAssertNotEqual(session.emptyResultNotice, first, "a repeated empty result is a new notice")
+    }
+
+    func testCancelLeaveAndStaleCompletionNeverShowEmptyResultNotice() async throws {
+        let (session, runner) = try await templateSession()
+        let empty = Data(#"{"actions":[]}"#.utf8)
+        session.run()
+        _ = await waitUntil { runner.isWaiting }
+        session.cancelRun()
+        await Task.yield()
+        XCTAssertNil(session.emptyResultNotice)
+        runner.setCancellationIgnored(true)
+        session.run()
+        _ = await waitUntil { runner.isWaiting }
+        session.leave()
+        let unexpectedNotice = expectation(description: "a late completion must not present an empty-result alert")
+        unexpectedNotice.isInverted = true
+        withObservationTracking { _ = session.emptyResultNotice } onChange: { unexpectedNotice.fulfill() }
+        runner.finish(.success(empty))
+        let lateResult = await XCTWaiter.fulfillment(of: [unexpectedNotice], timeout: 0.2)
+        XCTAssertEqual(lateResult, .completed)
+        XCTAssertNil(session.emptyResultNotice)
+        XCTAssertEqual(session.runState, .idle)
+    }
+
+    private func finishRun(_ session: ScriptSession, _ runner: FakeScriptRunner, _ data: Data) async throws {
+        session.run()
+        let started = await waitUntil { runner.isWaiting }
+        XCTAssertTrue(started)
+        runner.finish(.success(data))
+        let done = await waitUntil { session.runState != .running }
+        XCTAssertTrue(done)
+    }
+
+    private func templateSession() async throws -> (ScriptSession, FakeScriptRunner) {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("notice-" + UUID().uuidString)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let package = try PluginPackage.validate(AutomationTemplate.packageBytes(name: "Notice"))
+        let store = AutomationStore(fileURL: directory.appendingPathComponent("catalog.json"))
+        let client = try FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [package]), packages: [package])
+        let runner = FakeScriptRunner()
+        let controller = AutomationController(store: store, client: client, executor: runner)
+        await controller.load()
+        let revision = try await store.importLocal(package.bytes)
+        return (ScriptSession(controller: controller, revision: revision), runner)
     }
 
     private func multiFileSession() async throws -> (ScriptSession, AutomationController, FakeScriptRunner) {

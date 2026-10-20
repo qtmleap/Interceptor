@@ -16,6 +16,8 @@ final class ScriptSession {
     private(set) var saveErrorKey: String?
     private(set) var isSaving = false
     private(set) var bodyPreview: String?
+    /// Identity of the per-run "nothing returned" alert, so repeated identical empty results stay distinct.
+    private(set) var emptyResultNotice: UUID?
     var activationGeneration: UUID? {
         controller.activationSnapshot?.generation
     }
@@ -197,6 +199,7 @@ final class ScriptSession {
             runState = .failed("AUTO_ERR_CONFIG_INVALID"); return
         }
         let token = UUID(); runToken = token; runState = .running
+        emptyResultNotice = nil
         let (executor, package, selected) = (controller.executor, revision.package, hook)
         let manifest = package.manifest
         bodyPreview = nil
@@ -219,12 +222,18 @@ final class ScriptSession {
         }
     }
 
+    /// Closing the alert keeps the result on screen.
+    func dismissEmptyResultNotice() {
+        emptyResultNotice = nil
+    }
+
     func cancelRun() {
         guard isRunning else { return }
         controller.executor.cancel()
         runTask?.cancel()
         runTask = nil
         runToken = UUID()
+        emptyResultNotice = nil
         runState = .failed("AUTO_ERR_JS_CANCELLED")
     }
 
@@ -235,6 +244,7 @@ final class ScriptSession {
         }
         runTask?.cancel(); runTask = nil
         runToken = UUID()
+        emptyResultNotice = nil
         if isRunning {
             runState = .idle
         }
@@ -243,6 +253,9 @@ final class ScriptSession {
     private func finishRun(_ token: UUID, _ state: RunState) {
         guard token == runToken else { return }
         runState = state
+        if case let .finished(actions) = state, actions.isEmpty, bodyPreview == nil {
+            emptyResultNotice = UUID()
+        }
     }
 
     private func invalidateResult() {
@@ -252,6 +265,7 @@ final class ScriptSession {
         runToken = UUID()
         runState = .idle
         bodyPreview = nil
+        emptyResultNotice = nil
     }
 
     private static func sameSource(_ lhs: String?, _ rhs: String?) -> Bool {
