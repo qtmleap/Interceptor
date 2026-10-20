@@ -4464,13 +4464,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "File to edit"
+            "value" : "File"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "編集するファイル"
+            "value" : "ファイル"
           }
         }
       }
