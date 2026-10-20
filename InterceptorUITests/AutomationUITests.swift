@@ -534,11 +534,16 @@ private extension AutomationUITests {
     @discardableResult
     func reachAbove(_ element: XCUIElement, in form: XCUIElement) -> XCUIElement {
         for _ in 0 ..< 14 {
+            guard form.exists else {
+                captureSourceFailure(XCUIApplication(), name: "Plugin detail disappeared before scrolling")
+                XCTFail("Expected the plugin form to remain on screen")
+                return element
+            }
             if isVisibleForTap(element, in: form) {
                 return element
             }
-            form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.25))
-                .press(forDuration: 0.05, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.8)))
+            form.coordinate(withNormalizedOffset: CGVector(dx: 0.985, dy: 0.25))
+                .press(forDuration: 0.05, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.985, dy: 0.8)))
         }
         attach(XCUIApplication(), "Unreachable earlier plugin control")
         XCTFail("Expected a reachable earlier plugin control")
@@ -679,12 +684,19 @@ private extension AutomationUITests {
     @discardableResult
     func reach(_ element: XCUIElement, in form: XCUIElement, attempts: Int = 14) -> XCUIElement {
         for _ in 0 ..< attempts {
+            guard form.exists else {
+                captureSourceFailure(XCUIApplication(), name: "Plugin detail disappeared before scrolling")
+                XCTFail("Expected the plugin form to remain on screen")
+                return element
+            }
             if isVisibleForTap(element, in: form) {
                 return element
             }
             let above = element.exists && element.frame.midY < visibleFormFrame(form).minY
-            let start = form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: above ? 0.25 : 0.8))
-            let end = form.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: above ? 0.8 : 0.25))
+            // iPadOS 26 can report the full window as the detail form, including the sidebar.
+            // The right gutter avoids the sidebar, back gesture and nested source/JSON scrollers.
+            let start = form.coordinate(withNormalizedOffset: CGVector(dx: 0.985, dy: above ? 0.25 : 0.8))
+            let end = form.coordinate(withNormalizedOffset: CGVector(dx: 0.985, dy: above ? 0.8 : 0.25))
             start.press(forDuration: 0.05, thenDragTo: end)
         }
         let geometry = "target=\(element.exists ? String(describing: element.frame) : "absent"), visible=\(visibleFormFrame(form))"
