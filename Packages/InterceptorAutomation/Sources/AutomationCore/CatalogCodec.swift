@@ -52,7 +52,7 @@ enum CatalogCodec {
             bytes += r.package.bytes.count
             cat.revisions.append(r)
         }
-        guard cat.repositories.count <= Limits.repositories, cat.revisions.count <= Limits.revisions, bytes <= Limits.rawPackageBytes else {
+        guard cat.repositories.count <= Limits.repositories, cat.revisions.count <= Limits.archiveRevisions, bytes <= Limits.archiveRawPackageBytes else {
             throw AutomationError.corruptStore
         }
         return cat

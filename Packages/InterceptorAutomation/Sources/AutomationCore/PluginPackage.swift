@@ -48,12 +48,15 @@ public struct PluginPackage: Equatable, Sendable {
         }
     }
 
-    /// Checks exact size + SHA-256 first, then decodes and cross-checks id/name/version.
+    /// Checks exact size + SHA-256 first, then decodes and cross-checks id/name/version and any present display metadata.
     public static func validate(_ bytes: Data, against entry: IndexEntry) throws -> PluginPackage {
         guard bytes.count == entry.size else { throw AutomationError.sizeMismatch }
         guard Digest.sha256Hex(bytes) == entry.sha256 else { throw AutomationError.hashMismatch }
         let p = try validate(bytes)
-        guard p.manifest.id == entry.id, p.manifest.name == entry.name, p.manifest.version == entry.version else {
+        guard p.manifest.id == entry.id, p.manifest.name == entry.name, p.manifest.version == entry.version,
+              entry.author == nil || entry.author == p.manifest.author,
+              entry.summary == nil || entry.summary == p.manifest.summary,
+              entry.category == nil || entry.category == p.manifest.category else {
             throw AutomationError.metadataMismatch
         }
         return p

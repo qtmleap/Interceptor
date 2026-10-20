@@ -36,6 +36,8 @@ public struct PluginManifest: Equatable, Sendable {
     /// Optional publisher-supplied display text. Unauthenticated and unverified; never an identity claim.
     public let author: String?
     public let summary: String?
+    /// Optional display-only grouping label (1...80 Unicode scalars, <=256 UTF-8 bytes), preserved verbatim. Not a trust claim.
+    public let category: String?
     public let json: JSONValue
 
     public let schemaVersion: Int64
@@ -52,7 +54,7 @@ public struct PluginManifest: Equatable, Sendable {
         let f = try JSONFields(v, required: isV2
                                ? ["schemaVersion", "id", "name", "version", "matches", "read", "write", "endpointBindings", "settings"]
                                : ["schemaVersion", "id", "name", "version", "subscriptions", "read", "endpointBindings", "settings"],
-                               optional: ["author", "summary"], error: bad)
+                               optional: ["author", "summary", "category"], error: bad)
         let name = try f.string("name"), version = try f.string("version")
         guard Text.isDisplayName(name) else { throw bad }
         _ = try SemVer(parsing: version)
@@ -84,7 +86,7 @@ public struct PluginManifest: Equatable, Sendable {
         guard case .object = settings, settings.nesting <= Limits.settingsDepth,
               let encoded = try? settings.data(), encoded.count <= Limits.settingsBytes else { throw bad }
 
-        var author: String?, summary: String?
+        var author: String?, summary: String?, category: String?
         if f.has("author") {
             let a = try f.string("author")
             guard Text.isOptionalText(a, maxCharacters: 80, maxBytes: 256) else { throw bad }
@@ -95,10 +97,16 @@ public struct PluginManifest: Equatable, Sendable {
             guard Text.isOptionalText(t, maxCharacters: 280, maxBytes: 1024) else { throw bad }
             summary = t
         }
+        if f.has("category") {
+            let c = try f.string("category")
+            guard Text.isScalarBoundedText(c, maxScalars: 80, maxBytes: 256) else { throw bad }
+            category = c
+        }
 
         id = try f.uuid("id")
         self.author = author
         self.summary = summary
+        self.category = category
         self.name = name
         self.version = version
         subscriptions = subs

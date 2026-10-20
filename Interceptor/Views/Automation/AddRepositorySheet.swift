@@ -5,9 +5,11 @@ struct AddRepositorySheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var model: AddRepositoryModel
     @State private var confirmUnverified = false
+    private let onAdded: ((RepositoryURL) -> Void)?
 
-    init(controller: AutomationController) {
+    init(controller: AutomationController, onAdded: ((RepositoryURL) -> Void)? = nil) {
         _model = State(initialValue: AddRepositoryModel(controller: controller))
+        self.onAdded = onAdded
     }
 
     var body: some View {
@@ -43,6 +45,9 @@ struct AddRepositorySheet: View {
             }
             .onChange(of: model.phase) {
                 if model.phase == .added {
+                    if let url = model.snapshot?.url {
+                        onAdded?(url)
+                    }
                     close()
                 }
             }
@@ -55,7 +60,7 @@ struct AddRepositorySheet: View {
         }
         .interactiveDismissDisabled(model.phase == .adding)
         .onDisappear { model.cancel() }
-        .tint(Color("PluginAccent"))
+        .tint(PluginBrowserColor.accent)
     }
 
     private func close() {

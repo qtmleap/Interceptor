@@ -253,7 +253,87 @@ class PluginRepositoryFixtureTests(unittest.TestCase):
             for key in ('id', 'name', 'version'):
                 self.assertEqual(json.loads(raw)['manifest'][key], entry[key])
         expires = datetime.datetime.fromisoformat(index['expiresAt'].replace('Z', '+00:00'))
+        issued = datetime.datetime.fromisoformat(index['issuedAt'].replace('Z', '+00:00'))
+        self.assertLessEqual(issued, datetime.datetime.now(datetime.timezone.utc))
+        self.assertLessEqual(expires - issued, datetime.timedelta(days=90))
         self.assertGreater(expires, datetime.datetime.now(datetime.timezone.utc))
+        another_run, _ = fixture.repository_files('another-run', 'another-device')
+        self.assertEqual(files['/repository.json'], another_run['/repository.json'],
+                         'the visible payload hash must be stable across native runs')
+        self.assertNotEqual(files['/__interceptor_fixture'], another_run['/__interceptor_fixture'],
+                            'readiness remains bound to the individual run and device')
+
+    def test_browser_variant_is_explicitly_derived_and_keeps_sdk_catalog_unchanged(self):
+        files, _ = fixture.repository_files('this-run', DEVICE)
+        envelope = json.loads(files['/browser/repository.json'])
+        index = json.loads(base64.b64decode(envelope['payload'], validate=True))
+        self.assertEqual(index['name'], 'Browser catalog fixture')
+        self.assertEqual(len(index['plugins']), 1)
+        entry = index['plugins'][0]
+        self.assertEqual(entry['packagePath'], 'target-hosts.json')
+        raw = files['/browser/' + entry['packagePath']]
+        package = json.loads(raw)
+        manifest = package['manifest']
+        self.assertEqual(manifest['id'], 'E9472B70-2DB2-4F4C-A291-33F5FEF88519')
+        self.assertEqual(manifest['name'], 'Target hosts example')
+        self.assertEqual(manifest['category'], 'Requests')
+        self.assertEqual(manifest['author'], 'Browser fixture author')
+        self.assertEqual(manifest['summary'], 'Derived fixture for package and file target views.')
+        for key in ('id', 'name', 'version', 'author', 'summary', 'category'):
+            self.assertEqual(entry[key], manifest[key])
+        self.assertEqual(entry['sha256'], fixture.digest(raw))
+        self.assertEqual(entry['size'], len(raw))
+        self.assertEqual({host for rule in manifest['matches'] for host in rule['hosts']},
+                         {'example.com', 'api.example.com'})
+        sdk = json.loads(files['/multi-file-hooks.json'])
+        self.assertNotEqual(manifest['id'], sdk['manifest']['id'])
+        self.assertEqual(package['sourceFiles'], sdk['sourceFiles'],
+                         'derived target metadata must retain the actual SDK-emitted source bytes')
+        self.assertEqual(files['/multi-file-hooks.json'], (fixture.FIXTURES / 'multi-file-hooks.json').read_bytes())
+        for rule in manifest['matches']:
+            self.assertTrue({file for phases in rule['hooks'].values() for file in phases.values()}
+                            <= set(package['sourceFiles']))
+
+    def test_readiness_digest_binds_every_allowlisted_catalog_and_package(self):
+        files, bound_digest = fixture.repository_files('this-run', DEVICE)
+        payload_files = {path: fixture.digest(raw) for path, raw in files.items() if path != '/__interceptor_fixture'}
+        self.assertEqual(bound_digest, fixture.digest(fixture.encoded(payload_files)))
+        changed = dict(payload_files)
+        changed['/browser/target-hosts.json'] = '0' * 64
+        self.assertNotEqual(bound_digest, fixture.digest(fixture.encoded(changed)))
+
+    def test_browser_derivation_targets_the_exact_file_independent_of_rule_order(self):
+        packages = fixture.load_packages()
+        package = json.loads(packages['multi-file-hooks.json'][0])
+        package['manifest']['matches'].reverse()
+        packages['multi-file-hooks.json'] = (fixture.encoded(package), package['manifest'])
+        with patch.object(fixture, 'load_packages', return_value=packages):
+            files, _ = fixture.repository_files('this-run', DEVICE)
+        derived = json.loads(files['/browser/target-hosts.json'])
+        for rule in derived['manifest']['matches']:
+            if rule['path']['value'] == '/synthetic':
+                self.assertEqual(rule['hosts'], ['api.example.com'])
+                self.assertEqual(rule['methods'], ['POST'])
+                self.assertEqual({file for phases in rule['hooks'].values() for file in phases.values()},
+                                 {'hooks/example.com/synthetic/POST.js'})
+            else:
+                self.assertEqual(rule['hosts'], ['example.com'])
+
+    def test_browser_variant_is_served_over_https_and_written_under_owned_public_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary) / 'run'
+            with patch.object(sys, 'argv', [str(SCRIPT), '--self-test', '--work-dir', str(work)]), patch.object(fixture.signal, 'signal'):
+                self.assertEqual(fixture.main(), 0)
+            record = json.loads((work / 'fixture-run.json').read_text())
+            self.assertIn('/browser/repository.json', record['publicFiles'])
+            self.assertIn('/browser/target-hosts.json', record['publicFiles'])
+            self.assertEqual(record['derivedPackages'], {'/browser/target-hosts.json': 'multi-file-hooks.json'})
+            self.assertTrue((work / 'public/browser/repository.json').is_file())
+            served = {(entry['path'], entry['status']) for entry in record['requests']['entries']}
+            self.assertIn(('/browser/repository.json', 200), served)
+            self.assertIn(('/browser/target-hosts.json', 200), served)
+            self.assertTrue(record['serverStopped'])
+            self.assertTrue(record['privateKeysRemoved'])
 
     def test_preexisting_or_other_host_simulator_cannot_receive_trust(self):
         with tempfile.TemporaryDirectory() as temporary:

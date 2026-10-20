@@ -392,9 +392,9 @@ private extension HTTPPluginLiveIntegrationTests {
         afterSuccess: (@Sendable (PluginActivationStore, Locked<Bool>, HTTPPluginPhase) async throws -> Void)? = nil,
         body: (Network) async throws -> Void,
     ) async throws {
-        let store = PluginActivationStore(fileURL: directory.appendingPathComponent(UUID().uuidString + ".json"))
+        let (store, revisions) = try await AutomationFixtures.activationContext(packages: [package], activationURL: directory.appendingPathComponent(UUID().uuidString + ".json"))
         let empty = try await store.snapshot()
-        let snapshot = try await store.activate(package, revisionID: "local|\(package.manifest.id)|\(package.revision)", expectedGeneration: empty.generation)
+        let snapshot = try await store.activate(package, revisionID: XCTUnwrap(revisions.first).id, expectedGeneration: empty.generation)
         let consent = Locked(true)
         let adapter = HTTPPluginProcessor(store: store, snapshot: snapshot, hasCaptureConsent: { consent.value })
         let processor = WitnessingProcessor(delegate: adapter, afterSuccess: { phase in try await afterSuccess?(store, consent, phase) })

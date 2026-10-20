@@ -14,10 +14,10 @@ final class TunnelAuthorizationMonitorTests: XCTestCase, @unchecked Sendable {
     }
 
     private func snapshots() async throws -> (PluginActivationSnapshot, PluginActivationSnapshot, PluginActivationSnapshot) {
-        let store = PluginActivationStore(fileURL: directory.appendingPathComponent("active.json"))
-        let empty = try await store.snapshot()
         let p = try PluginPackage.validate(AutomationTemplate.packageBytes(name: "Monitor"))
-        let active = try await store.activate(p, revisionID: "local|\(p.manifest.id.uuidString)|\(p.revision)", expectedGeneration: empty.generation)
+        let (store, revisions) = try await AutomationFixtures.activationContext(packages: [p], activationURL: directory.appendingPathComponent("active.json"))
+        let empty = try await store.snapshot()
+        let active = try await store.activate(p, revisionID: XCTUnwrap(revisions.first).id, expectedGeneration: empty.generation)
         let revoked = try await store.revokeAll()
         return (empty, active, revoked)
     }

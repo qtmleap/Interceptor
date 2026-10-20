@@ -1,15 +1,21 @@
 import AutomationCore
 import AutomationRuntime
 import SwiftUI
-import UIKit
 
 struct ScriptDetailView: View {
     @State var session: ScriptSession
+    var testOnly = false
     @State private var approvalReview: ApprovalReview?
     @State private var approvalStale = false
     /// A full-screen cover can report the detail view as disappeared; only a real pop may cancel a dry run.
     @State private var isSourcePresented = false
-    @FocusState private var focusedEditor: ScriptSession.JSONInput?
+    @State private var sampleJSON: SampleJSON?
+
+    private struct SampleJSON: Identifiable {
+        let id = UUID()
+        let title: LocalizedStringKey
+        let json: String
+    }
 
     /// Frozen at capture time so the sheet can only ever show the package the generation was read for.
     private struct ApprovalReview: Identifiable {
@@ -20,6 +26,7 @@ struct ScriptDetailView: View {
 
     var body: some View {
         Form {
+            if !testOnly {
             Section {
                 TrustBadgeLabel(badge: session.badge)
                 VStack(alignment: .leading, spacing: 4) {
@@ -45,6 +52,7 @@ struct ScriptDetailView: View {
             } header: { Text("AUTO_SOURCE") } footer: {
                 Text("AUTO_SOURCE_READ_ONLY").accessibilityIdentifier("script.sourceReadOnly")
             }
+            }
             Section {
                 if session.isV2 {
                     Picker("AUTO_HOOK", selection: $session.hook) {
@@ -58,39 +66,26 @@ struct ScriptDetailView: View {
                     }
                     .pickerStyle(.segmented).accessibilityIdentifier("script.hook")
                 }
-                jsonEditor("AUTO_SYNTHETIC_EVENT", text: $session.eventText, id: "script.event", field: .event)
-                jsonEditor("AUTO_SYNTHETIC_CONFIG", text: $session.configText, id: "script.config", field: .config)
-            } header: { Text("AUTO_DRY_RUN") } footer: { Text("AUTO_SYNTHETIC_FOOTER") }
+                jsonViewer("AUTO_SYNTHETIC_EVENT", json: session.eventText, id: "script.event")
+                jsonViewer("AUTO_SYNTHETIC_CONFIG", json: session.configText, id: "script.config")
+            } header: {
+                if testOnly { Text(verbatim: session.revision.package.manifest.name) }
+                else { Text("AUTO_DRY_RUN") }
+            } footer: { Text("AUTO_SYNTHETIC_FOOTER") }
+            if !testOnly {
             Section {
-                Button { focusedEditor = nil; session.run() } label: { Text("AUTO_RUN_TEST").frame(maxWidth: .infinity, minHeight: 44) }
-                    .buttonStyle(.borderedProminent).disabled(!session.canRun)
-                    .accessibilityIdentifier("script.run")
-                if session.isRunning {
-                    Button(role: .cancel) { session.cancelRun() } label: { Text("Cancel").frame(maxWidth: .infinity, minHeight: 44) }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("script.cancel")
-                }
+                runControls
             }
             .listRowBackground(Color.clear).listRowInsets(EdgeInsets())
+            }
             Section { result }
         }
         .accessibilityIdentifier("script.form")
-        .navigationTitle(Text(verbatim: session.revision.package.manifest.name))
+        .safeAreaInset(edge: .bottom) {
+            if testOnly { runControls.padding().background(.bar) }
+        }
+        .navigationTitle(testOnly ? Text("AUTO_DRY_RUN") : Text(verbatim: session.revision.package.manifest.name))
         .navigationBarTitleDisplayMode(.inline)
-        .scrollDismissesKeyboard(.interactively)
-        .onChange(of: focusedEditor) { old, _ in
-            if let old { session.formatInput(old) }
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("AUTO_KEYBOARD_DONE") {
-                    focusedEditor = nil
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                }
-                .accessibilityIdentifier("script.inputDone")
-            }
-        }
         .task { await session.refreshActivation() }
         .sheet(item: $approvalReview) { review in
             approvalSheet(review)
@@ -110,9 +105,24 @@ struct ScriptDetailView: View {
                 isSourcePresented = false
             }
         }
+        .fullScreenCover(item: $sampleJSON) { sample in
+            NavigationStack {
+                PluginJSONViewer(json: Self.display(sample.json), identifier: "script.sampleJSON", fillsAvailableSpace: true)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.horizontal)
+                    .navigationTitle(Text(sample.title))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("AUTO_KEYBOARD_DONE") { sampleJSON = nil }
+                                .accessibilityIdentifier("script.closeJSON")
+                        }
+                    }
+            }
+        }
         // A full-screen cover may report this view as disappearing; that must not cancel a pending dry run.
         // The cover can only be closed by the reader itself, so a disappear while it is up is never a pop.
-        .onDisappear { if !isSourcePresented { session.leave() } }
+        .onDisappear { if !isSourcePresented, sampleJSON == nil { session.leave() } }
         .tint(Color("PluginAccent"))
     }
 
@@ -262,13 +272,37 @@ struct ScriptDetailView: View {
         return fields
     }
 
-    private func jsonEditor(_ title: LocalizedStringKey, text: Binding<String>, id: String, field: ScriptSession.JSONInput) -> some View {
+    @ViewBuilder private func jsonViewer(_ title: LocalizedStringKey, json: String, id: String) -> some View {
+        if testOnly {
+            Button {
+                sampleJSON = SampleJSON(title: title, json: json)
+            } label: {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                }
+            }
+            .accessibilityIdentifier(id)
+        } else {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.footnote).foregroundStyle(.secondary)
-            TextEditor(text: text).font(.system(.footnote, design: .monospaced)).frame(minHeight: 120)
-                .textInputAutocapitalization(.never).autocorrectionDisabled()
-                .focused($focusedEditor, equals: field).disabled(session.isRunning)
-                .accessibilityIdentifier(id)
+            PluginJSONViewer(json: json, identifier: id)
+                .frame(minHeight: 80, maxHeight: 220)
+        }
+        }
+    }
+
+    private var runControls: some View {
+        VStack(spacing: 8) {
+            Button { session.run() } label: { Text("AUTO_RUN_TEST").frame(maxWidth: .infinity, minHeight: 44) }
+                .buttonStyle(.borderedProminent).disabled(!session.canRun)
+                .accessibilityIdentifier("script.run")
+            if session.isRunning {
+                Button(role: .cancel) { session.cancelRun() } label: { Text("Cancel").frame(maxWidth: .infinity, minHeight: 44) }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("script.cancel")
+            }
         }
     }
 
@@ -286,9 +320,13 @@ struct ScriptDetailView: View {
                 Text(LocalizedStringKey(session.isV2 ? "AUTO_TEST_RESULT" : "AUTO_VALIDATED_ACTIONS")).foregroundStyle(AutomationStatusColor.ok).font(.headline).accessibilityIdentifier("script.validated")
                 Label("AUTO_NOT_SENT", systemImage: "paperplane.slash")
                 if let preview = session.bodyPreview {
+                    if testOnly {
+                        jsonViewer("AUTO_BODY_PREVIEW", json: preview, id: "script.bodyPreview")
+                    } else {
                     Text("AUTO_BODY_PREVIEW").font(.headline)
                     Text(verbatim: Self.display(preview)).font(.system(.footnote, design: .monospaced)).textSelection(.enabled)
                         .accessibilityIdentifier("script.bodyPreview")
+                    }
                 }
                 if actions.isEmpty, session.bodyPreview == nil {
                     Text("AUTO_NO_ACTIONS").foregroundStyle(.secondary)
@@ -296,7 +334,11 @@ struct ScriptDetailView: View {
                 ForEach(actions) { action in
                     VStack(alignment: .leading, spacing: 4) {
                         HashText(value: action.endpointID.uuidString)
+                        if testOnly {
+                            jsonViewer("JSON", json: action.json, id: "script.actionJSON.\(action.id)")
+                        } else {
                         Text(verbatim: Self.display(action.json)).font(.system(.footnote, design: .monospaced)).textSelection(.enabled)
+                        }
                     }
                 }
         }

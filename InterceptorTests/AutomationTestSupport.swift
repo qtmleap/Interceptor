@@ -75,6 +75,19 @@ enum AutomationFixtures {
     static func tempStoreURL() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("automation-ui-\(UUID().uuidString)/catalog.json")
     }
+
+    /// Mutation fixtures share the real persisted catalog with the grant writer.
+    static func activationContext(packages: [PluginPackage], activationURL: URL) async throws
+        -> (store: PluginActivationStore, revisions: [InstalledRevision])
+    {
+        let catalogURL = activationURL.deletingPathExtension().appendingPathExtension("catalog.json")
+        let catalog = AutomationStore(fileURL: catalogURL)
+        var revisions: [InstalledRevision] = []
+        for package in packages {
+            try await revisions.append(catalog.importLocal(package.bytes))
+        }
+        return (PluginActivationStore(fileURL: activationURL, catalogURL: catalogURL), revisions)
+    }
 }
 
 /// Records calls; never touches the network. Can hold a request open to test cancellation.

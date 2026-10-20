@@ -62,10 +62,10 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
     }
 
     private func approved(_ packages: [PluginPackage], consent: @escaping @Sendable () -> Bool = { true }) async throws -> Harness {
-        let store = PluginActivationStore(fileURL: directory.appendingPathComponent("active.json"))
+        let (store, revisions) = try await AutomationFixtures.activationContext(packages: packages, activationURL: directory.appendingPathComponent("active.json"))
         var snapshot = try await store.snapshot()
-        for package in packages {
-            snapshot = try await store.activate(package, revisionID: "local|\(package.manifest.id.uuidString)|\(package.revision)",
+        for revision in revisions {
+            snapshot = try await store.activate(revision.package, revisionID: revision.id,
                                                 expectedGeneration: snapshot.generation)
         }
         return Harness(processor: HTTPPluginProcessor(store: store, snapshot: snapshot, hasCaptureConsent: consent),
@@ -350,7 +350,9 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
         await fulfillment(of: [overflowStarted], timeout: 1)
         let overloadReturned = await XCTWaiter.fulfillment(of: [overflowDone], timeout: 1)
         XCTAssertEqual(overloadReturned, .completed, "one active + two waiting phases must reject further work promptly")
-        if overloadReturned != .completed { overflow.cancel() }
+        if overloadReturned != .completed {
+            overflow.cancel()
+        }
         order.releaseOwner()
         await admission.release()
         let finished = await XCTWaiter.fulfillment(of: [firstDone, secondDone], timeout: 3)
@@ -408,11 +410,14 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
 
     private func admissionTask(_ admission: HTTPPluginPhaseAdmission, name: String, order: AdmissionOrderProbe,
                                started: XCTestExpectation, done: XCTestExpectation,
-                               early: XCTestExpectation? = nil) -> Task<JavaScriptExecutionError?, Never> {
+                               early: XCTestExpectation? = nil) -> Task<JavaScriptExecutionError?, Never>
+    {
         Task {
             started.fulfill()
             defer {
-                if !order.ownerWasReleased && !Task.isCancelled { early?.fulfill() }
+                if !order.ownerWasReleased && !Task.isCancelled {
+                    early?.fulfill()
+                }
                 done.fulfill()
             }
             do {
@@ -447,6 +452,13 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
         let reached = await XCTWaiter.fulfillment(of: [atPostVM], timeout: 3)
         guard reached == .completed else {
             XCTFail("first phase never reached its post-VM gate")
+            gate.release()
+            firstTask.cancel()
+            let drained = await XCTWaiter.fulfillment(of: [firstDone], timeout: 3)
+            XCTAssertEqual(drained, .completed, "the first phase must finish before its fixture is removed")
+            if drained == .completed {
+                _ = await firstTask.result
+            }
             return
         }
         let secondStarted = expectation(description: "second task entered the adapter call")
@@ -456,7 +468,9 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
         let secondTask = Task {
             secondStarted.fulfill()
             defer {
-                if !gate.isReleased { earlyCompletion.fulfill() }
+                if !gate.isReleased {
+                    earlyCompletion.fulfill()
+                }
                 secondDone.fulfill()
             }
             return try await processor.process(second, request: req, response: second == .responseEnter ? res : nil)
@@ -466,12 +480,22 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(started, .completed)
         let stayedQueued = await XCTWaiter.fulfillment(of: [earlyCompletion], timeout: 0.2)
         XCTAssertEqual(stayedQueued, .completed, "ordinary concurrent phases must wait, not return early or fail busy")
-        if revokeWhileQueued { _ = try await harness.store.revokeAll() }
+        var revocationError: Error?
+        if revokeWhileQueued {
+            do { _ = try await harness.store.revokeAll() }
+            catch { revocationError = error }
+        }
         gate.release()
         let finished = await XCTWaiter.fulfillment(of: [firstDone, secondDone], timeout: 3)
         guard finished == .completed else {
             XCTFail("releasing admission must allow both bounded phases to finish")
             return
+        }
+        if let revocationError {
+            // Preserve the originating fixture/write error after both real phases have drained.
+            _ = await firstTask.result
+            _ = await secondTask.result
+            throw revocationError
         }
         if revokeWhileQueued {
             for task in [firstTask, secondTask] {
@@ -482,11 +506,14 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
             }
         } else {
             let firstOutput = try await firstTask.value
-            if first == .requestLeave { XCTAssertNil(firstOutput) }
-            else { XCTAssertEqual(try json(firstOutput), .object(["limit": .integer(5)])) }
+            if first == .requestLeave {
+                XCTAssertNil(firstOutput)
+            } else {
+                XCTAssertEqual(try json(firstOutput), .object(["limit": .integer(5)]))
+            }
             let secondOutput = try await secondTask.value
             XCTAssertEqual(try json(secondOutput), second == .responseEnter
-                           ? .object(["maintenance": .bool(true)]) : .object(["limit": .integer(5)]))
+                ? .object(["maintenance": .bool(true)]) : .object(["limit": .integer(5)]))
         }
         XCTAssertFalse(gate.timedOut)
     }
@@ -496,9 +523,9 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
             let consent = ConsentSequence(deniedCheck: deniedCheck)
             let package = try package(request: "onEnter(r){r.body.limit=5;}")
             let url = directory.appendingPathComponent("consent-\(deniedCheck).json")
-            let store = PluginActivationStore(fileURL: url)
+            let (store, revisions) = try await AutomationFixtures.activationContext(packages: [package], activationURL: url)
             let empty = try await store.snapshot()
-            let snapshot = try await store.activate(package, revisionID: "local|\(package.manifest.id.uuidString)|\(package.revision)", expectedGeneration: empty.generation)
+            let snapshot = try await store.activate(package, revisionID: XCTUnwrap(revisions.first).id, expectedGeneration: empty.generation)
             let processor = HTTPPluginProcessor(store: store, snapshot: snapshot, hasCaptureConsent: { consent.next() })
             do {
                 _ = try await processor.process(.requestEnter, request: request(), response: nil)
@@ -544,9 +571,9 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
     func testInvalidAndOversizeMutationsAndScriptErrorsKeepFailureSignal() async throws {
         for callback in ["r.body=undefined;", "r.body={value:'x'.repeat(25000)};", "throw new Error('failed');"] {
             let package = try package(request: "onEnter(r){\(callback)}")
-            let store = PluginActivationStore(fileURL: directory.appendingPathComponent(UUID().uuidString + ".json"))
+            let (store, revisions) = try await AutomationFixtures.activationContext(packages: [package], activationURL: directory.appendingPathComponent(UUID().uuidString + ".json"))
             let empty = try await store.snapshot()
-            let snapshot = try await store.activate(package, revisionID: "local|\(package.manifest.id.uuidString)|\(package.revision)", expectedGeneration: empty.generation)
+            let snapshot = try await store.activate(package, revisionID: XCTUnwrap(revisions.first).id, expectedGeneration: empty.generation)
             let processor = HTTPPluginProcessor(store: store, snapshot: snapshot, hasCaptureConsent: { true })
             do {
                 _ = try await processor.process(.requestEnter, request: request(), response: nil)
@@ -571,9 +598,9 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(try json(output), .object(["tag": .string("wrapped"), "endpoints": .integer(0)]))
         let large = try self.package(settings: .object(["x": .string(String(repeating: "x", count: 8184))]),
                                      request: "onEnter(){throw new Error('oversize config must not invoke callback');}")
-        let store = PluginActivationStore(fileURL: directory.appendingPathComponent("large-config.json"))
+        let (store, revisions) = try await AutomationFixtures.activationContext(packages: [large], activationURL: directory.appendingPathComponent("large-config.json"))
         let empty = try await store.snapshot()
-        let snapshot = try await store.activate(large, revisionID: "local|\(large.manifest.id.uuidString)|\(large.revision)", expectedGeneration: empty.generation)
+        let snapshot = try await store.activate(large, revisionID: XCTUnwrap(revisions.first).id, expectedGeneration: empty.generation)
         let largeProcessor = HTTPPluginProcessor(store: store, snapshot: snapshot, hasCaptureConsent: { true })
         do {
             _ = try await largeProcessor.process(.requestEnter, request: request(), response: nil)
@@ -696,10 +723,21 @@ private final class AdmissionOrderProbe: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [String] = []
     private var released = false
-    var names: [String] { lock.withLock { values } }
-    var ownerWasReleased: Bool { lock.withLock { released } }
-    func append(_ name: String) { lock.withLock { values.append(name) } }
-    func releaseOwner() { lock.withLock { released = true } }
+    var names: [String] {
+        lock.withLock { values }
+    }
+
+    var ownerWasReleased: Bool {
+        lock.withLock { released }
+    }
+
+    func append(_ name: String) {
+        lock.withLock { values.append(name) }
+    }
+
+    func releaseOwner() {
+        lock.withLock { released = true }
+    }
 }
 
 private final class ConsentSequence: @unchecked Sendable {

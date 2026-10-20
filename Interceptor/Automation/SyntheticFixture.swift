@@ -9,6 +9,27 @@ enum SyntheticFixture {
         JSONPrettyPrinter.format(rawEventJSON(for: hook), maxBytes: JavaScriptLimits.maxEventBytes)
     }
 
+    /// Package tests use declared routes, so an otherwise valid sample does not silently miss every hook.
+    static func eventJSON(for hook: JavaScriptHook, manifest: PluginManifest) -> String {
+        let fallback = eventJSON(for: hook)
+        guard manifest.schemaVersion == 2,
+              let match = manifest.matches.first(where: { $0.hooks[hook.rawValue] != nil }),
+              var event = try? JSONValue(parsing: Data(fallback.utf8)).objectValue,
+              var request = event["request"]?.objectValue,
+              let host = match.hosts.sorted().first else { return fallback }
+        let originalRequest = request
+        request["host"] = .string(host)
+        if let method = match.methods?.sorted().first { request["method"] = .string(method) }
+        switch match.path {
+            case let .exact(path)?, let .prefix(path)?: request["path"] = .string(path)
+            case nil: break
+        }
+        guard request != originalRequest else { return fallback }
+        event["request"] = .object(request)
+        guard let encoded = try? JSONValue.object(event).jsonString() else { return fallback }
+        return JSONPrettyPrinter.format(encoded, maxBytes: JavaScriptLimits.maxEventBytes)
+    }
+
     static var configJSON: String {
         JSONPrettyPrinter.format(rawConfigJSON, maxBytes: JavaScriptLimits.maxConfigBytes)
     }

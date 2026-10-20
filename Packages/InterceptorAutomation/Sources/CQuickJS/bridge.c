@@ -1338,7 +1338,8 @@ static int parse_phase(const char *hook, int *leg, int *kind) {
 //
 // Mirrors AutomationCore.PluginManifest for schemaVersion 2. Exactly these keys, nothing else:
 // schemaVersion=2, id, name, version, matches(1...16), read, write, endpointBindings(0...4), settings
-// and optional author, summary. Any violation (schema 1/3, missing, unknown or mistyped field) is
+// and optional author, summary, category (scalar-bounded 1...80, <=256 bytes). Any violation
+// (schema 1/3, missing, unknown or mistyped field) is
 // QJS_INVALID_INPUT. The read grants are applied to the event before any plugin code exists.
 
 #define MAX_MAP_ENTRIES 256
@@ -1381,6 +1382,45 @@ static int text_ok(const Str *s, size_t max_chars, size_t max_bytes, int reject_
         chars++;
     }
     return chars <= max_chars && !(reject_blank && all_space);
+}
+
+// Category only: generated from Vendor/libunicode's Unicode 17.0.0 Cc/Cf/Zl/Zp
+// ranges (unicode_general_category), sorted and merged where adjacent. Regenerate
+// after a reviewed Unicode vendor bump, then compare every valid scalar with
+// Swift UnicodeScalar.Properties.generalCategory. Do not change the legacy
+// name/author/summary predicate above when updating category's contract.
+static int is_category_forbidden_cp(uint32_t c) {
+    static const uint32_t ranges[][2] = {
+        {0x0, 0x1F}, {0x7F, 0x9F}, {0xAD, 0xAD}, {0x600, 0x605},
+        {0x61C, 0x61C}, {0x6DD, 0x6DD}, {0x70F, 0x70F}, {0x890, 0x891},
+        {0x8E2, 0x8E2}, {0x180E, 0x180E}, {0x200B, 0x200F}, {0x2028, 0x202E},
+        {0x2060, 0x2064}, {0x2066, 0x206F}, {0xFEFF, 0xFEFF}, {0xFFF9, 0xFFFB},
+        {0x110BD, 0x110BD}, {0x110CD, 0x110CD}, {0x13430, 0x1343F},
+        {0x1BCA0, 0x1BCA3}, {0x1D173, 0x1D17A}, {0xE0001, 0xE0001}, {0xE0020, 0xE007F},
+    };
+    size_t lo = 0, hi = sizeof(ranges) / sizeof(ranges[0]);
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (c < ranges[mid][0]) hi = mid;
+        else if (c > ranges[mid][1]) lo = mid + 1;
+        else return 1;
+    }
+    return 0;
+}
+
+static int category_text_ok(const Str *s) {
+    size_t i = 0, scalars = 0;
+    int all_space = 1;
+    if (s->n == 0 || s->n > 256) return 0;
+    while (i < s->n) {
+        uint32_t c;
+        size_t k;
+        if (!next_cp((const uint8_t *)s->s + i, s->n - i, &c, &k) || is_category_forbidden_cp(c)) return 0;
+        if (!is_space_cp(c)) all_space = 0;
+        i += k;
+        if (++scalars > 80) return 0;
+    }
+    return !all_space;
 }
 
 static int is_alnum_c(int c) { return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
@@ -1536,14 +1576,14 @@ done:
 
 static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *write_request, int *write_response) {
     static const char *const mk[] = {"schemaVersion", "id", "name", "version", "matches", "read", "write",
-                                     "endpointBindings", "settings", "author", "summary"};
+                                     "endpointBindings", "settings", "author", "summary", "category"};
     static const char *const wk[] = {"requestBody", "responseBody"};
-    JSValue f[11], w[2];
+    JSValue f[12], w[2];
     Str s = {NULL, 0}, *bind = NULL;
     size_t nbind = 0;
     int ok = 0;
     w[0] = w[1] = JS_UNDEFINED;
-    if (!read_obj(st, ctx, root, mk, 11, 0x1FFu, f)) return 0;
+    if (!read_obj(st, ctx, root, mk, 12, 0x1FFu, f)) return 0;
     if (JS_VALUE_GET_TAG(f[0]) != JS_TAG_INT || JS_VALUE_GET_INT(f[0]) != 2) goto done;
     if (!get_str(ctx, f[1], &s, 36) || !uuid_ok(&s)) goto done;
     str_free(&s);
@@ -1557,6 +1597,10 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
     }
     if (!JS_IsUndefined(f[10])) {
         if (!get_str(ctx, f[10], &s, 1024) || !text_ok(&s, 280, 1024, 1)) goto done;
+        str_free(&s);
+    }
+    if (!JS_IsUndefined(f[11])) {
+        if (!get_str(ctx, f[11], &s, 256) || !category_text_ok(&s)) goto done;
         str_free(&s);
     }
     {
@@ -1594,7 +1638,7 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
 done:
     str_free(&s);
     strs_free(bind, nbind);
-    for (int i = 0; i < 11; i++) JS_FreeValue(ctx, f[i]);
+    for (int i = 0; i < 12; i++) JS_FreeValue(ctx, f[i]);
     JS_FreeValue(ctx, w[0]);
     JS_FreeValue(ctx, w[1]);
     return ok;

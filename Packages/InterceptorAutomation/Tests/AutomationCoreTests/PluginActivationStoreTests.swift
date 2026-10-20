@@ -10,6 +10,7 @@ final class PluginActivationStoreTests: XCTestCase {
     }
     override func tearDownWithError() throws { try FileManager.default.removeItem(at: directory) }
     private var url: URL { directory.appendingPathComponent("active.json") }
+    private var catalogURL: URL { directory.appendingPathComponent("catalog.json") }
 
     private func package(_ id: UUID = UUID(), source: String = "// inactive until approved") throws -> PluginPackage {
         let json = """
@@ -18,13 +19,22 @@ final class PluginActivationStoreTests: XCTestCase {
         "read":{"metadata":["method","host","path","status"],"headers":[],"queryKeys":[],"body":{"mode":"json"}},
         "write":{"requestBody":true,"responseBody":true},"endpointBindings":[],"settings":{}},"sourceFiles":{"hooks/example.com/GET.js":"\(source)"}}
         """
-        return try PluginPackage.validate(Data(json.utf8))
+        let package = try PluginPackage.validate(Data(json.utf8))
+        // Real legacy catalog context lets revocation freeze the active-preferred selection atomically.
+        let file = CatalogFile(url: catalogURL)
+        try file.locked {
+            var catalog = try file.read().map(CatalogCodec.decode) ?? Catalog()
+            let revision = InstalledRevision(package: package, provenance: .init(origin: .localImport, trustAtImport: nil), enabled: false)
+            if catalog.revision(id: revision.id) == nil { catalog.revisions.append(revision) }
+            try file.replace(with: CatalogCodec.encode(catalog))
+        }
+        return package
     }
     private func key(_ p: PluginPackage) -> String { "local|\(p.manifest.id.uuidString)|\(p.revision)" }
 
     func testApprovalPersistsExactBytesAndRevocationInvalidatesAnotherReader() async throws {
-        let store = PluginActivationStore(fileURL: url)
-        let observer = PluginActivationStore(fileURL: url)
+        let store = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
+        let observer = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let initial = try await store.snapshot()
         XCTAssertTrue(initial.revisions.isEmpty)
         let p = try package()
@@ -42,10 +52,11 @@ final class PluginActivationStoreTests: XCTestCase {
     }
 
     func testStaleApprovalCannotResurrectRevokedRevision() async throws {
-        let store = PluginActivationStore(fileURL: url)
-        let before = try await store.snapshot()
-        _ = try await store.revoke(revisionID: "deleted-before-enable")
+        let store = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let p = try package()
+        let initial = try await store.snapshot()
+        let before = try await store.activate(p, revisionID: key(p), expectedGeneration: initial.generation)
+        _ = try await store.revoke(revisionID: key(p))
         do {
             _ = try await store.activate(p, revisionID: key(p), expectedGeneration: before.generation)
             XCTFail("stale approval must fail")
@@ -55,7 +66,7 @@ final class PluginActivationStoreTests: XCTestCase {
     }
 
     func testLegacyPackageAndForgedRevisionIdentityCannotActivate() async throws {
-        let store = PluginActivationStore(fileURL: url)
+        let store = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let snapshot = try await store.snapshot()
         let legacy = try PluginPackage.template()
         do {
@@ -70,7 +81,7 @@ final class PluginActivationStoreTests: XCTestCase {
     }
 
     func testNewRevisionNeedsApprovalAndReplacesOnlySameSourcePlugin() async throws {
-        let store = PluginActivationStore(fileURL: url)
+        let store = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let p = try package()
         let initial = try await store.snapshot()
         let old = try await store.activate(p, revisionID: key(p), expectedGeneration: initial.generation)
@@ -83,7 +94,7 @@ final class PluginActivationStoreTests: XCTestCase {
     }
 
     func testActivationLimitFailurePreservesExistingApprovedSet() async throws {
-        let store = PluginActivationStore(fileURL: url)
+        let store = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         var snapshot = try await store.snapshot()
         for _ in 0..<4 {
             let p = try package()
@@ -101,7 +112,7 @@ final class PluginActivationStoreTests: XCTestCase {
     func testCorruptAndSymlinkedActivationFilesFailClosedAndRemainUntouched() async throws {
         let bytes = Data("{bad".utf8)
         try bytes.write(to: url)
-        let store = PluginActivationStore(fileURL: url)
+        let store = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let current = await store.isCurrent(admitted: .empty)
         XCTAssertFalse(current)
         do { _ = try await store.revokeAll(); XCTFail("preserve corrupt state") }
@@ -118,14 +129,14 @@ final class PluginActivationStoreTests: XCTestCase {
     func testOversizeFileIsRejectedBeforeParsingAndPreserved() async throws {
         let bytes = Data(repeating: 0x20, count: PluginActivationStore.maxBytes + 1)
         try bytes.write(to: url)
-        let store = PluginActivationStore(fileURL: url)
+        let store = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         do { _ = try await store.snapshot(); XCTFail("bounded read") }
         catch { XCTAssertEqual(error as? AutomationError, .corruptStore) }
         XCTAssertEqual(try Data(contentsOf: url), bytes)
     }
 
     func testDigestTamperingPreservesFileAndFailsClosed() async throws {
-        let store = PluginActivationStore(fileURL: url)
+        let store = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let package = try package()
         let initial = try await store.snapshot()
         _ = try await store.activate(package, revisionID: key(package), expectedGeneration: initial.generation)
@@ -144,11 +155,11 @@ final class PluginActivationStoreTests: XCTestCase {
 
 
     func testCachedSnapshotIsReusedOnlyForIdenticalBytes() async throws {
-        let writer = PluginActivationStore(fileURL: url)
+        let writer = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let p = try package()
         let initial = try await writer.snapshot()
         _ = try await writer.activate(p, revisionID: key(p), expectedGeneration: initial.generation)
-        let reader = PluginActivationStore(fileURL: url)
+        let reader = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let first = try await reader.snapshot()
         _ = try await reader.snapshot()
         let count = await reader.validationCount
@@ -164,7 +175,7 @@ final class PluginActivationStoreTests: XCTestCase {
     }
 
     func testSameGenerationChangedRevisionIsRevalidatedAndNotCurrent() async throws {
-        let store = PluginActivationStore(fileURL: url)
+        let store = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let p = try package(), changed = try package()
         let initial = try await store.snapshot()
         let admitted = try await store.activate(p, revisionID: key(p), expectedGeneration: initial.generation)
@@ -181,12 +192,12 @@ final class PluginActivationStoreTests: XCTestCase {
     }
 
     func testFailedWritePreservesFileAndPreviouslyValidatedSnapshot() async throws {
-        let setup = PluginActivationStore(fileURL: url)
+        let setup = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let p = try package()
         let initial = try await setup.snapshot()
         let admitted = try await setup.activate(p, revisionID: key(p), expectedGeneration: initial.generation)
         let bytes = try Data(contentsOf: url)
-        let store = PluginActivationStore(fileURL: url, writer: { _, _ in throw AutomationError.saveFailed })
+        let store = PluginActivationStore(fileURL: url, catalogURL: catalogURL, writer: { _, _ in throw AutomationError.saveFailed })
         _ = try await store.snapshot()
         do { _ = try await store.revokeAll(); XCTFail("write must fail") }
         catch { XCTAssertEqual(error as? AutomationError, .saveFailed) }
@@ -203,13 +214,13 @@ final class PluginActivationStoreTests: XCTestCase {
         let snapshot = try await store.snapshot()
         XCTAssertTrue(snapshot.revisions.isEmpty)
         XCTAssertFalse(FileManager.default.fileExists(atPath: missing.deletingLastPathComponent().path))
-        let existing = PluginActivationStore(fileURL: url)
+        let existing = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         _ = try await existing.snapshot()
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.appendingPathExtension("lock").path))
     }
 
     func testConcurrentAtomicWriterAndLockFreeReaderOnlySeeValidSnapshots() async throws {
-        let writer = PluginActivationStore(fileURL: url), reader = PluginActivationStore(fileURL: url)
+        let writer = PluginActivationStore(fileURL: url, catalogURL: catalogURL), reader = PluginActivationStore(fileURL: url, catalogURL: catalogURL)
         let p = try package()
         let revisionID = key(p)
         let writing = Task {

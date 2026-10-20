@@ -43,31 +43,30 @@ final class HTTPHookPresentationTests: XCTestCase {
         XCTAssertThrowsError(try SyntheticResult.parse(result, hook: .requestEnter, manifest: PluginPackage.template().manifest))
     }
 
-    func testSourceEditAndDeletionRevokeExactOldApprovalWithoutAutoEnabling() async throws {
+    func testCoordinatorDeletionRevokesExactApprovalAndKeepsHistoryDisabled() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let store = AutomationStore(fileURL: directory.appendingPathComponent("catalog.json"))
-        let activation = PluginActivationStore(fileURL: directory.appendingPathComponent("active.json"))
+        let catalogURL = directory.appendingPathComponent("catalog.json")
+        let store = AutomationStore(fileURL: catalogURL)
+        let activation = PluginActivationStore(fileURL: directory.appendingPathComponent("active.json"), catalogURL: catalogURL)
+        let coordinator = InstallationCoordinator(catalogURL: catalogURL, activationURL: directory.appendingPathComponent("active.json"))
         let package = try PluginPackage.validate(AutomationTemplate.packageBytes(name: "Original"))
         let client = try FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [package]), packages: [package])
-        let controller = AutomationController(store: store, client: client, executor: FakeScriptRunner(), activationStore: activation)
-        await controller.load()
         let revision = try await store.importLocal(package.bytes)
-        await controller.refreshCatalog()
-        let initial = try await activation.snapshot()
-        _ = try await activation.activate(package, revisionID: revision.id, expectedGeneration: initial.generation)
-        let session = ScriptSession(controller: controller, revision: revision)
-        session.source += "\n// edited"
-        await session.saveAsLocalEdit()
-        XCTAssertNotEqual(session.revision.id, revision.id)
-        let afterEdit = try await activation.snapshot()
-        XCTAssertTrue(afterEdit.revisions.isEmpty)
-        XCTAssertTrue(controller.scripts.allSatisfy { !$0.enabled })
-        _ = try await activation.activate(package, revisionID: revision.id, expectedGeneration: afterEdit.generation)
+        let controller = AutomationController(store: store, client: client, executor: FakeScriptRunner(), activationStore: activation,
+                                              installationCoordinator: coordinator, hasCaptureConsent: { true }, stopCapture: {})
+        await controller.load()
+        let initial = try coordinator.state()
+        await controller.activate(revision, expectedGeneration: initial.activation.generation)
+        XCTAssertTrue(controller.isActive(revision.id))
         await controller.deleteScript(id: revision.id)
-        let afterDelete = try await activation.snapshot()
-        XCTAssertTrue(afterDelete.revisions.isEmpty)
+        let afterDelete = try coordinator.state()
+        XCTAssertTrue(afterDelete.activation.revisions.isEmpty)
+        XCTAssertTrue(afterDelete.installed.isEmpty)
+        XCTAssertEqual(afterDelete.catalog.revision(id: revision.id)?.package.bytes, package.bytes)
+        XCTAssertTrue(afterDelete.catalog.revisions.allSatisfy { !$0.enabled })
         XCTAssertFalse(controller.scripts.contains { $0.id == revision.id })
+        XCTAssertNil(controller.actionError)
     }
 
     func testFileDraftsSurviveSelectionAndSaveTogetherInOneChildRevision() async throws {

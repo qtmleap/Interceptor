@@ -27,6 +27,12 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / 'fixtures/plugin-repository'
 PACKAGE_NAMES = ('request-summary.json', 'response-details.json', 'multi-file-hooks.json', 'approval-limits.json')
 MARKER = 'Interceptor Plugin Repository Fixture'
+# Pinned within the client's 90-day lifetime limit so visible payload hashes are
+# reproducible. Renew deliberately with the visual baselines before expiry.
+REPOSITORY_ISSUED_AT = '2026-10-01T00:00:00Z'
+REPOSITORY_EXPIRES_AT = '2026-12-30T00:00:00Z'
+DERIVED_BROWSER_PACKAGE = '/browser/target-hosts.json'
+DERIVED_BROWSER_REPOSITORY = '/browser/repository.json'
 
 
 def encoded(value):
@@ -91,14 +97,34 @@ def repository_files(token, device):
         files['/' + name] = raw
         entries.append({key: manifest[key] for key in ('id', 'name', 'version')} | {
             'packagePath': name, 'sha256': digest(raw), 'size': len(raw)})
-    now = datetime.datetime.now(datetime.timezone.utc)
-    iso = lambda date: date.isoformat(timespec='seconds').replace('+00:00', 'Z')
     payload = {'schemaVersion': 1, 'id': '57414817-0F72-40BA-A27C-535B784BEE00',
                'name': 'Local repository fixture', 'sequence': 1,
-               'issuedAt': iso(now - datetime.timedelta(seconds=60)),
-               'expiresAt': iso(now + datetime.timedelta(days=1)), 'plugins': entries}
+               'issuedAt': REPOSITORY_ISSUED_AT,
+               'expiresAt': REPOSITORY_EXPIRES_AT, 'plugins': entries}
     files['/repository.json'] = encoded({'schemaVersion': 1, 'payload': base64.b64encode(encoded(payload)).decode()})
-    package_digest = digest(encoded(entries))
+    # This separate catalog is explicitly synthetic: sourceFiles retain the SDK's
+    # exact text, while identity and target metadata are authored for browser tests.
+    # The original four-package catalog and SDK provenance remain unchanged.
+    derived = json.loads(packages['multi-file-hooks.json'][0])
+    derived['manifest'].update(id='E9472B70-2DB2-4F4C-A291-33F5FEF88519', name='Target hosts example',
+                               author='Browser fixture author', category='Requests',
+                               summary='Derived fixture for package and file target views.')
+    target_rules = [rule for rule in derived['manifest']['matches']
+                    if rule['path'] == {'kind': 'exact', 'value': '/synthetic'} and rule['methods'] == ['POST']]
+    if len(target_rules) != 1:
+        raise ValueError('Derived browser fixture requires one exact POST /synthetic rule')
+    target_rules[0]['hosts'] = ['api.example.com']
+    derived_raw = encoded(derived)
+    files[DERIVED_BROWSER_PACKAGE] = derived_raw
+    metadata = derived['manifest']
+    derived_entry = {key: metadata[key] for key in ('id', 'name', 'version', 'author', 'summary', 'category')} | {
+        'packagePath': 'target-hosts.json', 'sha256': digest(derived_raw), 'size': len(derived_raw)}
+    derived_payload = payload | {'id': '532AEB4B-8744-44DA-86CB-DC46E3831F23',
+                                 'name': 'Browser catalog fixture', 'plugins': [derived_entry]}
+    files[DERIVED_BROWSER_REPOSITORY] = encoded({'schemaVersion': 1, 'payload': base64.b64encode(encoded(derived_payload)).decode()})
+    # The readiness nonce binds the exact complete allowlist, including the
+    # derived catalog, rather than only entries in the original catalog.
+    package_digest = digest(encoded({path: digest(raw) for path, raw in files.items()}))
     files['/__interceptor_fixture'] = encoded({'fixture': MARKER, 'version': 1, 'runToken': token,
                                               'device': device, 'packageDigest': package_digest})
     return files, package_digest
@@ -405,13 +431,20 @@ def main():
         public = work / 'public'
         public.mkdir()
         for path, raw in files.items():
-            (public / path[1:]).write_bytes(raw)
+            destination = public / path[1:]
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(raw)
         tls = make_tls(work)
         server = FixtureServer(files, tls, options.port)
         record.update({'repositoryURL': server.base_url + '/repository.json', 'runToken': token,
-                       'packageDigest': package_digest, 'publicFiles': {name: digest(raw) for name, raw in files.items()}})
+                       'packageDigest': package_digest, 'publicFiles': {name: digest(raw) for name, raw in files.items()},
+                       'derivedPackages': {DERIVED_BROWSER_PACKAGE: 'multi-file-hooks.json'}})
         context = check_ready(server, tls, files['/__interceptor_fixture'])
         if options.self_test:
+            for path in (DERIVED_BROWSER_REPOSITORY, DERIVED_BROWSER_PACKAGE):
+                with urllib.request.urlopen(server.base_url + path, context=context, timeout=2) as response:
+                    if response.status != 200 or response.read() != files[path]:
+                        raise RuntimeError('Derived browser fixture was not served exactly: ' + path)
             for path in ['/private-tls/ca.key', '/../private-tls/server.key', '/authored/plugins/ui-multifile/plugin.json']:
                 try:
                     urllib.request.urlopen(server.base_url + path, context=context, timeout=2).close()

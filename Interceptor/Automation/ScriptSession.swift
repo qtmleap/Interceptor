@@ -44,7 +44,9 @@ final class ScriptSession {
     }
 
     var hooks: [JavaScriptHook] {
-        isV2 ? [.requestEnter, .requestLeave, .responseEnter, .responseLeave] : [.request, .response]
+        guard isV2 else { return [.request, .response] }
+        let declared = Set(revision.package.manifest.matches.flatMap { $0.hooks.keys })
+        return [JavaScriptHook.requestEnter, .requestLeave, .responseEnter, .responseLeave].filter { declared.contains($0.rawValue) }
     }
 
     func refreshActivation() async {
@@ -90,7 +92,7 @@ final class ScriptSession {
     var hook = JavaScriptHook.request {
         didSet {
             if hook != oldValue {
-                eventText = SyntheticFixture.eventJSON(for: hook); invalidateResult()
+                eventText = SyntheticFixture.eventJSON(for: hook, manifest: revision.package.manifest); invalidateResult()
             }
         }
     }
@@ -121,8 +123,8 @@ final class ScriptSession {
         selectedSourceFile = revision.package.sourceFiles.keys.sorted().first
         legacySource = revision.package.source ?? ""
         if revision.package.manifest.schemaVersion == 2 {
-            hook = .requestEnter
-            eventText = SyntheticFixture.eventJSON(for: .requestEnter)
+            hook = hooks.first ?? .requestEnter
+            eventText = SyntheticFixture.eventJSON(for: hook, manifest: revision.package.manifest)
             let config = (try? JSONValue.object(["settings": revision.package.manifest.settings, "endpoints": .object([:])]).jsonString()) ?? "{}"
             configText = JSONPrettyPrinter.format(config, maxBytes: JavaScriptLimits.maxConfigBytes)
         }

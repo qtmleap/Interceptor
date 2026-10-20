@@ -7,6 +7,7 @@ public struct ActivatedPlugin: Equatable, Sendable {
     public let package: PluginPackage
 }
 
+/// Grant-only admission token. Selection-only writes do not change generation or equality.
 public struct PluginActivationSnapshot: Equatable, Sendable {
     public let generation: UUID
     public let revisions: [ActivatedPlugin]
@@ -16,120 +17,124 @@ public struct PluginActivationSnapshot: Equatable, Sendable {
     public func contains(revisionID: String) -> Bool { revisions.contains { $0.revisionID == revisionID } }
 }
 
-/// Readers use bounded, lock-free reads of atomically replaced files. Only fully validated exact
-/// bytes are cached. Writers retain the per-path lock; corrupt data is never reset or overwritten.
+/// Readers use bounded, lock-free reads of atomically replaced files and never migrate on read.
+/// Writers preserve initialized selections; corrupt data is never reset or overwritten.
 public actor PluginActivationStore {
     public static let maxActiveRevisions = 4
     public static let maxBytes = 2 * 1024 * 1024
     typealias Writer = @Sendable (CatalogFile, Data) throws -> Void
     private let file: CatalogFile
+    private let catalogURL: URL?
     private let writer: Writer
-    private var cached: (bytes: Data, snapshot: PluginActivationSnapshot)?
-    /// Internal evidence for cache regression tests; never influences admission.
+    private let reader: ActivationInitialization.Reader
+    private var cached: (bytes: Data, document: ActivationDocument)?
     private(set) var validationCount = 0
 
-    public init(fileURL: URL) {
+    /// Supply catalogURL for legacy revocation. Extension readers need only fileURL and never migrate.
+    public init(fileURL: URL, catalogURL: URL? = nil) {
         file = CatalogFile(url: fileURL)
+        self.catalogURL = catalogURL
         writer = { try $0.replace(with: $1) }
+        reader = { try $0.read(maximumBytes: PluginActivationStore.maxBytes) }
     }
 
-    /// Narrow save-failure seam, matching AutomationStore's internal writer injection.
-    init(fileURL: URL, writer: @escaping Writer) {
+    init(fileURL: URL, catalogURL: URL? = nil, writer: @escaping Writer,
+         reader: @escaping ActivationInitialization.Reader = { try $0.read(maximumBytes: PluginActivationStore.maxBytes) }) {
         file = CatalogFile(url: fileURL)
+        self.catalogURL = catalogURL
         self.writer = writer
+        self.reader = reader
     }
 
-    public func snapshot() throws -> PluginActivationSnapshot { try readUnlocked() }
+    public func snapshot() throws -> PluginActivationSnapshot { try readUnlocked().activation }
 
     public func isCurrent(admitted: PluginActivationSnapshot) -> Bool {
         guard let current = try? snapshot() else { return false }
         return current == admitted
     }
 
-    /// Approval is compare-and-swap against the state the user reviewed. Revoke
-    /// rotates generation even when absent, invalidating an in-flight approval.
+    /// Legacy caller compatibility. Once v2 is initialized, this cannot switch the selected revision.
+    /// New app callers must use InstallationCoordinator's exact-byte approval and live-consent gate.
     @discardableResult
     public func activate(_ package: PluginPackage, revisionID: String,
                          expectedGeneration: UUID) throws -> PluginActivationSnapshot {
-        guard case .integer(2)? = package.manifest.json.objectValue?["schemaVersion"],
-              Self.validIdentity(revisionID, package: package) else { throw AutomationError.invalidManifest }
+        guard package.manifest.schemaVersion == 2, InstallationIdentity.valid(revisionID, package: package) else {
+            throw AutomationError.invalidManifest
+        }
         return try file.locked {
-            let current = try readUnlocked()
-            guard current.generation == expectedGeneration else { throw AutomationError.staleSnapshot }
-            let family = Self.family(revisionID)
-            var revisions = current.revisions.filter { Self.family($0.revisionID) != family }
+            var document = try readUnlocked()
+            guard document.activation.generation == expectedGeneration else { throw AutomationError.staleSnapshot }
+            let family = InstallationIdentity.family(revisionID)
+            if let selections = document.selections {
+                guard selections[family] == revisionID else { throw AutomationError.staleSnapshot }
+            }
+            var revisions = document.activation.revisions.filter { InstallationIdentity.family($0.revisionID) != family }
             revisions.append(.init(revisionID: revisionID, package: package))
             guard revisions.count <= Self.maxActiveRevisions else { throw AutomationError.limitExceeded }
-            return try saveUnlocked(revisions)
+            return try saveUnlocked(&document, revisions: revisions)
         }
     }
 
+    /// Revocation changes grants only, never the installed selection.
     @discardableResult
     public func revoke(revisionID: String) throws -> PluginActivationSnapshot {
-        try file.locked {
-            let current = try readUnlocked()
-            return try saveUnlocked(current.revisions.filter { $0.revisionID != revisionID })
+        if let catalogURL {
+            return try InstallationCoordinator(catalogURL: catalogURL, activationURL: file.url,
+                catalogWriter: { try $0.replace(with: $1) }, activationWriter: writer).revokeGrants(revisionID: revisionID).activation
+        }
+        return try file.locked {
+            var document = try readUnlocked()
+            let remaining = document.activation.revisions.filter { $0.revisionID != revisionID }
+            guard document.selections != nil || remaining == document.activation.revisions else {
+                // Without catalog context a v1 revoke could silently select the last historical revision.
+                throw InstallationError.activationUnavailable
+            }
+            return try saveUnlocked(&document, revisions: remaining, invalidateApprovals: true)
         }
     }
 
     @discardableResult
     public func revokeAll() throws -> PluginActivationSnapshot {
-        try file.locked {
-            _ = try readUnlocked()
-            return try saveUnlocked([])
+        if let catalogURL {
+            return try InstallationCoordinator(catalogURL: catalogURL, activationURL: file.url,
+                catalogWriter: { try $0.replace(with: $1) }, activationWriter: writer).deactivateAll().activation
         }
-    }
-
-    private static func family(_ id: String) -> Substring {
-        id[..<(id.lastIndex(of: "|") ?? id.endIndex)]
-    }
-
-    private static func validIdentity(_ id: String, package: PluginPackage) -> Bool {
-        let suffix = "|\(package.manifest.id.uuidString)|\(package.revision)"
-        return id.utf8.count <= 4096 && id.hasSuffix(suffix) && id.count > suffix.count &&
-            !id.unicodeScalars.contains { $0.value < 32 || $0.value == 127 }
-    }
-
-    private func readUnlocked() throws -> PluginActivationSnapshot {
-        guard let data = try file.read(maximumBytes: Self.maxBytes) else { return .empty }
-        if let cached, cached.bytes == data { return cached.snapshot }
-        validationCount += 1
-        do {
-            let root = try JSONFields(try JSONValue(parsing: data),
-                                      required: ["version", "generation", "revisions"], error: .corruptStore)
-            guard try root.int("version") == 1 else { throw AutomationError.corruptStore }
-            let generation = try root.uuid("generation")
-            let entries = try root.array("revisions")
-            guard entries.count <= Self.maxActiveRevisions else { throw AutomationError.corruptStore }
-            var identities = Set<String>()
-            let revisions = try entries.map { value -> ActivatedPlugin in
-                let fields = try JSONFields(value, required: ["revisionID", "digest", "package"], error: .corruptStore)
-                let id = try fields.string("revisionID")
-                let package = try PluginPackage.validate(try StrictBase64.decode(try fields.string("package")))
-                guard case .integer(2)? = package.manifest.json.objectValue?["schemaVersion"],
-                      try fields.string("digest") == package.revision,
-                      Self.validIdentity(id, package: package),
-                      identities.insert(String(Self.family(id))).inserted else { throw AutomationError.corruptStore }
-                return ActivatedPlugin(revisionID: id, package: package)
+        return try file.locked {
+            var document = try readUnlocked()
+            guard document.selections != nil || document.activation.revisions.isEmpty else {
+                throw InstallationError.activationUnavailable
             }
-            guard generation != PluginActivationSnapshot.empty.generation else { throw AutomationError.corruptStore }
-            let snapshot = PluginActivationSnapshot(generation: generation, revisions: revisions.sorted { $0.revisionID < $1.revisionID })
-            cached = (data, snapshot)
-            return snapshot
-        } catch { throw AutomationError.corruptStore }
+            return try saveUnlocked(&document, revisions: [], invalidateApprovals: true)
+        }
     }
 
-    private func saveUnlocked(_ revisions: [ActivatedPlugin]) throws -> PluginActivationSnapshot {
-        let snapshot = PluginActivationSnapshot(generation: UUID(), revisions: revisions.sorted { $0.revisionID < $1.revisionID })
-        let entries: [JSONValue] = snapshot.revisions.map {
-            .object(["revisionID": .string($0.revisionID), "digest": .string($0.package.revision),
-                     "package": .string($0.package.bytes.base64EncodedString())])
+    private func readUnlocked() throws -> ActivationDocument {
+        let read = try ActivationInitialization.read(file, reader: reader)
+        guard let data = read.bytes else {
+            cached = nil
+            try ActivationInitialization.validate(.empty, initialized: read.initialized)
+            return .empty
         }
-        let data = try JSONValue.object(["version": .integer(1), "generation": .string(snapshot.generation.uuidString),
-                                         "revisions": .array(entries)]).data()
-        guard data.count <= Self.maxBytes else { throw AutomationError.limitExceeded }
+        if let cached, cached.bytes == data {
+            try ActivationInitialization.validate(cached.document, initialized: read.initialized)
+            return cached.document
+        }
+        validationCount += 1
+        let document = try ActivationDocument.decode(data)
+        try ActivationInitialization.validate(document, initialized: read.initialized)
+        cached = (data, document)
+        return document
+    }
+
+    private func saveUnlocked(_ document: inout ActivationDocument, revisions: [ActivatedPlugin],
+                              invalidateApprovals: Bool = false) throws -> PluginActivationSnapshot {
+        let sorted = revisions.sorted { $0.revisionID < $1.revisionID }
+        guard invalidateApprovals || sorted != document.activation.revisions else { return document.activation }
+        document.activation = .init(generation: UUID(), revisions: sorted)
+        let data = try document.encoded()
+        if document.selections != nil { try ActivationInitialization.prepare(file, writer: writer) }
         try writer(file, data)
-        cached = (data, snapshot)
-        return snapshot
+        cached = (data, document)
+        return document.activation
     }
 }

@@ -38,7 +38,7 @@ final class PluginSourceViewerTests: XCTestCase {
         }
     }
 
-    func testFullScreenViewerKeepsExactBytesDoesNotWrapAndStaysReadOnly() throws {
+    func testFullScreenViewerKeepsExactBytesSoftWrapsAndStaysReadOnly() throws {
         let original = "// " + String(repeating: "long ", count: 200) + "\r\nconst é = 1;\r\n"
         let host = UIHostingController(rootView: PluginSourceViewer(source: original, identifier: "plugin.source", fillsAvailableSpace: true))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 800))
@@ -56,7 +56,7 @@ final class PluginSourceViewerTests: XCTestCase {
         XCTAssertFalse(viewer.isEditable)
         XCTAssertTrue(viewer.isSelectable)
         XCTAssertTrue(viewer.showLineNumbers)
-        XCTAssertFalse(viewer.isLineWrappingEnabled, "long lines scroll horizontally")
+        XCTAssertTrue(viewer.isLineWrappingEnabled, "soft wrapping keeps long lines readable without changing source bytes")
         XCTAssertGreaterThan(viewer.bounds.height, 320, "the full-screen viewer fills the offered space")
         XCTAssertEqual(viewer.accessibilityIdentifier, "plugin.source")
     }

@@ -28,7 +28,11 @@ public actor AutomationStore {
         try file.locked { try reload() }
     }
 
-    public func catalog() -> Catalog { current }
+    /// Compatibility accessor. Reload durable bytes so another controller's transaction is visible.
+    /// Use load() when the caller must distinguish corruption from an empty catalog.
+    public func catalog() -> Catalog {
+        (try? file.locked { try reload() }) ?? Catalog()
+    }
 
     private func reload() throws -> Catalog {
         do {
@@ -45,15 +49,20 @@ public actor AutomationStore {
         try file.locked {
             var cat = try reload()
             let result = try body(&cat)
-            let data = try CatalogCodec.encode(cat)
-            _ = try CatalogCodec.decode(data)   // never write what we could not read back
-            do { try writer(file, data) } catch {
-                if let d = try? file.read(), let c = try? CatalogCodec.decode(d) { current = c }
-                throw (error as? AutomationError) ?? AutomationError.saveFailed
-            }
-            current = cat
+            try persistUnlocked(cat)
             return result
         }
+    }
+
+    /// Caller must hold the file lock.
+    private func persistUnlocked(_ cat: Catalog) throws {
+        let data = try CatalogCodec.encode(cat)
+        _ = try CatalogCodec.decode(data)   // never write what we could not read back
+        do { try writer(file, data) } catch {
+            if let d = try? file.read(), let c = try? CatalogCodec.decode(d) { current = c }
+            throw (error as? AutomationError) ?? AutomationError.saveFailed
+        }
+        current = cat
     }
 
     // MARK: Repositories
@@ -119,6 +128,28 @@ public actor AutomationStore {
         }
     }
 
+    /// Compare-and-swap refresh of a visible repository's metadata. Fails closed with `.staleSnapshot` when the
+    /// record is missing, hidden or its generation moved. A refresh identical in sequence, payload and trust
+    /// writes nothing and returns the stored record (and stored snapshot); installs must use that snapshot.
+    /// Installed revisions and pins are never touched.
+    public func refresh(_ snapshot: VerifiedSnapshot, expectedGeneration: UUID, acknowledgeUnverified: Bool, now: Date) throws -> RepositoryRecord {
+        try file.locked {
+            var cat = try reload()
+            guard let existing = cat.record(for: snapshot.url), existing.visible,
+                  existing.generation == expectedGeneration else { throw AutomationError.staleSnapshot }
+            let plan = try TrustPlanner.plan(existing: existing, snapshot: snapshot, now: now)
+            if plan.requiresAck && !acknowledgeUnverified { throw AutomationError.acknowledgmentRequired }
+            if existing.snapshot != nil, existing.sequence == snapshot.index.sequence,
+               existing.payloadDigest == snapshot.payloadDigest, existing.trust == plan.trust { return existing }
+            let record = RepositoryRecord(url: existing.url, repositoryID: existing.repositoryID, trust: plan.trust,
+                                          sequence: snapshot.index.sequence, payloadDigest: snapshot.payloadDigest,
+                                          visible: true, generation: UUID(), snapshot: snapshot)
+            replace(record, in: &cat)
+            try persistUnlocked(cat)
+            return record
+        }
+    }
+
     /// Pin requires the independently obtained full 64-hex fingerprint to match the offered key.
     public func pin(_ url: RepositoryURL, fingerprint: String) throws -> RepositoryRecord {
         try transact { cat in
@@ -156,16 +187,7 @@ public actor AutomationStore {
     /// expired metadata, and packages that do not match the snapshot's index entry. Idempotent per source+plugin+revision.
     public func install(_ package: PluginPackage, from snapshot: VerifiedSnapshot, expectedGeneration: UUID, now: Date) throws -> InstalledRevision {
         try transact { cat in
-            guard let r = cat.record(for: snapshot.url), r.visible, let accepted = r.snapshot else { throw AutomationError.unknownRepository }
-            guard r.generation == expectedGeneration else { throw AutomationError.staleGeneration }
-            guard accepted == snapshot, r.sequence == snapshot.index.sequence, r.payloadDigest == snapshot.payloadDigest else {
-                throw AutomationError.staleSnapshot
-            }
-            try RepositoryEnvelope.checkTime(snapshot.index, now: now)
-            guard let entry = snapshot.index.plugins.first(where: { $0.id == package.manifest.id }) else { throw AutomationError.metadataMismatch }
-            let checked = try PluginPackage.validate(package.bytes, against: entry)
-            guard checked == package else { throw AutomationError.metadataMismatch }
-            let rev = InstalledRevision(package: checked, provenance: Provenance(origin: .repository(url: r.url, sequence: r.sequence), trustAtImport: r.trust), enabled: false)
+            let rev = try Self.repositoryRevision(package, from: snapshot, expectedGeneration: expectedGeneration, now: now, catalog: cat)
             return try add(rev, to: &cat)
         }
     }
@@ -216,6 +238,21 @@ public actor AutomationStore {
             guard let i = cat.revisions.firstIndex(where: { $0.id == revisionID }) else { throw AutomationError.unknownRevision }
             cat.revisions.remove(at: i)
         }
+    }
+
+    /// Pure unlocked validation shared with the synchronous coordinator. Caller owns the catalog lock.
+    static func repositoryRevision(_ package: PluginPackage, from snapshot: VerifiedSnapshot,
+                                   expectedGeneration: UUID, now: Date, catalog cat: Catalog) throws -> InstalledRevision {
+        guard let r = cat.record(for: snapshot.url), r.visible, let accepted = r.snapshot else { throw AutomationError.unknownRepository }
+        guard r.generation == expectedGeneration else { throw AutomationError.staleGeneration }
+        guard accepted == snapshot, r.sequence == snapshot.index.sequence, r.payloadDigest == snapshot.payloadDigest else {
+            throw AutomationError.staleSnapshot
+        }
+        try RepositoryEnvelope.checkTime(snapshot.index, now: now)
+        guard let entry = snapshot.index.plugins.first(where: { $0.id == package.manifest.id }) else { throw AutomationError.metadataMismatch }
+        let checked = try PluginPackage.validate(package.bytes, against: entry)
+        guard checked == package else { throw AutomationError.metadataMismatch }
+        return InstalledRevision(package: checked, provenance: Provenance(origin: .repository(url: r.url, sequence: r.sequence), trustAtImport: r.trust), enabled: false)
     }
 
     private func add(_ rev: InstalledRevision, to cat: inout Catalog) throws -> InstalledRevision {

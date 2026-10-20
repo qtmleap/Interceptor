@@ -25,11 +25,13 @@ final class AutomationActivationControllerTests: XCTestCase {
         let revision: InstalledRevision
         let activationURL: URL
         let catalogURL: URL
+        let coordinator: InstallationCoordinator
         let stops: StopRecorder
     }
 
     private func fixture(legacy: Bool = false, multiFile: Bool = false, active: Bool = false, consent: Bool = true,
-                         writer: PluginActivationStore.Writer? = nil) async throws -> Fixture
+                         writer: PluginActivationStore.Writer? = nil, coordinated: Bool = false,
+                         coordinatorWrapper: ((InstallationCoordinator) -> any InstallationCoordinating)? = nil) async throws -> Fixture
     {
         let base = directory.appendingPathComponent(UUID().uuidString)
         let catalogURL = base.appendingPathComponent("catalog.json"), activationURL = base.appendingPathComponent("active.json")
@@ -41,21 +43,38 @@ final class AutomationActivationControllerTests: XCTestCase {
             try PluginPackage.validate(AutomationTemplate.packageBytes(name: "Approval"))
         }
         let backing = AutomationStore(fileURL: catalogURL)
-        let revision = try await backing.importLocal(package.bytes)
+        let setupCoordinator = InstallationCoordinator(catalogURL: catalogURL, activationURL: activationURL)
+        let revision: InstalledRevision
+        if coordinated {
+            let empty = try setupCoordinator.state()
+            let imported = try setupCoordinator.importLocal(package.bytes, expectedSelectionGeneration: empty.selectionGeneration)
+            revision = try XCTUnwrap(imported.installed.first)
+            if active {
+                _ = try setupCoordinator.activate(revisionID: revision.id, expectedSelectionGeneration: imported.selectionGeneration,
+                                                  approval: InstallationApproval(packageBytes: package.bytes, expectedGrantGeneration: imported.activation.generation),
+                                                  captureConsent: { true })
+            }
+        } else {
+            revision = try await backing.importLocal(package.bytes)
+        }
         let store = ObservedAutomationStore(backing)
-        let original = PluginActivationStore(fileURL: activationURL)
-        if active {
+        let original = PluginActivationStore(fileURL: activationURL, catalogURL: catalogURL)
+        if active && !coordinated {
             let snapshot = try await original.snapshot()
             _ = try await original.activate(package, revisionID: revision.id, expectedGeneration: snapshot.generation)
         }
-        let activation = writer.map { PluginActivationStore(fileURL: activationURL, writer: $0) } ?? original
+        let activation = writer.map { PluginActivationStore(fileURL: activationURL, catalogURL: catalogURL, writer: $0) } ?? original
+        let coordinator = InstallationCoordinator(catalogURL: catalogURL, activationURL: activationURL,
+                                                  catalogWriter: { try $0.replace(with: $1) },
+                                                  activationWriter: writer ?? { try $0.replace(with: $1) })
         let client = try FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [package]), packages: [package])
         let stops = StopRecorder()
         let controller = AutomationController(store: store, client: client, executor: FakeScriptRunner(), activationStore: activation,
+                                              installationCoordinator: coordinated ? (coordinatorWrapper?(coordinator) ?? coordinator) : nil,
                                               hasCaptureConsent: { consent }, stopCapture: { stops.count += 1 })
         await controller.load()
         return Fixture(controller: controller, store: store, activation: activation, baseActivation: original,
-                       revision: revision, activationURL: activationURL, catalogURL: catalogURL, stops: stops)
+                       revision: revision, activationURL: activationURL, catalogURL: catalogURL, coordinator: coordinator, stops: stops)
     }
 
     func testConsentIsRequiredAndFailedApprovalLeavesFileUnchanged() async throws {
@@ -89,7 +108,9 @@ final class AutomationActivationControllerTests: XCTestCase {
     }
 
     func testFailedActivationWriteKeepsPreviousSnapshotAndError() async throws {
-        let f = try await fixture(active: true, writer: { _, _ in throw AutomationError.saveFailed })
+        let f = try await fixture(writer: { _, _ in throw AutomationError.saveFailed })
+        _ = try await f.baseActivation.revokeAll()
+        await f.controller.refreshActivation()
         let before = try await f.activation.snapshot(), bytes = try Data(contentsOf: f.activationURL)
         await f.controller.activate(f.revision, expectedGeneration: before.generation)
         XCTAssertEqual(f.controller.activationErrorKey, "AUTO_ERR_SAVE")
@@ -106,31 +127,23 @@ final class AutomationActivationControllerTests: XCTestCase {
         XCTAssertEqual(after, before)
     }
 
-    func testSaveAndDeleteRevokeBeforeCatalogMutationAndDeleteRevokesAgain() async throws {
-        let f = try await fixture(active: true)
-        await f.store.beforeEdit { [activation = f.activation, revisionID = f.revision.id] in
-            let snapshot = try await activation.snapshot()
-            XCTAssertFalse(snapshot.contains(revisionID: revisionID))
-        }
-        let session = ScriptSession(controller: f.controller, revision: f.revision)
-        session.source += "\n// change"
-        await session.saveAsLocalEdit()
-        XCTAssertNil(session.saveError)
-        let afterSave = try await f.activation.snapshot()
-        _ = try await f.activation.activate(f.revision.package, revisionID: f.revision.id, expectedGeneration: afterSave.generation)
-        let firstRevokeGeneration = LockedValue<UUID?>(nil)
-        await f.store.beforeDelete { [activation = f.activation, revisionID = f.revision.id] in
-            let snapshot = try await activation.snapshot()
-            XCTAssertFalse(snapshot.contains(revisionID: revisionID))
-            firstRevokeGeneration.value = snapshot.generation
-        }
+    func testCoordinatorDeleteRemovesSelectionAndExactGrantWhileRetainingHistory() async throws {
+        let f = try await fixture(active: true, coordinated: true)
+        let before = try f.coordinator.state()
         await f.controller.deleteScript(id: f.revision.id)
-        let afterDelete = try await f.activation.snapshot()
-        XCTAssertNotEqual(afterDelete.generation, firstRevokeGeneration.value)
-        XCTAssertTrue(afterDelete.revisions.isEmpty)
+        let after = try f.coordinator.state()
+        XCTAssertTrue(after.installed.isEmpty)
+        XCTAssertTrue(after.activation.revisions.isEmpty)
+        XCTAssertNotEqual(after.activation.generation, before.activation.generation)
+        XCTAssertNotEqual(after.selectionGeneration, before.selectionGeneration)
+        XCTAssertEqual(after.catalog.revision(id: f.revision.id)?.package.bytes, f.revision.package.bytes)
+        XCTAssertTrue(f.controller.scripts.isEmpty)
+        XCTAssertNil(f.controller.actionError)
+        XCTAssertTrue(f.controller.pendingRevocations.isEmpty)
+        XCTAssertEqual(f.stops.count, 0, "atomic revocation needs no emergency capture-stop request")
         let counts = await f.store.counts
-        XCTAssertEqual(counts.edits, 1)
-        XCTAssertEqual(counts.deletes, 1)
+        XCTAssertEqual(counts.edits, 0)
+        XCTAssertEqual(counts.deletes, 0, "the coordinator must not physically delete catalog history")
     }
 
     func testAnyFileDraftBlocksApprovalAndBulkSaveRevokesExactParentOnce() async throws {
@@ -235,30 +248,51 @@ final class AutomationActivationControllerTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: f.activationURL), corrupt)
     }
 
-    func testApprovalBetweenFirstRevokeAndDeleteIsRemovedBySecondRevoke() async throws {
-        let f = try await fixture(active: true)
-        await f.store.beforeDelete { [activation = f.baseActivation, revision = f.revision] in
-            let reviewed = try await activation.snapshot()
-            _ = try await activation.activate(revision.package, revisionID: revision.id, expectedGeneration: reviewed.generation)
-        }
+    func testConcurrentApprovalBeforeCoordinatorDeleteIsRevokedAndCannotBeRestored() async throws {
+        let concurrentApproval = LockedValue<PluginActivationSnapshot?>(nil)
+        let f = try await fixture(coordinated: true, coordinatorWrapper: { coordinator in
+            DeleteObservingCoordinator(base: coordinator) { revisionID in
+                let before = try coordinator.state()
+                let revision = try XCTUnwrap(before.installed.first { $0.id == revisionID })
+                let approved = try coordinator.activate(revisionID: revisionID, expectedSelectionGeneration: before.selectionGeneration,
+                                                        approval: InstallationApproval(packageBytes: revision.package.bytes, expectedGrantGeneration: before.activation.generation),
+                                                        captureConsent: { true })
+                concurrentApproval.value = approved.activation
+            }
+        })
+        let reviewedSelection = try f.coordinator.state().selectionGeneration
         await f.controller.deleteScript(id: f.revision.id)
-        let after = try await f.activation.snapshot()
-        XCTAssertTrue(after.revisions.isEmpty)
+        let approved = try XCTUnwrap(concurrentApproval.value)
+        XCTAssertTrue(approved.contains(revisionID: f.revision.id), "the other window must really publish a grant before deletion")
+        let after = try f.coordinator.state()
+        XCTAssertTrue(after.activation.revisions.isEmpty)
+        XCTAssertTrue(after.installed.isEmpty)
+        XCTAssertNotNil(after.catalog.revision(id: f.revision.id))
         XCTAssertTrue(f.controller.pendingRevocations.isEmpty)
         XCTAssertFalse(f.controller.scripts.contains { $0.id == f.revision.id })
+        await f.controller.activate(f.revision, expectedGeneration: approved.generation)
+        XCTAssertEqual(f.controller.activationErrorKey, "AUTO_ACTIVATION_STALE")
+        XCTAssertThrowsError(try f.coordinator.activate(revisionID: f.revision.id, expectedSelectionGeneration: after.selectionGeneration,
+                                                        approval: InstallationApproval(packageBytes: f.revision.package.bytes, expectedGrantGeneration: after.activation.generation),
+                                                        captureConsent: { true }))
+        { error in
+            XCTAssertEqual(error as? AutomationError, .staleSnapshot)
+        }
+        XCTAssertThrowsError(try f.coordinator.delete(revisionID: f.revision.id, expectedSelectionGeneration: reviewedSelection)) { error in
+            XCTAssertEqual(error as? AutomationError, .staleGeneration)
+        }
+        XCTAssertEqual(try f.coordinator.state(), after, "review of removed selection cannot restore execution authority")
     }
 
-    func testFailedSecondRevokeStopsCaptureRecordsPendingAndReconcilesAfterCatalogLoad() async throws {
-        let writer = FailingWriter(failAt: 2)
-        let f = try await fixture(active: true, writer: { try writer.write($0, $1) })
-        await f.store.beforeDelete { [activation = f.baseActivation, revision = f.revision] in
-            let reviewed = try await activation.snapshot()
-            _ = try await activation.activate(revision.package, revisionID: revision.id, expectedGeneration: reviewed.generation)
-        }
-        await f.controller.deleteScript(id: f.revision.id)
-        XCTAssertFalse(f.controller.scripts.contains { $0.id == f.revision.id })
-        let orphan = try await f.activation.snapshot()
-        XCTAssertTrue(orphan.contains(revisionID: f.revision.id), "failed persisted revocation must never be claimed as success")
+    func testFailedCoordinatorRevokeStopsCaptureRecordsPendingAndReconciles() async throws {
+        let writer = FailingWriter(failAt: 1)
+        let f = try await fixture(active: true, writer: { try writer.write($0, $1) }, coordinated: true)
+        let before = try f.coordinator.state(), bytes = try Data(contentsOf: f.activationURL)
+        let revoked = await f.controller.revokeActivation(id: f.revision.id)
+        XCTAssertFalse(revoked)
+        XCTAssertEqual(try f.coordinator.state(), before)
+        XCTAssertEqual(try Data(contentsOf: f.activationURL), bytes)
+        XCTAssertTrue(f.controller.isActive(f.revision.id), "failed persisted revocation must never be claimed as success")
         XCTAssertEqual(f.controller.pendingRevocations, [f.revision.id])
         XCTAssertEqual(f.controller.activationErrorKey, "AUTO_ACTIVATION_REVOCATION_PENDING")
         XCTAssertEqual(f.stops.count, 1)
@@ -268,6 +302,29 @@ final class AutomationActivationControllerTests: XCTestCase {
         XCTAssertTrue(reconciled.revisions.isEmpty)
         XCTAssertTrue(f.controller.pendingRevocations.isEmpty)
         XCTAssertNil(f.controller.activationError)
+        XCTAssertTrue(f.controller.scripts.contains { $0.id == f.revision.id }, "deactivation preserves installation")
+        XCTAssertEqual(f.stops.count, 1)
+    }
+
+    func testFailedCoordinatorDeletePreservesSelectionApprovalAndReportsError() async throws {
+        let writer = FailingWriter(failAt: 1, stage: .uninstallation)
+        let f = try await fixture(active: true, writer: { try writer.write($0, $1) }, coordinated: true)
+        let before = try f.coordinator.state(), bytes = try Data(contentsOf: f.activationURL)
+        await f.controller.deleteScript(id: f.revision.id)
+        XCTAssertEqual(f.controller.actionError as? AutomationError, .saveFailed)
+        XCTAssertEqual(try f.coordinator.state(), before)
+        XCTAssertEqual(try Data(contentsOf: f.activationURL), bytes)
+        XCTAssertTrue(f.controller.isActive(f.revision.id))
+        XCTAssertTrue(f.controller.scripts.contains { $0.id == f.revision.id })
+        XCTAssertTrue(f.controller.pendingRevocations.isEmpty)
+        XCTAssertEqual(f.stops.count, 0, "a failed atomic uninstall preserves the admitted grant")
+        writer.enabled = false
+        await f.controller.deleteScript(id: f.revision.id)
+        let after = try f.coordinator.state()
+        XCTAssertTrue(after.installed.isEmpty)
+        XCTAssertTrue(after.activation.revisions.isEmpty)
+        XCTAssertNotNil(after.catalog.revision(id: f.revision.id))
+        XCTAssertNil(f.controller.actionError)
     }
 
     func testPendingReconcileDoesNotTreatCorruptCatalogAsEmpty() async throws {
@@ -337,7 +394,7 @@ final class AutomationActivationControllerTests: XCTestCase {
 
     func testRepeatedSaveFailedRetriesRemainPendingButRequestShutdownOnce() async throws {
         let writer = FailingWriter(failAt: 1, repeated: true)
-        let f = try await fixture(active: true, writer: { try writer.write($0, $1) })
+        let f = try await fixture(active: true, writer: { try writer.write($0, $1) }, coordinated: true)
         let before = try Data(contentsOf: f.activationURL)
         let revoked = await f.controller.revokeActivation(id: f.revision.id)
         XCTAssertFalse(revoked)
@@ -387,12 +444,14 @@ private final class LockedValue<Value>: @unchecked Sendable {
 }
 
 private final class FailingWriter: @unchecked Sendable {
+    enum Stage { case revocation, uninstallation }
     private let lock = NSLock()
     private let failAt: Int
     private let repeated: Bool
+    private let stage: Stage
     private var writes = 0, failing = true
-    init(failAt: Int, repeated: Bool = false) {
-        self.failAt = failAt; self.repeated = repeated
+    init(failAt: Int, repeated: Bool = false, stage: Stage = .revocation) {
+        self.failAt = failAt; self.repeated = repeated; self.stage = stage
     }
 
     var count: Int {
@@ -404,11 +463,62 @@ private final class FailingWriter: @unchecked Sendable {
     }
 
     func write(_ file: CatalogFile, _ bytes: Data) throws {
-        let fails = lock.withLock { writes += 1; return failing && (writes == failAt || (repeated && writes >= failAt)) }
+        let root = try JSONValue(parsing: bytes).objectValue
+        // Ignore unchanged migration/barrier publications. Fail the authoritative logical change.
+        let matchesStage = switch stage {
+            case .revocation: root?["revisions"]?.arrayValue?.isEmpty == true
+            case .uninstallation: root?["selections"]?.arrayValue?.isEmpty == true
+        }
+        let fails = lock.withLock {
+            guard matchesStage else { return false }
+            writes += 1
+            return failing && (writes == failAt || (repeated && writes >= failAt))
+        }
         if fails {
             throw AutomationError.saveFailed
         }
         try file.replace(with: bytes)
+    }
+}
+
+/// Simulates another window immediately before a real atomic delete starts, outside its file locks.
+private struct DeleteObservingCoordinator: InstallationCoordinating {
+    let base: InstallationCoordinator
+    let beforeDelete: @Sendable (String) throws -> Void
+
+    func state() throws -> InstallationState {
+        try base.state()
+    }
+
+    func batch(_ requests: [InstallationRequest], expectedSelectionGeneration: UUID, now: Date) throws -> InstallationState {
+        try base.batch(requests, expectedSelectionGeneration: expectedSelectionGeneration, now: now)
+    }
+
+    func importLocal(_ bytes: Data, operation: InstallationOperation, expectedSelectionGeneration: UUID) throws -> InstallationState {
+        try base.importLocal(bytes, operation: operation, expectedSelectionGeneration: expectedSelectionGeneration)
+    }
+
+    func activate(revisionID: String, expectedSelectionGeneration: UUID, approval: InstallationApproval,
+                  captureConsent: @Sendable () -> Bool) throws -> InstallationState
+    {
+        try base.activate(revisionID: revisionID, expectedSelectionGeneration: expectedSelectionGeneration,
+                          approval: approval, captureConsent: captureConsent)
+    }
+
+    func deactivate(revisionID: String, expectedSelectionGeneration: UUID) throws -> InstallationState {
+        try base.deactivate(revisionID: revisionID, expectedSelectionGeneration: expectedSelectionGeneration)
+    }
+
+    func delete(revisionID: String, expectedSelectionGeneration: UUID) throws -> InstallationState {
+        try beforeDelete(revisionID)
+        return try base.delete(revisionID: revisionID, expectedSelectionGeneration: expectedSelectionGeneration)
+    }
+
+    func update(_ request: InstallationRequest, baseRevisionID: String, expectedSelectionGeneration: UUID,
+                approval: InstallationApproval?, now: Date, captureConsent: @Sendable () -> Bool) throws -> InstallationState
+    {
+        try base.update(request, baseRevisionID: baseRevisionID, expectedSelectionGeneration: expectedSelectionGeneration,
+                        approval: approval, now: now, captureConsent: captureConsent)
     }
 }
 

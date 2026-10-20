@@ -66,6 +66,15 @@ struct CatalogFile: Sendable {
         }
     }
 
+    /// Used only while preparing initialization, before catalog staging/final publication. Keep
+    /// replace's pre-rename failure contract unchanged: final publication must not throw after rename.
+    func synchronizeParentDirectory() throws {
+        let fd = open(url.deletingLastPathComponent().path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        guard fd >= 0 else { throw AutomationError.saveFailed }
+        defer { close(fd) }
+        guard fsync(fd) == 0 else { throw AutomationError.saveFailed }
+    }
+
     func protect() throws {
         do {
             var candidate = url

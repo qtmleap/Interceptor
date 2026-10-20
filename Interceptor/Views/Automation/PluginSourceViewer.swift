@@ -10,7 +10,7 @@ struct PluginSourceViewer: View {
     @ScaledMetric(relativeTo: .body) private var lineHeight: CGFloat = 17 * 1.3
 
     /// The default is the compact, wrapping viewer. `fillsAvailableSpace` is the full-screen reader: it takes
-    /// all offered space and does not wrap, so long lines scroll horizontally.
+    /// all offered space and soft-wraps long lines without changing the source bytes.
     init(source: String, identifier: String = "repo.script.source", fillsAvailableSpace: Bool = false) {
         sourceUTF8 = Array(source.utf8)
         self.identifier = identifier
@@ -19,7 +19,7 @@ struct PluginSourceViewer: View {
 
     var body: some View {
         if fillsAvailableSpace {
-            PluginSourceViewerRepresentable(sourceUTF8: sourceUTF8, identifier: identifier, wraps: false)
+            PluginSourceViewerRepresentable(sourceUTF8: sourceUTF8, identifier: identifier, wraps: true)
         } else {
             // Approximate natural height by newline count, bounded so short scripts stay compact and large ones scroll.
             let lines = CGFloat(sourceUTF8.reduce(1) { $1 == 0x0A ? $0 + 1 : $0 })

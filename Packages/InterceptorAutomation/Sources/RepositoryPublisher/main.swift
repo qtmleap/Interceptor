@@ -100,10 +100,14 @@ func publish(directory: String, id: UUID, name: String, sequence: Int64, keyPath
         let package = try PluginPackage.validate(bytes)
         guard ids.insert(package.manifest.id).inserted else { throw Fail(message: "duplicate plugin id \(package.manifest.id)") }
         packages["plugins/" + file] = bytes
-        entries.append(.object([
+        var entry: [String: JSONValue] = [
             "id": .string(package.manifest.id.uuidString), "name": .string(package.manifest.name), "version": .string(package.manifest.version),
             "packagePath": .string("plugins/" + file), "sha256": .string(Digest.sha256Hex(bytes)), "size": .integer(Int64(bytes.count)),
-        ]))
+        ]
+        if let author = package.manifest.author { entry["author"] = .string(author) }
+        if let summary = package.manifest.summary { entry["summary"] = .string(summary) }
+        if let category = package.manifest.category { entry["category"] = .string(category) }
+        entries.append(.object(entry))
     }
     let issued = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down))
     let payload = try JSONValue.object([

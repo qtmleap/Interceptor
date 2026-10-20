@@ -16,7 +16,7 @@ struct PluginSourceRow: View {
                 }
                 Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
             }
-            .frame(minHeight: 44).contentShape(Rectangle())
+            .contentShape(Rectangle())
         }
         .accessibilityIdentifier(identifier)
     }
@@ -31,13 +31,15 @@ struct PluginSourceReader: View {
     let sourceIdentifier: String
     let pickerIdentifier: String
     let closeIdentifier: String
+    var title: String?
+    var accentColor = Color("PluginAccent")
     let done: () -> Void
 
     var body: some View {
         NavigationStack {
             PluginSourceViewer(source: source(selection), identifier: sourceIdentifier, fillsAvailableSpace: true)
                 .ignoresSafeArea(.container, edges: .bottom)
-                .navigationTitle("AUTO_SOURCE")
+                .navigationTitle(title.map { Text(verbatim: $0) } ?? Text("AUTO_SOURCE"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
@@ -53,6 +55,6 @@ struct PluginSourceReader: View {
                     }
                 }
         }
-        .tint(Color("PluginAccent"))
+        .tint(accentColor)
     }
 }

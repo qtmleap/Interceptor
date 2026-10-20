@@ -21,4 +21,7 @@ public enum Limits {
     public static let maxSequence: Int64 = 9_007_199_254_740_991
     public static let repositories = 16, revisions = 32
     public static let rawPackageBytes = 8 * 1024 * 1024, catalogBytes = 16 * 1024 * 1024
+    // Hidden staging headroom for one replacement; installed and legacy direct-install bounds stay unchanged.
+    static let archiveRevisions = revisions + 1
+    static let archiveRawPackageBytes = rawPackageBytes + package
 }
