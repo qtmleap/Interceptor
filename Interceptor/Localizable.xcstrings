@@ -4640,7 +4640,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Webhook actions send no external data."
+            "value" : "No data is sent via webhooks."
           }
         },
         "ja" : {
