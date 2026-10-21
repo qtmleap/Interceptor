@@ -91,9 +91,7 @@ final class AutomationUITests: XCTestCase {
             reopened.buttons["plugins.package.tab.version"].tap()
             XCTAssertFalse(reopened.switches["plugins.package.enabled"].exists, "Details content is hidden on the Version tab")
             let version = reopened.staticTexts["plugins.package.version"].label
-            let versionTitle = japanese ? "バージョン" : "Version"
-            let combinedVersion = japanese ? "\(versionTitle)、1.0.0" : "\(versionTitle), 1.0.0"
-            XCTAssertTrue(["1.0.0", combinedVersion].contains(version), "The selected version must remain exactly 1.0.0: \(version)")
+            XCTAssertEqual(version, "1.0.0", "The selected version must remain exactly 1.0.0")
             reopened.terminate()
         }
     }

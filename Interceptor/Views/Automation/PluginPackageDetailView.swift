@@ -241,7 +241,7 @@ struct PluginPackageDetailView: View {
 
     @ViewBuilder private func version(_ package: PluginPackage) -> some View {
         Section {
-            LabeledContent("AUTO_VERSION") { Text(verbatim: package.manifest.version).accessibilityIdentifier("plugins.package.version") }
+            Text(verbatim: package.manifest.version).accessibilityIdentifier("plugins.package.version")
             if let selected, let record, case .available = model.updateComparison(for: selected, record: record) {
                 Button("AUTO_BROWSER_UPDATE") { prepareUpdate(selected, record: record) }
                     .disabled(busy).accessibilityIdentifier("plugins.package.update")
