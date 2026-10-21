@@ -38,6 +38,9 @@ public struct PluginManifest: Equatable, Sendable {
     public let summary: String?
     /// Optional display-only grouping label (1...80 Unicode scalars, <=256 UTF-8 bytes), preserved verbatim. Not a trust claim.
     public let category: String?
+    /// Optional publisher-declared static release date (`yyyy-MM-ddTHH:mm:ssZ`, UTC whole seconds). Display only; not a
+    /// trust, ordering or freshness claim. Covered by the package bytes/revision hash.
+    public let publishedAt: Date?
     public let json: JSONValue
 
     public let schemaVersion: Int64
@@ -54,7 +57,7 @@ public struct PluginManifest: Equatable, Sendable {
         let f = try JSONFields(v, required: isV2
                                ? ["schemaVersion", "id", "name", "version", "matches", "read", "write", "endpointBindings", "settings"]
                                : ["schemaVersion", "id", "name", "version", "subscriptions", "read", "endpointBindings", "settings"],
-                               optional: ["author", "summary", "category"], error: bad)
+                               optional: ["author", "summary", "category", "publishedAt"], error: bad)
         let name = try f.string("name"), version = try f.string("version")
         guard Text.isDisplayName(name) else { throw bad }
         _ = try SemVer(parsing: version)
@@ -103,7 +106,14 @@ public struct PluginManifest: Equatable, Sendable {
             category = c
         }
 
+        var publishedAt: Date?
+        if f.has("publishedAt") {
+            guard let d = DateCodec.parse(try f.string("publishedAt")) else { throw bad }
+            publishedAt = d
+        }
+
         id = try f.uuid("id")
+        self.publishedAt = publishedAt
         self.author = author
         self.summary = summary
         self.category = category

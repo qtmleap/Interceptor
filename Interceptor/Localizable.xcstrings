@@ -5435,6 +5435,22 @@
         }
       }
     },
+    "AUTO_BROWSER_SEARCH_TAB" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search"
+          }
+        }
+      }
+    },
     "AUTO_BROWSER_SEARCH" : {
       "localizations" : {
         "en" : {

@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum PluginBrowserDestination: String, CaseIterable, Identifiable, Hashable {
-    case sources, packages, scripts
+    case sources, packages, scripts, search
     var id: String {
         rawValue
     }
@@ -13,6 +13,7 @@ enum PluginBrowserDestination: String, CaseIterable, Identifiable, Hashable {
             case .sources: "AUTO_BROWSER_SOURCES"
             case .packages: "AUTO_BROWSER_PACKAGES"
             case .scripts: "AUTO_BROWSER_SCRIPTS"
+            case .search: "AUTO_BROWSER_SEARCH_TAB"
         }
     }
 
@@ -21,16 +22,20 @@ enum PluginBrowserDestination: String, CaseIterable, Identifiable, Hashable {
             case .sources: "folder"
             case .packages: "shippingbox"
             case .scripts: "doc.text"
+            case .search: "magnifyingglass"
         }
     }
 }
 
-/// One model and queue survive navigation between all three browser destinations.
+/// One model and queue survive navigation between all four browser destinations.
 struct PluginBrowserView: View {
     @State var model: PluginBrowserModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var destination: PluginBrowserDestination? = .sources
+    @State private var packagesQuery = ""
+    @State private var searchQuery = ""
+    @State private var localQuery = ""
 
     var body: some View {
         let queueCount = model.queue.count
@@ -43,6 +48,13 @@ struct PluginBrowserView: View {
                             .accessibilityIdentifier("plugins.tab." + item.rawValue)
                     }
                     .navigationTitle("AUTO_PLUGINS")
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            sidebarCloseButton
+                                .disabled(model.isProcessing)
+                                .accessibilityIdentifier("plugins.close")
+                        }
+                    }
                 } detail: {
                     browserStack(destination ?? .sources, includesQueueBar: false)
                 }
@@ -91,20 +103,34 @@ struct PluginBrowserView: View {
         }
     }
 
+    @ViewBuilder private var sidebarCloseButton: some View {
+        if #available(iOS 26.0, *) {
+            Button(role: .close) { dismiss() }
+        } else {
+            Button("AUTO_BROWSER_CLOSE", systemImage: "xmark") { dismiss() }
+                .labelStyle(.iconOnly)
+        }
+    }
+
     private func browserStack(_ item: PluginBrowserDestination, includesQueueBar: Bool = true) -> some View {
-        NavigationStack {
+        let ownsSearch = sizeClass == .regular && (item == .packages || item == .search)
+        return NavigationStack {
             Group {
                 switch item {
-                    case .sources: PluginSourcesView(model: model)
-                    case .packages: PluginInstalledPackagesView(model: model)
+                    case .sources: PluginSourcesView(model: model, localQuery: $localQuery)
+                    case .packages: PluginInstalledPackagesView(model: model, query: $packagesQuery, includesSearchField: !ownsSearch)
                     case .scripts: PluginScriptFilesView(model: model)
+                    case .search: PluginPackageSearchView(model: model, query: $searchQuery, includesSearchField: !ownsSearch)
                 }
             }
+            .modifier(PluginStableSearch(isEnabled: ownsSearch, text: stableSearchBinding(item)))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("AUTO_BROWSER_CLOSE") { dismiss() }
-                        .disabled(model.isProcessing)
-                        .accessibilityIdentifier("plugins.close")
+                if sizeClass != .regular {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("AUTO_BROWSER_CLOSE") { dismiss() }
+                            .disabled(model.isProcessing)
+                            .accessibilityIdentifier("plugins.close")
+                    }
                 }
             }
         }
@@ -113,6 +139,11 @@ struct PluginBrowserView: View {
                 PluginInstallQueueBar(count: model.queue.count, isBusy: model.isProcessing) { model.openQueue() }
             }
         }
+    }
+
+    /// Selects the independent parent query so the regular stack keeps one native search field across tab switches.
+    private func stableSearchBinding(_ item: PluginBrowserDestination) -> Binding<String> {
+        item == .search ? $searchQuery : $packagesQuery
     }
 
     private func queueID(_ id: PluginBrowserFamilyID) -> String {
@@ -143,8 +174,28 @@ struct PluginBrowserView: View {
     }
 }
 
+/// One `.searchable` owner for the regular-width Packages/Search roots.
+private struct PluginStableSearch: ViewModifier {
+    let isEnabled: Bool
+    let text: Binding<String>
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            let searchableContent = content.searchable(text: text, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("AUTO_BROWSER_SEARCH"))
+            if #available(iOS 17.1, *) {
+                searchableContent.searchPresentationToolbarBehavior(.avoidHidingContent)
+            } else {
+                searchableContent
+            }
+        } else {
+            content
+        }
+    }
+}
+
 struct PluginSourcesView: View {
     let model: PluginBrowserModel
+    @Binding var localQuery: String
     @State private var showAdd = false
     @State private var showImporter = false
     @State private var addedURL: RepositoryURL?
@@ -185,7 +236,7 @@ struct PluginSourcesView: View {
                     }
                 }
                 NavigationLink {
-                    PluginInstalledPackagesView(model: model, localOnly: true)
+                    PluginInstalledPackagesView(model: model, query: $localQuery, localOnly: true)
                 } label: {
                     PluginRepositoryRow(name: String(localized: "AUTO_BROWSER_LOCAL"),
                                         url: String(localized: "AUTO_BROWSER_LOCAL_DESCRIPTION"),
@@ -347,10 +398,61 @@ struct PluginCatalogLink: View {
     }
 }
 
+/// One cached catalog row: source-qualified identity, detail navigation, installed check and source hint.
+struct PluginCatalogPackageLink: View {
+    let model: PluginBrowserModel
+    let item: PluginBrowserCatalogPackage
+    let identifierPrefix: String
+
+    var body: some View {
+        NavigationLink {
+            PluginPackageDetailView(model: model, family: item.id, sourceURL: item.record?.url)
+        } label: {
+            PluginPackageRow(name: item.name, author: item.author, version: item.version,
+                             summary: item.summary ?? "", isInstalled: item.installed != nil)
+                .accessibilityHint(Text(verbatim: item.record?.displayName ?? item.id.source))
+        }
+        .accessibilityIdentifier(identifierPrefix + item.id.source + "|" + item.id.manifestID.uuidString)
+    }
+}
+
+/// Global search over the cached catalogs. Never fetches, queues, installs or enables.
+struct PluginPackageSearchView: View {
+    let model: PluginBrowserModel
+    @Binding var query: String
+    var includesSearchField = true
+
+    var body: some View {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let results = trimmed.isEmpty ? [] : model.catalogPackages(query: trimmed)
+        let loaded = model.controller.isLoaded
+        List {
+            PluginBrowserErrors(controller: model.controller)
+            if !loaded {
+                ProgressView("AUTO_BROWSER_LOADING").accessibilityIdentifier("plugins.loading")
+            }
+            if model.isRefreshing {
+                ProgressView("AUTO_BROWSER_REFRESHING").accessibilityIdentifier("plugins.refreshing")
+            } else if !model.refreshErrors.isEmpty {
+                Text("AUTO_BROWSER_REFRESH_FAILED").foregroundStyle(AutomationStatusColor.error)
+            }
+            ForEach(results) { item in
+                PluginCatalogPackageLink(model: model, item: item, identifierPrefix: "plugins.search.package.")
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle("AUTO_BROWSER_SEARCH_TAB")
+        .navigationBarTitleDisplayMode(.large)
+        .modifier(PluginStableSearch(isEnabled: includesSearchField, text: $query))
+        .accessibilityIdentifier("plugins.search")
+    }
+}
+
 struct PluginInstalledPackagesView: View {
     let model: PluginBrowserModel
+    @Binding var query: String
     var localOnly = false
-    @State private var query = ""
+    var includesSearchField = true
     @State private var ascending = true
     @State private var pendingDelete: InstalledRevision?
     private var packages: [InstalledRevision] {
@@ -385,20 +487,13 @@ struct PluginInstalledPackagesView: View {
                     ProgressView("AUTO_BROWSER_LOADING").accessibilityIdentifier("plugins.loading")
                 }
                 ForEach(catalog) { item in
-                    NavigationLink {
-                        PluginPackageDetailView(model: model, family: item.id, sourceURL: item.record?.url)
-                    } label: {
-                        PluginPackageRow(name: item.name, author: item.author, version: item.version,
-                                         summary: item.summary ?? "", isInstalled: item.installed != nil)
-                            .accessibilityHint(Text(verbatim: item.record?.displayName ?? item.id.source))
-                    }
-                    .accessibilityIdentifier("plugins.package." + item.id.source + "|" + item.id.manifestID.uuidString)
-                    .swipeActions {
-                        if let installed = item.installed {
-                            Button("AUTO_BROWSER_DELETE", role: .destructive) { pendingDelete = installed }
-                                .disabled(model.isProcessing)
+                    PluginCatalogPackageLink(model: model, item: item, identifierPrefix: "plugins.package.")
+                        .swipeActions {
+                            if let installed = item.installed {
+                                Button("AUTO_BROWSER_DELETE", role: .destructive) { pendingDelete = installed }
+                                    .disabled(model.isProcessing)
+                            }
                         }
-                    }
                 }
                 if catalog.isEmpty && model.controller.isLoaded {
                     PluginPackagesEmpty(query: query, installed: true)
@@ -425,7 +520,7 @@ struct PluginInstalledPackagesView: View {
         .listStyle(.plain)
         .navigationTitle(localOnly ? Text("AUTO_BROWSER_LOCAL") : Text("AUTO_BROWSER_PACKAGES"))
         .navigationBarTitleDisplayMode(.large)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("AUTO_BROWSER_SEARCH"))
+        .modifier(PluginStableSearch(isEnabled: includesSearchField, text: $query))
         .accessibilityIdentifier("plugins.packages")
         .alert("AUTO_BROWSER_DELETE_QUESTION \(pendingDelete?.package.manifest.name ?? "")",
                isPresented: Binding(get: { pendingDelete != nil }, set: {
@@ -454,9 +549,6 @@ struct PluginScriptFilesView: View {
                 ForEach(model.installedPackages(), id: \.id) { revision in
                     Section(revision.package.manifest.name) { files(revision.package) }
                 }
-                if model.installedPackages().isEmpty {
-                    ContentUnavailableView("AUTO_BROWSER_NO_SCRIPTS", systemImage: "doc.text", description: Text("AUTO_BROWSER_ADD_TO_SEE_SCRIPTS"))
-                }
             }
         }
         .listStyle(.plain)
@@ -478,7 +570,6 @@ struct PluginScriptFilesView: View {
                         }
                     }
                 } icon: { Image(systemName: "doc.text").foregroundStyle(PluginBrowserColor.accent) }
-                    .frame(minHeight: 44)
             }
             .accessibilityIdentifier("plugins.file." + package.manifest.id.uuidString + "." + file)
         }

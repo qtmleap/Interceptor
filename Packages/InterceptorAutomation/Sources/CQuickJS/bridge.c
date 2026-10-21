@@ -1338,7 +1338,8 @@ static int parse_phase(const char *hook, int *leg, int *kind) {
 //
 // Mirrors AutomationCore.PluginManifest for schemaVersion 2. Exactly these keys, nothing else:
 // schemaVersion=2, id, name, version, matches(1...16), read, write, endpointBindings(0...4), settings
-// and optional author, summary, category (scalar-bounded 1...80, <=256 bytes). Any violation
+// and optional author, summary, category (scalar-bounded 1...80, <=256 bytes) and publishedAt
+// (exactly 20 ASCII bytes, UTC yyyy-MM-ddTHH:mm:ssZ, valid Gregorian date, year 1...9999). Any violation
 // (schema 1/3, missing, unknown or mistyped field) is
 // QJS_INVALID_INPUT. The read grants are applied to the event before any plugin code exists.
 
@@ -1424,6 +1425,28 @@ static int category_text_ok(const Str *s) {
 }
 
 static int is_alnum_c(int c) { return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+
+static int published_at_ok(const Str *s) {
+    static const unsigned char dim[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    static const int seps[6][2] = {{4, '-'}, {7, '-'}, {10, 'T'}, {13, ':'}, {16, ':'}, {19, 'Z'}};
+    static const int from[6] = {0, 5, 8, 11, 14, 17};
+    const unsigned char *u = (const unsigned char *)s->s;
+    int v[6] = {0, 0, 0, 0, 0, 0};
+    if (s->n != 20) return 0;
+    for (int i = 0; i < 6; i++) if (u[seps[i][0]] != seps[i][1]) return 0;
+    for (int k = 0; k < 6; k++) {
+        int w = k == 0 ? 4 : 2;
+        for (int j = 0; j < w; j++) {
+            unsigned char c = u[from[k] + j];
+            if (c < '0' || c > '9') return 0;
+            v[k] = v[k] * 10 + (c - '0');
+        }
+    }
+    if (v[0] < 1 || v[1] < 1 || v[1] > 12 || v[3] > 23 || v[4] > 59 || v[5] > 59) return 0;
+    int leap = (v[0] % 4 == 0 && v[0] % 100 != 0) || v[0] % 400 == 0;
+    int max = dim[v[1] - 1] + (v[1] == 2 && leap);
+    return v[2] >= 1 && v[2] <= max;
+}
 
 static int semver_ok(const Str *s) {
     const char *p = s->s, *end = s->s + s->n;
@@ -1576,14 +1599,15 @@ done:
 
 static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *write_request, int *write_response) {
     static const char *const mk[] = {"schemaVersion", "id", "name", "version", "matches", "read", "write",
-                                     "endpointBindings", "settings", "author", "summary", "category"};
+                                     "endpointBindings", "settings", "author", "summary", "category",
+                                     "publishedAt"};
     static const char *const wk[] = {"requestBody", "responseBody"};
-    JSValue f[12], w[2];
+    JSValue f[13], w[2];
     Str s = {NULL, 0}, *bind = NULL;
     size_t nbind = 0;
     int ok = 0;
     w[0] = w[1] = JS_UNDEFINED;
-    if (!read_obj(st, ctx, root, mk, 12, 0x1FFu, f)) return 0;
+    if (!read_obj(st, ctx, root, mk, 13, 0x1FFu, f)) return 0;
     if (JS_VALUE_GET_TAG(f[0]) != JS_TAG_INT || JS_VALUE_GET_INT(f[0]) != 2) goto done;
     if (!get_str(ctx, f[1], &s, 36) || !uuid_ok(&s)) goto done;
     str_free(&s);
@@ -1601,6 +1625,10 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
     }
     if (!JS_IsUndefined(f[11])) {
         if (!get_str(ctx, f[11], &s, 256) || !category_text_ok(&s)) goto done;
+        str_free(&s);
+    }
+    if (!JS_IsUndefined(f[12])) {
+        if (!get_str(ctx, f[12], &s, 20) || !published_at_ok(&s)) goto done;
         str_free(&s);
     }
     {
@@ -1638,7 +1666,7 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
 done:
     str_free(&s);
     strs_free(bind, nbind);
-    for (int i = 0; i < 12; i++) JS_FreeValue(ctx, f[i]);
+    for (int i = 0; i < 13; i++) JS_FreeValue(ctx, f[i]);
     JS_FreeValue(ctx, w[0]);
     JS_FreeValue(ctx, w[1]);
     return ok;

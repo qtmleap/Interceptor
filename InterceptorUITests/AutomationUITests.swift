@@ -402,6 +402,28 @@ final class AutomationUITests: XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [deleted], timeout: 5), .completed, "deleting keeps the catalog entry discoverable without its installed check")
         }
     }
+
+    /// Dedicated cached global package search. CI loops both locales; a native run may select one cell with
+    /// `TEST_RUNNER_INTERCEPTOR_PACKAGE_SEARCH_LANGUAGE=en|ja` (and optionally `..._SUITE`) without repeating the matrix.
+    @MainActor
+    func testPackageSearchTabInEnglishAndJapanese() async {
+        guard let repositoryURL = await requiredRepositoryURL() else { return }
+        let browserURL = repositoryURL.deletingLastPathComponent().appendingPathComponent("browser/repository.json")
+        let environment = ProcessInfo.processInfo.environment
+        let cells: [Bool] = switch environment["INTERCEPTOR_PACKAGE_SEARCH_LANGUAGE"]?.lowercased() {
+            case "en": [false]
+            case "ja": [true]
+            default: [false, true]
+        }
+        XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
+        defer { XCUIDevice.shared.orientation = .portrait }
+        for japanese in cells {
+            let suite = environment["INTERCEPTOR_PACKAGE_SEARCH_SUITE"] ?? "Interceptor.UITests.\(UUID().uuidString)"
+            if !runPackageSearchCell(japanese: japanese, suite: suite, repositoryURL: repositoryURL, browserURL: browserURL) {
+                return
+            }
+        }
+    }
 }
 
 private extension AutomationUITests {
@@ -849,5 +871,244 @@ private extension AutomationUITests {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+}
+
+// MARK: - Package Search tab
+
+extension AutomationUITests {
+    /// Fixture identities: `summaryID` lives in the primary source ("Local repository fixture", author
+    /// "Interceptor test fixture"); `searchTargetsID` only in the browser source ("Browser catalog fixture", scripts/ci-plugin-repository-fixture.py:109-111).
+    private static let searchTargetsID = "E9472B70-2DB2-4F4C-A291-33F5FEF88519"
+    private static let searchSummaryID = "57414817-0F72-40BA-A27C-535B784BEE01"
+    private static let searchRowPrefix = "plugins.search.package."
+
+    /// One language cell. Returns false after the single guarded failure (missing Search tab) so callers stop.
+    @MainActor
+    func runPackageSearchCell(japanese: Bool, suite: String, repositoryURL: URL, browserURL: URL) -> Bool {
+        let tag = japanese ? "ja" : "en"
+        let placeholder = japanese ? "パッケージを検索" : "Search for Packages"
+        let installed = japanese ? "インストール済み" : "Installed"
+        let app = launch(japanese: japanese, suite: suite)
+        defer { app.terminate() }
+        openPlugins(app, japanese: japanese)
+
+        // No sources: idle, no rows.
+        guard openSearchTab(app) else { return false }
+        XCTAssertEqual(app.searchFields.firstMatch.placeholderValue, placeholder)
+        XCTAssertTrue(searchRowIDs(app).isEmpty, "no source means no rows")
+        XCTAssertFalse(scrollContainer(app, "plugins.search").staticTexts.allElementsBoundByIndex.contains(where: \.isHittable), "empty Search has no placeholder copy")
+        attachDiagnostic("Search idle no source \(tag)", app: app)
+        selectTab("sources", app: app)
+        addRepository(repositoryURL, app: app)
+        goBack(app, from: "Local repository fixture")
+        addRepository(browserURL, app: app)
+        goBack(app, from: "Browser catalog fixture")
+
+        guard openSearchTab(app) else { return false }
+        XCTAssertTrue(searchRowIDs(app).isEmpty, "idle Search shows nothing even with catalogs")
+        attachDiagnostic("Search idle \(tag)", app: app)
+
+        // Whitespace is idle; clearing returns to idle.
+        setSearch("   ", app: app)
+        XCTAssertTrue(searchRowIDs(app).isEmpty, "whitespace shows no rows")
+        setSearch("", app: app)
+        XCTAssertTrue(searchRowIDs(app).isEmpty)
+
+        // Author query finds an uninstalled package from the second source.
+        setSearch("Browser fixture author", app: app)
+        let targets = searchRow(Self.searchTargetsID, app: app)
+        XCTAssertTrue(targets.waitForExistence(timeout: 10), "author match includes uninstalled catalog entries")
+        XCTAssertTrue(targets.label.contains("Target hosts example"))
+        XCTAssertEqual(searchRowIDs(app).count, 1)
+        XCTAssertNotEqual(targets.value as? String, installed, "search results of a catalog entry are not installed")
+        attachDiagnostic("Search results author \(tag)", app: app)
+
+        // Name query from the other source: identities are source-qualified and differ per source.
+        setSearch("Request summary", app: app)
+        let summary = searchRow(Self.searchSummaryID, app: app)
+        XCTAssertTrue(summary.waitForExistence(timeout: 10), "name match")
+        XCTAssertTrue(searchRow(Self.searchTargetsID, app: app).waitForNonExistence(timeout: 5))
+        // Summary text matches too (browser fixture summary).
+        setSearch("Derived fixture", app: app)
+        XCTAssertTrue(targets.waitForExistence(timeout: 10), "summary match")
+        let targetSource = searchSource(of: targets.identifier)
+        XCTAssertFalse(targetSource.isEmpty, "row id is plugins.search.package.<source>|<uuid>")
+
+        setSearch("Browser fixture author", app: app)
+        XCTAssertTrue(targets.waitForExistence(timeout: 10))
+        XCTAssertTrue(searchRowIDs(app).allSatisfy { $0.contains("|") })
+
+        // Open detail and return: query and result retained.
+        reach(targets, in: scrollContainer(app, "plugins.search")).tap()
+        XCTAssertTrue(scrollContainer(app, "plugins.package.detail").waitForExistence(timeout: 15))
+        XCTAssertFalse(app.switches["plugins.package.enabled"].exists, "an uninstalled result is not installed")
+        goBack(app, from: "Target hosts example")
+        XCTAssertTrue(scrollContainer(app, "plugins.search").waitForExistence(timeout: 5))
+        XCTAssertEqual(searchText(app), "Browser fixture author", "query retained through detail/back")
+        XCTAssertTrue(searchRow(Self.searchTargetsID, app: app).waitForExistence(timeout: 5))
+
+        // Packages has its own query; both survive switching.
+        selectTab("packages", app: app)
+        XCTAssertEqual(searchText(app), "", "Packages query is separate from Search")
+        XCTAssertTrue(packageRow(Self.searchSummaryID, app: app).waitForExistence(timeout: 5))
+        setSearch("no such package anywhere", app: app)
+        XCTAssertTrue(packageRow(Self.searchSummaryID, app: app).waitForNonExistence(timeout: 5))
+        guard openSearchTab(app) else { return false }
+        XCTAssertEqual(searchText(app), "Browser fixture author", "Search query retained across tab switch")
+        if app.staticTexts["plugins.tab.search"].exists {
+            XCTAssertFalse(app.tabBars.allElementsBoundByIndex.contains(where: \.isHittable), "sidebar is the only destination control")
+            XCTAssertEqual(app.searchFields.allElementsBoundByIndex.filter(\.isHittable).count, 1, "only the active search field is exposed")
+            XCTAssertEqual(app.buttons.matching(identifier: "plugins.close").allElementsBoundByIndex.filter(\.isHittable).count, 1)
+        }
+        XCTAssertTrue(searchRow(Self.searchTargetsID, app: app).waitForExistence(timeout: 5))
+        for destination in ["sources", "scripts"] {
+            selectTab(destination, app: app)
+            if destination == "scripts" {
+                XCTAssertFalse(scrollContainer(app, "plugins.scripts").staticTexts.allElementsBoundByIndex.contains(where: \.isHittable), "empty Scripts has no placeholder copy")
+            }
+            guard openSearchTab(app) else { return false }
+            XCTAssertEqual(searchText(app), "Browser fixture author", "Search query retained through \(destination)")
+            XCTAssertTrue(searchRow(Self.searchTargetsID, app: app).waitForExistence(timeout: 5))
+        }
+        selectTab("packages", app: app)
+        XCTAssertEqual(searchText(app), "no such package anywhere", "Packages query retained independently")
+        setSearch("", app: app)
+
+        // No match.
+        guard openSearchTab(app) else { return false }
+        setSearch("zzz no such package", app: app)
+        let none = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in self.searchRowIDs(app).isEmpty }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [none], timeout: 5), .completed)
+        XCTAssertFalse(scrollContainer(app, "plugins.search").staticTexts.allElementsBoundByIndex.contains(where: \.isHittable), "unmatched Search has no placeholder copy")
+        attachDiagnostic("Search no match \(tag)", app: app)
+        setSearch("", app: app)
+        XCTAssertTrue(searchRowIDs(app).isEmpty, "clear returns idle")
+
+        // Search never queues, installs or enables.
+        XCTAssertFalse(app.buttons.matching(identifier: "plugins.queue.open").firstMatch.exists)
+        selectTab("packages", app: app)
+        XCTAssertNotEqual(packageRow(Self.searchTargetsID, app: app).value as? String, installed)
+        XCTAssertNotEqual(packageRow(Self.searchSummaryID, app: app).value as? String, installed)
+        XCTAssertFalse(app.buttons.matching(identifier: "plugins.queue.open").firstMatch.exists, "no automatic queue")
+        return true
+    }
+
+    /// Selects Search with one guarded failure (no cascading tap timeouts on an app without the tab).
+    @MainActor
+    func openSearchTab(_ app: XCUIApplication) -> Bool {
+        let sidebar = app.staticTexts["plugins.tab.search"]
+        let tabButton = app.tabBars.buttons.matching(NSPredicate(format: "label == %@", "Search")).firstMatch
+        let anyButton = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "Search", "plugins.tab.search")).firstMatch
+        let found = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sidebar.exists || tabButton.exists || anyButton.exists }, object: nil)
+        guard XCTWaiter.wait(for: [found], timeout: 5) == .completed else {
+            attachDiagnostic("Missing Search destination", app: app)
+            XCTFail("Search destination (plugins.tab.search / \"Search\" tab) is missing")
+            return false
+        }
+        if sidebar.exists {
+            if !sidebar.isHittable,
+               let toggle = app.buttons.matching(identifier: "ToggleSidebar").allElementsBoundByIndex.first(where: { $0.isHittable })
+            {
+                toggle.tap()
+            }
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sidebar.isHittable }, object: nil)
+            guard XCTWaiter.wait(for: [ready], timeout: 5) == .completed else {
+                attachDiagnostic("Search sidebar not hittable", app: app)
+                XCTFail("Search sidebar item is not hittable")
+                return false
+            }
+            sidebar.tap()
+        } else {
+            let button = tabButton.exists ? tabButton : anyButton
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in button.isHittable }, object: nil)
+            guard XCTWaiter.wait(for: [ready], timeout: 5) == .completed else {
+                attachDiagnostic("Search tab not hittable", app: app)
+                XCTFail("Search tab is not hittable")
+                return false
+            }
+            tapWhenStable(button)
+        }
+        guard scrollContainer(app, "plugins.search").waitForExistence(timeout: 5) else {
+            attachDiagnostic("Search list missing", app: app)
+            XCTFail("plugins.search list did not appear")
+            return false
+        }
+        return true
+    }
+
+    @MainActor
+    func searchText(_ app: XCUIApplication) -> String {
+        let field = app.searchFields.firstMatch
+        let value = field.value as? String ?? ""
+        return value == field.placeholderValue ? "" : value
+    }
+
+    /// Replaces the current query; dismisses the keyboard so later taps stay stable on iPad.
+    @MainActor
+    func setSearch(_ text: String, app: XCUIApplication) {
+        let field = app.searchFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let current = searchText(app)
+        if current == text {
+            return
+        }
+        field.tap()
+        if !current.isEmpty {
+            // Tapping the field may place the caret mid-query; use its native clear control.
+            let clear = field.buttons.firstMatch
+            XCTAssertTrue(clear.waitForExistence(timeout: 5))
+            clear.tap()
+            let cleared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in self.searchText(app).isEmpty }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [cleared], timeout: 5), .completed)
+        }
+        if !text.isEmpty {
+            // Clearing can relinquish input focus on iPad; acquire it again before typing.
+            tapWhenStable(field)
+            XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+            field.typeText(text)
+        }
+        if app.keyboards.firstMatch.exists {
+            if text.isEmpty {
+                // An empty search cannot submit. End editing with UIKit's search cancel control.
+                let cancel = app.navigationBars.buttons.matching(NSPredicate(
+                    format: "identifier != %@ AND label IN %@", "plugins.close", ["Close", "Cancel", "閉じる", "キャンセル"],
+                )).firstMatch
+                guard cancel.waitForExistence(timeout: 5) else {
+                    attachDiagnostic("Search cancel control missing", app: app)
+                    XCTFail("Native search cancel control is missing")
+                    return
+                }
+                tapWhenStable(cancel)
+                XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+            } else if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                field.typeText("\n")
+                XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+            }
+        }
+        let actual = searchText(app)
+        if !text.isEmpty && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // Japanese keyboards may enter ideographic spaces for the same whitespace-only query.
+            XCTAssertFalse(actual.isEmpty)
+            XCTAssertTrue(actual.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } else {
+            XCTAssertEqual(actual, text)
+        }
+    }
+
+    @MainActor
+    func searchRowIDs(_ app: XCUIApplication) -> Set<String> {
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", Self.searchRowPrefix))
+        return Set(rows.allElementsBoundByIndex.map(\.identifier))
+    }
+
+    @MainActor
+    func searchRow(_ id: String, app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", Self.searchRowPrefix, "|" + id)).firstMatch
+    }
+
+    func searchSource(of identifier: String) -> String {
+        guard identifier.hasPrefix(Self.searchRowPrefix), let bar = identifier.lastIndex(of: "|") else { return "" }
+        return String(identifier[identifier.index(identifier.startIndex, offsetBy: Self.searchRowPrefix.count) ..< bar])
     }
 }

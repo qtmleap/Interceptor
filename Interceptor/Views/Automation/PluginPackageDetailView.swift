@@ -21,6 +21,7 @@ struct PluginPackageDetailView: View {
     @State private var isChangingActivation = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.locale) private var locale
 
     private var selected: InstalledRevision? {
         model.selectedRevision(for: family)
@@ -148,7 +149,7 @@ struct PluginPackageDetailView: View {
                 tabButton(.details, title: "AUTO_BROWSER_DETAILS", id: "plugins.package.tab.details")
                 tabButton(.version, title: "AUTO_VERSION", id: "plugins.package.tab.version")
             }
-            .listRowInsets(EdgeInsets()).listRowSeparator(.visible)
+            .listRowInsets(EdgeInsets()).listRowSeparator(.hidden)
             switch tab {
                 case .details: details(package)
                 case .version: version(package)
@@ -241,7 +242,16 @@ struct PluginPackageDetailView: View {
 
     @ViewBuilder private func version(_ package: PluginPackage) -> some View {
         Section {
-            Text(verbatim: package.manifest.version).accessibilityIdentifier("plugins.package.version")
+            if let published = package.manifest.publishedAt {
+                LabeledContent {
+                    Text(verbatim: PluginPublicationDate.string(published, locale: locale))
+                        .accessibilityIdentifier("plugins.package.publishedAt")
+                } label: {
+                    Text(verbatim: package.manifest.version).accessibilityIdentifier("plugins.package.version")
+                }
+            } else {
+                Text(verbatim: package.manifest.version).accessibilityIdentifier("plugins.package.version")
+            }
             if let selected, let record, case .available = model.updateComparison(for: selected, record: record) {
                 Button("AUTO_BROWSER_UPDATE") { prepareUpdate(selected, record: record) }
                     .disabled(busy).accessibilityIdentifier("plugins.package.update")
@@ -321,6 +331,17 @@ struct PluginPackageDetailView: View {
                     ))
             }
         }
+    }
+}
+
+/// Short localized UTC calendar day for a manifest's publisher-declared `publishedAt`.
+enum PluginPublicationDate {
+    static func string(_ date: Date, locale: Locale) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        calendar.locale = locale
+        let style = Date.FormatStyle(date: .abbreviated, time: .omitted, locale: locale, calendar: calendar, timeZone: calendar.timeZone)
+        return date.formatted(style)
     }
 }
 

@@ -49,7 +49,7 @@ jobs:
     name: Build and test (Xcode 27)
     if: ${{ !cancelled() && (true) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ${{ fromJSON((needs['ci-change-scope'].result == 'success' && needs['ci-change-scope'].outputs.docs_only == 'true') && '["self-hosted","ubuntu-latest"]' || '["self-hosted","macos-27"]') }}
-    timeout-minutes: 75
+    timeout-minutes: 120
     defaults:
       run:
         working-directory: Interceptor
