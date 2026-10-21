@@ -88,8 +88,9 @@ remain device-only checks.
 GitHub Actions runs the simulator build and the complete unit/UI test suite on
 pull requests to `master` and pushes to `master`. It checks out the pinned
 Mudmouth revision beside Interceptor, honors `Package.resolved`, and creates a
-fresh iPhone simulator for each run. Test results and logs are retained for
-seven days in the `simulator-results` artifact.
+fresh iPhone simulator for each run. Test results and logs are uploaded in the
+`simulator-results` artifact only when the simulator job fails, and they are
+kept for one day.
 
 CI requires the repository secret `QUANTUMLEAP_READ_TOKEN`, a GitHub token with
 read access to `qtmleap/QuantumLeap`. For a dedicated CI credential, prefer a
