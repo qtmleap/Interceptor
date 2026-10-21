@@ -360,11 +360,11 @@ struct PluginCatalogPackagesView: View {
     var body: some View {
         List {
             if let current {
-                let entries = model.catalogEntries(in: current, category: category, query: query)
-                ForEach(entries, id: \.id) { entry in
-                    PluginCatalogLink(model: model, entry: entry, record: current)
+                let rows = model.catalogPackages(in: current, category: category, query: query)
+                ForEach(rows, id: \.id) { item in
+                    PluginCatalogPackageLink(model: model, item: item, identifier: "plugins.catalog.package." + item.id.manifestID.uuidString)
                 }
-                if entries.isEmpty {
+                if rows.isEmpty {
                     PluginPackagesEmpty(query: query, installed: false)
                 }
             } else {
@@ -379,30 +379,11 @@ struct PluginCatalogPackagesView: View {
     }
 }
 
-struct PluginCatalogLink: View {
-    let model: PluginBrowserModel
-    let entry: IndexEntry
-    let record: RepositoryRecord
-    private var family: PluginBrowserFamilyID {
-        PluginBrowserFamilyID(repository: record.url, manifestID: entry.id)
-    }
-
-    var body: some View {
-        NavigationLink {
-            PluginPackageDetailView(model: model, family: family, sourceURL: record.url)
-        } label: {
-            PluginPackageRow(name: entry.name, author: entry.author, version: entry.version, summary: entry.summary ?? "",
-                             isInstalled: model.selectedRevision(for: family) != nil)
-        }
-        .accessibilityIdentifier("plugins.catalog.package." + entry.id.uuidString)
-    }
-}
-
 /// One cached catalog row: source-qualified identity, detail navigation, installed check and source hint.
 struct PluginCatalogPackageLink: View {
     let model: PluginBrowserModel
     let item: PluginBrowserCatalogPackage
-    let identifierPrefix: String
+    let identifier: String
 
     var body: some View {
         NavigationLink {
@@ -412,7 +393,7 @@ struct PluginCatalogPackageLink: View {
                              summary: item.summary ?? "", isInstalled: item.installed != nil)
                 .accessibilityHint(Text(verbatim: item.record?.displayName ?? item.id.source))
         }
-        .accessibilityIdentifier(identifierPrefix + item.id.source + "|" + item.id.manifestID.uuidString)
+        .accessibilityIdentifier(identifier)
     }
 }
 
@@ -437,7 +418,7 @@ struct PluginPackageSearchView: View {
                 Text("AUTO_BROWSER_REFRESH_FAILED").foregroundStyle(AutomationStatusColor.error)
             }
             ForEach(results) { item in
-                PluginCatalogPackageLink(model: model, item: item, identifierPrefix: "plugins.search.package.")
+                PluginCatalogPackageLink(model: model, item: item, identifier: "plugins.search.package." + item.id.source + "|" + item.id.manifestID.uuidString)
             }
         }
         .listStyle(.plain)
@@ -487,7 +468,7 @@ struct PluginInstalledPackagesView: View {
                     ProgressView("AUTO_BROWSER_LOADING").accessibilityIdentifier("plugins.loading")
                 }
                 ForEach(catalog) { item in
-                    PluginCatalogPackageLink(model: model, item: item, identifierPrefix: "plugins.package.")
+                    PluginCatalogPackageLink(model: model, item: item, identifier: "plugins.package." + item.id.source + "|" + item.id.manifestID.uuidString)
                         .swipeActions {
                             if let installed = item.installed {
                                 Button("AUTO_BROWSER_DELETE", role: .destructive) { pendingDelete = installed }

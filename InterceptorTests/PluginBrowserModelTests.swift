@@ -163,6 +163,109 @@ final class PluginBrowserModelTests: XCTestCase {
         XCTAssertEqual(client.packageCount, 0)
     }
 
+    private func categorized(_ package: PluginPackage, category: String, version: String? = nil, name: String? = nil,
+                             author: String? = nil, summary: String? = nil) throws -> PluginPackage
+    {
+        var root = try XCTUnwrap(JSONValue(parsing: package.bytes).objectValue)
+        var manifest = try XCTUnwrap(root["manifest"]?.objectValue)
+        manifest["category"] = .string(category)
+        if let version {
+            manifest["version"] = .string(version)
+        }
+        if let name {
+            manifest["name"] = .string(name)
+        }
+        if let author {
+            manifest["author"] = .string(author)
+        }
+        if let summary {
+            manifest["summary"] = .string(summary)
+        }
+        root["manifest"] = .object(manifest)
+        return try PluginPackage.validate(JSONValue.object(root).data())
+    }
+
+    func testCategoryPackagesUseLatestEntryMembershipAndInstalledManifestDisplay() async throws {
+        let v1 = try categorized(AutomationFixtures.package(name: "Moving"), category: "Old", author: "Old Author", summary: "Old summary")
+        let (controller, model, _, _, record, client) = try await fixture(packages: [v1], repositorySnapshot: catalogSnapshot([v1]))
+        XCTAssertTrue(model.enqueueGet(package: v1, record: record))
+        let installed = await model.confirmQueue()
+        XCTAssertTrue(installed)
+        let v2 = try categorized(v1, category: "New", version: "2.0.0", name: "Published variant", author: "New Author", summary: "New summary")
+        _ = try await controller.store.refresh(catalogSnapshot([v2], sequence: 2), expectedGeneration: XCTUnwrap(controller.catalog.record(for: record.url)).generation,
+                                               acknowledgeUnverified: false, now: AutomationFixtures.now)
+        await controller.refreshCatalog()
+        let categories = model.categories(in: record)
+        XCTAssertEqual(categories.map(\.name), ["New"])
+        let new = try XCTUnwrap(categories.first)
+        let rows = model.catalogPackages(in: record, category: new)
+        XCTAssertEqual(rows.map(\.id), [PluginBrowserFamilyID(repository: record.url, manifestID: v1.manifest.id)])
+        let row = try XCTUnwrap(rows.first)
+        XCTAssertNotNil(row.installed)
+        XCTAssertEqual(row.name, "Moving")
+        XCTAssertEqual(row.version, "1.0.0")
+        XCTAssertEqual(row.author, "Old Author")
+        XCTAssertEqual(row.summary, "Old summary")
+        XCTAssertEqual(row.entry?.version, "2.0.0")
+        XCTAssertEqual(row.entry?.name, "Published variant")
+        XCTAssertEqual(model.catalogPackages(in: record, category: new, query: "moving").count, 1)
+        XCTAssertTrue(model.catalogPackages(in: record, category: new, query: "published variant").isEmpty)
+        XCTAssertEqual(model.catalogPackages(in: record, category: new, query: "old summary").count, 1)
+        XCTAssertTrue(model.catalogPackages(in: record, category: new, query: "new author").isEmpty, "Search follows the displayed manifest")
+        XCTAssertTrue(model.catalogPackages(in: record, category: PluginBrowserCategory(name: "Old", count: 1)).isEmpty)
+        XCTAssertEqual(client.previewCount, 0)
+        XCTAssertEqual(client.packageCount, 0)
+    }
+
+    func testCategoryPackagesDoNotFallBackToIndexMetadataForInstalledNilFields() async throws {
+        let bare = try categorized(AutomationFixtures.package(name: "Bare"), category: "Tools")
+        let (controller, model, _, _, record, _) = try await fixture(packages: [bare], repositorySnapshot: catalogSnapshot([bare]))
+        XCTAssertTrue(model.enqueueGet(package: bare, record: record))
+        let installed = await model.confirmQueue()
+        XCTAssertTrue(installed)
+        let published = try categorized(bare, category: "Tools", version: "2.0.0", author: "Index Author", summary: "Index summary")
+        _ = try await controller.store.refresh(catalogSnapshot([published], sequence: 2), expectedGeneration: XCTUnwrap(controller.catalog.record(for: record.url)).generation,
+                                               acknowledgeUnverified: false, now: AutomationFixtures.now)
+        await controller.refreshCatalog()
+        let tools = try XCTUnwrap(model.categories(in: record).first)
+        let row = try XCTUnwrap(model.catalogPackages(in: record, category: tools).first)
+        XCTAssertNil(row.author)
+        XCTAssertNil(row.summary)
+        XCTAssertEqual(row.entry?.author, "Index Author")
+        XCTAssertTrue(model.catalogPackages(in: record, category: tools, query: "index").isEmpty)
+    }
+
+    func testCategoryPackagesKeepSourcesSeparateAndExcludeScopedOrphans() async throws {
+        let first = try categorized(AutomationFixtures.package(name: "Shared"), category: "Tools", author: "First Author")
+        let second = try categorized(first, category: "Tools", author: "Second Author")
+        let sibling = try categorized(AutomationFixtures.package(name: "Sibling"), category: "Tools")
+        let (controller, model, store, _, record, _) = try await fixture(packages: [first], repositorySnapshot: catalogSnapshot([first]))
+        let otherURL = try RepositoryURL(parsing: otherSource)
+        let other = try await store.accept(catalogSnapshot([second], url: otherURL), acknowledgeUnverified: true, now: AutomationFixtures.now)
+        await controller.refreshCatalog()
+        XCTAssertTrue(model.enqueueGet(package: first, record: record))
+        let installed = await model.confirmQueue()
+        XCTAssertTrue(installed)
+        let tools = PluginBrowserCategory(name: "Tools", count: 1)
+        let otherRow = try XCTUnwrap(model.catalogPackages(in: other, category: tools).first)
+        XCTAssertNil(otherRow.installed)
+        XCTAssertEqual(otherRow.author, "Second Author", "An uninstalled source row uses its Index")
+        XCTAssertEqual(try XCTUnwrap(model.catalogPackages(in: record, category: tools).first).author, "First Author")
+        let globalCount = model.catalogPackages().count
+        _ = try await controller.store.refresh(catalogSnapshot([sibling], sequence: 2), expectedGeneration: XCTUnwrap(controller.catalog.record(for: record.url)).generation,
+                                               acknowledgeUnverified: false, now: AutomationFixtures.now)
+        await controller.refreshCatalog()
+        XCTAssertEqual(model.catalogPackages(in: record, category: tools).map(\.name), ["Sibling"], "Entry removal drops the orphan from the category")
+        let orphan = PluginBrowserFamilyID(repository: record.url, manifestID: first.manifest.id)
+        XCTAssertTrue(model.catalogPackages().contains { $0.id == orphan && $0.entry == nil })
+        XCTAssertEqual(model.catalogPackages(in: other, category: tools).count, 1)
+        try await store.remove(record.url)
+        await controller.refreshCatalog()
+        XCTAssertTrue(model.catalogPackages(in: record, category: tools).isEmpty)
+        XCTAssertTrue(model.catalogPackages().contains { $0.id == orphan && $0.entry == nil }, "Global fallback persists")
+        XCTAssertEqual(globalCount, 2)
+    }
+
     func testCatalogPackagesShowInstalledOrphansOnceAfterEntryOrSourceRemoval() async throws {
         let kept = try AutomationFixtures.package(name: "Kept")
         let dropped = try AutomationFixtures.package(name: "Dropped")

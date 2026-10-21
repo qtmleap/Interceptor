@@ -333,6 +333,14 @@ final class PluginBrowserModel {
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
+    /// One source's category rows. Membership follows the latest Index entries; display and search follow the global projection
+    /// (selected local manifest when installed). Installed orphans stay global-only. Never fetches.
+    func catalogPackages(in record: RepositoryRecord, category: PluginBrowserCategory, query: String = "") -> [PluginBrowserCatalogPackage] {
+        let members = Set(catalogEntries(in: record, category: category).map(\.id))
+        let source = record.url.canonical
+        return catalogPackages(query: query).filter { $0.id.source == source && $0.entry != nil && members.contains($0.id.manifestID) }
+    }
+
     /// Cached catalogs of all visible sources plus installed repository orphans. Never fetches.
     func catalogPackages(query: String = "") -> [PluginBrowserCatalogPackage] {
         let records = controller.repositories
