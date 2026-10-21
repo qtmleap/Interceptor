@@ -194,7 +194,9 @@ jobs:
           python3 scripts/ci-simulator-cleanup.py
 
       - name: Save test results and build logs
-        if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') && (always()) }}
+        # Upload results only when the job fails: the org artifact quota is small,
+        # and successful or superseded runs do not need them.
+        if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') && failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: simulator-results
@@ -208,7 +210,7 @@ jobs:
             ${{ runner.temp }}/simulators-before.json
             ${{ runner.temp }}/simulator-processes-before.txt
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 1
 
       - name: Docs-only exemption
         if: ${{ needs['ci-change-scope'].result == 'success' && needs['ci-change-scope'].outputs.docs_only == 'true' }}
