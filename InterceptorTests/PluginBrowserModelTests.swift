@@ -1,4 +1,6 @@
 import AutomationCore
+import AutomationRepository
+import CryptoKit
 import Foundation
 @testable import Interceptor
 import XCTest
@@ -44,24 +46,169 @@ final class PluginBrowserModelTests: XCTestCase {
         return try RepositoryEnvelope.verify(envelope: envelope.data(), url: url, now: AutomationFixtures.now)
     }
 
-    private func fixture(packages: [PluginPackage], coordinatorWrapper: ((InstallationCoordinator) -> any InstallationCoordinating)? = nil,
+    private func fixture(packages: [PluginPackage], repositorySnapshot: VerifiedSnapshot? = nil,
+                         publishedSnapshot: VerifiedSnapshot? = nil, publishedPackages: [PluginPackage]? = nil,
+                         namespace: String? = nil, clientWrapper: ((FakeRepositoryClient) -> any RepositoryFetching)? = nil,
+                         coordinatorWrapper: ((InstallationCoordinator) -> any InstallationCoordinating)? = nil,
                          stopCapture: @escaping @MainActor () -> Void = {}) async throws
         -> (AutomationController, PluginBrowserModel, AutomationStore, InstallationCoordinator, RepositoryRecord, FakeRepositoryClient)
     {
-        let catalogURL = directory.appendingPathComponent("catalog.json")
-        let activationURL = directory.appendingPathComponent("activation.json")
+        let fixtureDirectory = namespace.map { directory.appendingPathComponent($0) } ?? directory!
+        let catalogURL = fixtureDirectory.appendingPathComponent("catalog.json")
+        let activationURL = fixtureDirectory.appendingPathComponent("activation.json")
         let store = AutomationStore(fileURL: catalogURL)
-        let snapshot = try AutomationFixtures.snapshot(packages: packages)
+        let snapshot = try repositorySnapshot ?? AutomationFixtures.snapshot(packages: packages)
         let record = try await store.accept(snapshot, acknowledgeUnverified: true, now: AutomationFixtures.now)
         let coordinator = InstallationCoordinator(catalogURL: catalogURL, activationURL: activationURL)
-        let client = FakeRepositoryClient(snapshot: snapshot, packages: packages)
-        let controller = AutomationController(store: store, client: client, executor: FakeScriptRunner(),
+        let client = FakeRepositoryClient(snapshot: publishedSnapshot ?? snapshot, packages: publishedPackages ?? packages)
+        let controller = AutomationController(store: store, client: clientWrapper?(client) ?? client, executor: FakeScriptRunner(),
                                               clock: { AutomationFixtures.now },
                                               activationStore: PluginActivationStore(fileURL: activationURL),
                                               installationCoordinator: coordinatorWrapper?(coordinator) ?? coordinator,
                                               hasCaptureConsent: { true }, stopCapture: stopCapture)
         await controller.load()
         return (controller, PluginBrowserModel(controller: controller), store, coordinator, record, client)
+    }
+
+    private func described(_ package: PluginPackage, version: String? = nil,
+                           author: String? = nil, summary: String? = nil) throws -> PluginPackage {
+        var root = try XCTUnwrap(JSONValue(parsing: package.bytes).objectValue)
+        var manifest = try XCTUnwrap(root["manifest"]?.objectValue)
+        if let version { manifest["version"] = .string(version) }
+        if let author { manifest["author"] = .string(author) }
+        if let summary { manifest["summary"] = .string(summary) }
+        root["manifest"] = .object(manifest)
+        return try PluginPackage.validate(JSONValue.object(root).data())
+    }
+
+    private let otherSource = "https://other.example.com/repository.json"
+
+    func testCatalogPackagesListsEveryVisibleEntryWithNothingInstalledAndNoFetch() async throws {
+        let a = try described(AutomationFixtures.package(name: "Zeta"), author: "Ann", summary: "Rewrites headers")
+        let b = try AutomationFixtures.package(name: "Alpha")
+        let c = try AutomationFixtures.package(name: "Middle")
+        let (controller, model, store, _, record, client) = try await fixture(packages: [a, b], repositorySnapshot: catalogSnapshot([a, b]))
+        let otherURL = try RepositoryURL(parsing: otherSource)
+        let other = try await store.accept(catalogSnapshot([c], url: otherURL), acknowledgeUnverified: true, now: AutomationFixtures.now)
+        await controller.refreshCatalog()
+        let rows = model.catalogPackages()
+        XCTAssertEqual(rows.map(\.name), ["Alpha", "Middle", "Zeta"])
+        XCTAssertEqual(rows.map(\.id), [
+            PluginBrowserFamilyID(repository: record.url, manifestID: b.manifest.id),
+            PluginBrowserFamilyID(repository: other.url, manifestID: c.manifest.id),
+            PluginBrowserFamilyID(repository: record.url, manifestID: a.manifest.id),
+        ])
+        XCTAssertTrue(rows.allSatisfy { $0.installed == nil && $0.entry != nil && $0.record != nil })
+        XCTAssertEqual(rows.last?.author, "Ann")
+        XCTAssertEqual(rows.last?.summary, "Rewrites headers")
+        XCTAssertTrue(controller.scripts.isEmpty)
+        XCTAssertTrue(model.queue.isEmpty)
+        XCTAssertEqual(client.previewCount, 0)
+        XCTAssertEqual(client.packageCount, 0)
+    }
+
+    func testCatalogPackagesKeepsTheSameUUIDFromTwoSourcesDistinctAndChecksOnlyTheInstalledOne() async throws {
+        let package = try AutomationFixtures.package(name: "Shared")
+        let (controller, model, store, _, record, _) = try await fixture(packages: [package], repositorySnapshot: catalogSnapshot([package]))
+        let otherURL = try RepositoryURL(parsing: otherSource)
+        let other = try await store.accept(catalogSnapshot([package], url: otherURL), acknowledgeUnverified: true, now: AutomationFixtures.now)
+        await controller.refreshCatalog()
+        XCTAssertEqual(Set(model.catalogPackages().map(\.id)).count, 2)
+        XCTAssertTrue(model.enqueueGet(package: package, record: other))
+        let installed = await model.confirmQueue()
+        XCTAssertTrue(installed)
+        let rows = model.catalogPackages()
+        XCTAssertEqual(rows.count, 2, "The installed package must not add a duplicate row")
+        XCTAssertEqual(rows.filter { $0.installed != nil }.map(\.id),
+                       [PluginBrowserFamilyID(repository: other.url, manifestID: package.manifest.id)])
+        let untouched = try XCTUnwrap(rows.first { $0.id == PluginBrowserFamilyID(repository: record.url, manifestID: package.manifest.id) })
+        XCTAssertNil(untouched.installed)
+        XCTAssertNotNil(untouched.entry)
+    }
+
+    func testCatalogPackagesSortTiesByNameThenSourceThenUUID() async throws {
+        let low = try AutomationFixtures.package(name: "Same", id: UUID(uuidString: "00000000-0000-4000-8000-000000000001")!)
+        let high = try AutomationFixtures.package(name: "Same", id: UUID(uuidString: "00000000-0000-4000-8000-000000000002")!)
+        let (controller, model, store, _, record, _) = try await fixture(packages: [high, low], repositorySnapshot: catalogSnapshot([high, low]))
+        let otherURL = try RepositoryURL(parsing: otherSource)
+        let other = try await store.accept(catalogSnapshot([high, low], url: otherURL), acknowledgeUnverified: true, now: AutomationFixtures.now)
+        await controller.refreshCatalog()
+        let sources = [record.url.canonical, other.url.canonical].sorted()
+        let expected = sources.flatMap { source in [low, high].map { source + "|" + $0.manifest.id.uuidString } }
+        XCTAssertEqual(model.catalogPackages().map { $0.id.source + "|" + $0.id.manifestID.uuidString }, expected)
+    }
+
+    func testCatalogPackagesSearchNameAuthorSummaryAndDisplayInstalledLocalMetadata() async throws {
+        let first = try described(AutomationFixtures.package(name: "Headers"), author: "Local Author", summary: "Local summary")
+        let plain = try described(AutomationFixtures.package(name: "Plain"), author: "Someone", summary: "Other text")
+        let (controller, model, _, _, record, client) = try await fixture(packages: [first, plain], repositorySnapshot: catalogSnapshot([first, plain]))
+        XCTAssertEqual(model.catalogPackages(query: "local author").map(\.name), ["Headers"])
+        XCTAssertEqual(model.catalogPackages(query: "other text").map(\.name), ["Plain"])
+        XCTAssertEqual(model.catalogPackages(query: "plain").map(\.name), ["Plain"])
+        XCTAssertTrue(model.catalogPackages(query: "absent").isEmpty)
+        XCTAssertTrue(model.enqueueGet(package: first, record: record))
+        let installed = await model.confirmQueue()
+        XCTAssertTrue(installed)
+        let published = try described(first, version: "2.0.0", author: "New Author", summary: "New summary")
+        _ = try await controller.store.refresh(catalogSnapshot([published, plain], sequence: 2), expectedGeneration: XCTUnwrap(controller.catalog.record(for: record.url)).generation,
+                                               acknowledgeUnverified: false, now: AutomationFixtures.now)
+        await controller.refreshCatalog()
+        let row = try XCTUnwrap(model.catalogPackages().first { $0.id.manifestID == first.manifest.id })
+        XCTAssertEqual(row.version, first.manifest.version)
+        XCTAssertEqual(row.author, "Local Author")
+        XCTAssertEqual(row.entry?.version, "2.0.0")
+        XCTAssertEqual(model.catalogPackages(query: "local summary").map(\.name), ["Headers"])
+        XCTAssertTrue(model.catalogPackages(query: "new author").isEmpty, "Search follows the displayed local metadata")
+        XCTAssertEqual(client.previewCount, 0)
+        XCTAssertEqual(client.packageCount, 0)
+    }
+
+    func testCatalogPackagesShowInstalledOrphansOnceAfterEntryOrSourceRemoval() async throws {
+        let kept = try AutomationFixtures.package(name: "Kept")
+        let dropped = try AutomationFixtures.package(name: "Dropped")
+        let gone = try AutomationFixtures.package(name: "Gone")
+        let (controller, model, store, _, record, _) = try await fixture(packages: [kept, dropped], repositorySnapshot: catalogSnapshot([kept, dropped]))
+        let otherURL = try RepositoryURL(parsing: otherSource)
+        let other = try await store.accept(catalogSnapshot([gone], url: otherURL), acknowledgeUnverified: true, now: AutomationFixtures.now)
+        await controller.refreshCatalog()
+        XCTAssertTrue(model.enqueueGet(package: dropped, record: record))
+        XCTAssertTrue(model.enqueueGet(package: gone, record: other))
+        let installed = await model.confirmQueue()
+        XCTAssertTrue(installed)
+        XCTAssertEqual(model.catalogPackages().count, 3, "Installed packages with a catalog entry appear once")
+        _ = try await controller.store.refresh(catalogSnapshot([kept], sequence: 2), expectedGeneration: XCTUnwrap(controller.catalog.record(for: record.url)).generation,
+                                               acknowledgeUnverified: false, now: AutomationFixtures.now)
+        try await store.remove(other.url)
+        await controller.refreshCatalog()
+        let rows = model.catalogPackages()
+        XCTAssertEqual(rows.map(\.name), ["Dropped", "Gone", "Kept"])
+        let entryOrphan = try XCTUnwrap(rows.first { $0.name == "Dropped" })
+        XCTAssertNil(entryOrphan.entry)
+        XCTAssertNotNil(entryOrphan.installed)
+        XCTAssertNotNil(entryOrphan.record)
+        let sourceOrphan = try XCTUnwrap(rows.first { $0.name == "Gone" })
+        XCTAssertNil(sourceOrphan.entry)
+        XCTAssertNil(sourceOrphan.record)
+        XCTAssertEqual(sourceOrphan.id, PluginBrowserFamilyID(repository: other.url, manifestID: gone.manifest.id))
+        XCTAssertNil(try XCTUnwrap(rows.first { $0.name == "Kept" }).installed)
+    }
+
+    func testCatalogPackagesExcludeLocalImportsAndRemovedSourcesWithoutInstalls() async throws {
+        let remote = try AutomationFixtures.package(name: "Remote")
+        let local = try AutomationFixtures.package(name: "Local only")
+        let (controller, model, store, coordinator, record, client) = try await fixture(packages: [remote], repositorySnapshot: catalogSnapshot([remote]))
+        let initial = try await Task.detached { try coordinator.state() }.value
+        _ = try await Task.detached { try coordinator.importLocal(local.bytes, expectedSelectionGeneration: initial.selectionGeneration) }.value
+        await controller.refreshCatalog()
+        XCTAssertEqual(model.installedPackages().map(\.package.manifest.name), ["Local only"])
+        XCTAssertEqual(model.catalogPackages().map(\.name), ["Remote"])
+        XCTAssertTrue(model.catalogPackages(query: "local only").isEmpty, "Local imports stay under Sources > Local")
+        try await store.remove(record.url)
+        await controller.refreshCatalog()
+        XCTAssertTrue(model.catalogPackages().isEmpty)
+        XCTAssertEqual(model.installedPackages().count, 1)
+        XCTAssertEqual(client.previewCount, 0)
+        XCTAssertEqual(client.packageCount, 0)
     }
 
     func testGetOnlyQueuesAndRetainsFirstVersionAcrossMetadataRefresh() async throws {
@@ -299,6 +446,232 @@ final class PluginBrowserModelTests: XCTestCase {
         await model.refreshSources()
         XCTAssertFalse(model.refreshErrors.isEmpty)
         XCTAssertEqual(controller.catalog.record(for: record.url), record)
+    }
+
+    func testPackageRecoveryRefreshesOnlyMetadataAndKeepsQueueFrozen() async throws {
+        let old = try AutomationFixtures.package(name: "Published package")
+        let newer = try revised(old, version: "1.0.1", marker: "\n// published new bytes")
+        let fresh = try AutomationFixtures.snapshot(packages: [newer], sequence: 2)
+        var stops = 0
+        let (controller, model, _, coordinator, record, client) = try await fixture(
+            packages: [old], publishedSnapshot: fresh, publishedPackages: [newer], stopCapture: { stops += 1 })
+        XCTAssertTrue(model.enqueueGet(package: old, record: record))
+        let before = try await Task.detached { try coordinator.state() }.value
+        let recovered = try await model.recoverPackageSource(after: RepositoryClientError.responseTooLarge, record: record)
+        XCTAssertTrue(recovered, "A stale index must be replaced by accepted current metadata")
+        let refreshed = try XCTUnwrap(controller.catalog.record(for: record.url))
+        XCTAssertNotEqual(refreshed.generation, record.generation)
+        XCTAssertEqual(refreshed.snapshot, fresh)
+        XCTAssertEqual(client.previewCount, 1)
+        XCTAssertEqual(client.packageCount, 0, "Recovery only refreshes metadata; the new view identity owns the next download")
+        let entry = try XCTUnwrap(refreshed.snapshot?.index.plugins.first)
+        let downloaded = try await model.fetchPackage(entry: entry, record: refreshed)
+        XCTAssertEqual(downloaded.bytes, newer.bytes)
+        let after = try await Task.detached { try coordinator.state() }.value
+        XCTAssertEqual(after.installed, before.installed)
+        XCTAssertEqual(after.activation, before.activation)
+        XCTAssertEqual(after.selectionGeneration, before.selectionGeneration)
+        XCTAssertEqual(stops, 0)
+        XCTAssertEqual(model.queue.first?.package.bytes, old.bytes)
+        XCTAssertEqual(model.queue.first?.sourceGeneration, record.generation)
+        let committed = await model.confirmQueue()
+        XCTAssertFalse(committed, "Recovery must not retarget a previously queued package")
+        XCTAssertEqual(model.queue.first?.package.bytes, old.bytes)
+        XCTAssertTrue(controller.scripts.isEmpty)
+        model.clearQueue()
+        XCTAssertTrue(model.enqueueGet(package: downloaded, record: refreshed))
+        let installed = await model.confirmQueue()
+        XCTAssertTrue(installed)
+        XCTAssertEqual(controller.scripts.map(\.package.bytes), [newer.bytes])
+        XCTAssertFalse(controller.isActive(try XCTUnwrap(controller.scripts.first?.id)))
+        XCTAssertFalse(model.isProcessing)
+    }
+
+    func testPackageRecoveryDoesNotPreviewForUnrelatedFailures() async throws {
+        let package = try AutomationFixtures.package(name: "No refresh")
+        let (_, model, _, _, record, client) = try await fixture(packages: [package])
+        let failures: [Error] = [RepositoryClientError.transport, RepositoryClientError.timedOut,
+                                 RepositoryClientError.unexpectedStatus(404), AutomationError.metadataMismatch,
+                                 AutomationError.limitExceeded, AutomationError.invalidSignature]
+        for failure in failures {
+            let recovered = try await model.recoverPackageSource(after: failure, record: record)
+            XCTAssertFalse(recovered)
+        }
+        XCTAssertEqual(client.previewCount, 0)
+        XCTAssertFalse(model.isProcessing)
+    }
+
+    func testPackageRecoveryLeavesUnchangedMetadataAndCorruptBytesAlone() async throws {
+        let package = try AutomationFixtures.package(name: "Same metadata")
+        let (controller, model, _, _, record, client) = try await fixture(packages: [package])
+        let file = directory.appendingPathComponent("catalog.json")
+        let before = try Data(contentsOf: file)
+        for failure: Error in [AutomationError.sizeMismatch, AutomationError.hashMismatch] {
+            let recovered = try await model.recoverPackageSource(after: failure, record: record)
+            XCTAssertFalse(recovered, "Unchanged metadata cannot authorize different package bytes")
+        }
+        XCTAssertEqual(client.previewCount, 2)
+        XCTAssertEqual(client.packageCount, 0)
+        XCTAssertEqual(controller.catalog.record(for: record.url), record)
+        XCTAssertEqual(try Data(contentsOf: file), before)
+        XCTAssertFalse(model.isProcessing)
+    }
+
+    func testPackageRecoveryRejectsTrustAndContinuityChanges() async throws {
+        let package = try AutomationFixtures.package(name: "Trust continuity")
+        let newer = try revised(package, version: "1.0.1", marker: "\n// changed")
+        let key = Curve25519.Signing.PrivateKey()
+        let anotherKey = Curve25519.Signing.PrivateKey()
+        let unsigned = try AutomationFixtures.snapshot(packages: [package], sequence: 2)
+        let signed = try AutomationFixtures.snapshot(packages: [package], sequence: 2, key: key)
+        let cases: [(VerifiedSnapshot, VerifiedSnapshot, AutomationError)] = [
+            (unsigned, try AutomationFixtures.snapshot(packages: [newer], sequence: 1), .rollback),
+            (unsigned, try AutomationFixtures.snapshot(packages: [newer], sequence: 2), .sameSequenceDifferentPayload),
+            (unsigned, try AutomationFixtures.snapshot(packages: [newer], sequence: 3, key: key), .acknowledgmentRequired),
+            (signed, try AutomationFixtures.snapshot(packages: [newer], sequence: 3, key: anotherKey), .keyChanged),
+            (signed, try AutomationFixtures.snapshot(packages: [newer], sequence: 3), .signatureRemoved),
+            (unsigned, try AutomationFixtures.snapshot(packages: [newer], sequence: 3, repositoryID: UUID()), .repositoryIdentityChanged),
+        ]
+        for (i, testCase) in cases.enumerated() {
+            let (controller, model, _, _, record, client) = try await fixture(
+                packages: [package], repositorySnapshot: testCase.0, publishedSnapshot: testCase.1, namespace: "trust-\(i)")
+            XCTAssertTrue(model.enqueueGet(package: package, record: record))
+            let file = directory.appendingPathComponent("trust-\(i)/catalog.json")
+            let before = try Data(contentsOf: file)
+            do {
+                _ = try await model.recoverPackageSource(after: RepositoryClientError.responseTooLarge, record: record)
+                XCTFail("Trust or continuity change must be refused: \(testCase.2)")
+            } catch { XCTAssertEqual(error as? AutomationError, testCase.2) }
+            XCTAssertEqual(client.previewCount, 1)
+            XCTAssertEqual(controller.catalog.record(for: record.url), record)
+            XCTAssertEqual(try Data(contentsOf: file), before)
+            XCTAssertEqual(model.queue.first?.package.bytes, package.bytes)
+            XCTAssertTrue(controller.scripts.isEmpty)
+            XCTAssertFalse(model.isProcessing)
+        }
+    }
+
+    func testPackageRecoveryUsesConcurrentAcceptedRefreshWithoutOverwritingIt() async throws {
+        let old = try AutomationFixtures.package(name: "Concurrent source")
+        let newer = try revised(old, version: "1.0.1", marker: "\n// new")
+        let newest = try revised(old, version: "1.0.2", marker: "\n// newest")
+        let fresh = try AutomationFixtures.snapshot(packages: [newer], sequence: 2)
+        let latest = try AutomationFixtures.snapshot(packages: [newest], sequence: 3)
+        let gate = BrowserAsyncMutationGate()
+        let (controller, model, _, _, record, _) = try await fixture(packages: [old], publishedSnapshot: fresh, clientWrapper: {
+            BrowserRecoveryPreviewGate(base: $0, gate: gate)
+        })
+        defer { gate.release() }
+        let recovery = Task { try await model.recoverPackageSource(after: RepositoryClientError.responseTooLarge, record: record) }
+        let entered = await waitUntil { gate.isHeld }
+        XCTAssertTrue(entered)
+        let beforeConcurrent = try await controller.store.load()
+        XCTAssertEqual(beforeConcurrent.record(for: record.url), record)
+        // Use Sources' existential seam; a concrete actor call can select the fail-closed async default.
+        let concurrent = try await controller.store.refresh(latest, expectedGeneration: record.generation,
+                                                           acknowledgeUnverified: false, now: AutomationFixtures.now)
+        gate.release()
+        let recovered = try await recovery.value
+        XCTAssertTrue(recovered)
+        XCTAssertEqual(controller.catalog.record(for: record.url), concurrent)
+        XCTAssertEqual(controller.catalog.record(for: record.url)?.snapshot, latest)
+        XCTAssertFalse(model.isProcessing)
+    }
+
+    func testPackageRecoveryCannotRestoreARemovedSource() async throws {
+        let old = try AutomationFixtures.package(name: "Removed source")
+        let fresh = try AutomationFixtures.snapshot(packages: [old], sequence: 2)
+        let gate = BrowserAsyncMutationGate()
+        let (controller, model, store, _, record, _) = try await fixture(packages: [old], publishedSnapshot: fresh, clientWrapper: {
+            BrowserRecoveryPreviewGate(base: $0, gate: gate)
+        })
+        defer { gate.release() }
+        let recovery = Task { try await model.recoverPackageSource(after: RepositoryClientError.responseTooLarge, record: record) }
+        let entered = await waitUntil { gate.isHeld }
+        XCTAssertTrue(entered)
+        try await store.remove(record.url)
+        gate.release()
+        do { _ = try await recovery.value; XCTFail("Recovery must not restore a removed repository") }
+        catch { XCTAssertEqual(error as? AutomationError, .staleSnapshot) }
+        XCTAssertTrue(controller.repositories.isEmpty)
+        XCTAssertFalse(model.isProcessing)
+    }
+
+    func testPackageRecoveryAcceptsManifestRemovalWithoutFetchingAnotherPackage() async throws {
+        let old = try AutomationFixtures.package(name: "Removed package")
+        let fresh = try AutomationFixtures.snapshot(packages: [], sequence: 2)
+        let (controller, model, _, _, record, client) = try await fixture(packages: [old], publishedSnapshot: fresh)
+        let recovered = try await model.recoverPackageSource(after: RepositoryClientError.responseTooLarge, record: record)
+        XCTAssertTrue(recovered)
+        let current = try XCTUnwrap(controller.catalog.record(for: record.url))
+        XCTAssertTrue(model.catalogEntries(in: current).isEmpty)
+        XCTAssertNotEqual(current.generation, record.generation)
+        XCTAssertEqual(client.packageCount, 0)
+        XCTAssertTrue(model.queue.isEmpty)
+        XCTAssertTrue(controller.scripts.isEmpty)
+    }
+
+    func testPackageRecoveryCancellationBeforeCommitKeepsCatalog() async throws {
+        let old = try AutomationFixtures.package(name: "Cancelled recovery")
+        let fresh = try AutomationFixtures.snapshot(packages: [old], sequence: 2)
+        let (controller, model, _, _, record, client) = try await fixture(packages: [old], publishedSnapshot: fresh)
+        client.delayNanoseconds = 5_000_000_000
+        let before = try Data(contentsOf: directory.appendingPathComponent("catalog.json"))
+        let recovery = Task { try await model.recoverPackageSource(after: RepositoryClientError.responseTooLarge, record: record) }
+        let entered = await waitUntil { client.previewCount == 1 }
+        XCTAssertTrue(entered)
+        recovery.cancel()
+        do { _ = try await recovery.value; XCTFail("Expected cancellation") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        XCTAssertEqual(controller.catalog.record(for: record.url), record)
+        XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("catalog.json")), before)
+        XCTAssertFalse(model.isProcessing)
+    }
+
+    func testPackageRecoveryPublishesCommittedMetadataAfterCancellation() async throws {
+        let old = try AutomationFixtures.package(name: "Committed recovery")
+        let fresh = try AutomationFixtures.snapshot(packages: [old], sequence: 2)
+        var gate: BrowserCoordinatorReceiptGate!
+        let (controller, model, _, _, record, _) = try await fixture(packages: [old], publishedSnapshot: fresh, coordinatorWrapper: {
+            gate = BrowserCoordinatorReceiptGate($0); return gate
+        })
+        gate.holdNextRead()
+        defer { gate.releaseRead() }
+        let recovery = Task { try await model.recoverPackageSource(after: RepositoryClientError.responseTooLarge, record: record) }
+        let entered = await waitUntil { gate.readIsHeld }
+        XCTAssertTrue(entered)
+        recovery.cancel()
+        gate.releaseRead()
+        let recovered = try await recovery.value
+        XCTAssertTrue(recovered)
+        XCTAssertEqual(controller.catalog.record(for: record.url)?.snapshot, fresh)
+        XCTAssertNotEqual(controller.catalog.record(for: record.url)?.generation, record.generation)
+        XCTAssertFalse(model.isProcessing)
+    }
+
+    func testPackageRecoveryBlocksQueueChangesAndDuplicateRecoveryWhileBusy() async throws {
+        let package = try AutomationFixtures.package(name: "Busy recovery")
+        let fresh = try AutomationFixtures.snapshot(packages: [package], sequence: 2)
+        let gate = BrowserAsyncMutationGate()
+        let (_, model, _, _, record, client) = try await fixture(packages: [package], publishedSnapshot: fresh, clientWrapper: {
+            BrowserRecoveryPreviewGate(base: $0, gate: gate)
+        })
+        defer { gate.release() }
+        XCTAssertTrue(model.enqueueGet(package: package, record: record))
+        let recovery = Task { try await model.recoverPackageSource(after: RepositoryClientError.responseTooLarge, record: record) }
+        let entered = await waitUntil { gate.isHeld }
+        XCTAssertTrue(entered)
+        XCTAssertTrue(model.isProcessing)
+        model.clearQueue()
+        let confirmed = await model.confirmQueue()
+        XCTAssertFalse(confirmed)
+        do { _ = try await model.recoverPackageSource(after: RepositoryClientError.responseTooLarge, record: record); XCTFail("Expected busy") }
+        catch { XCTAssertEqual(error as? PluginBrowserError, .busy) }
+        gate.release()
+        _ = try await recovery.value
+        XCTAssertEqual(client.previewCount, 1)
+        XCTAssertEqual(model.queue.count, 1)
+        XCTAssertFalse(model.isProcessing)
     }
 
     func testControllerReloadReadsCoordinatorChangesInsteadOfActorCache() async throws {
@@ -957,4 +1330,23 @@ private final class BrowserAsyncMutationGate {
         await withCheckedContinuation { continuation = $0; isHeld = true }
     }
     func release() { continuation?.resume(); continuation = nil }
+}
+
+private final class BrowserRecoveryPreviewGate: RepositoryFetching, @unchecked Sendable {
+    private let base: FakeRepositoryClient
+    private let gate: BrowserAsyncMutationGate
+
+    init(base: FakeRepositoryClient, gate: BrowserAsyncMutationGate) {
+        self.base = base; self.gate = gate
+    }
+
+    func preview(url: RepositoryURL, now: Date) async throws -> VerifiedSnapshot {
+        let snapshot = try await base.preview(url: url, now: now)
+        await gate.hold()
+        return snapshot
+    }
+
+    func fetchPackage(entry: IndexEntry, from snapshot: VerifiedSnapshot) async throws -> PluginPackage {
+        try await base.fetchPackage(entry: entry, from: snapshot)
+    }
 }

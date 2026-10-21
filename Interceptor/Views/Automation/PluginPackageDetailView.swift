@@ -5,10 +5,13 @@ struct PluginPackageDetailView: View {
     let model: PluginBrowserModel
     let family: PluginBrowserFamilyID
     var sourceURL: RepositoryURL?
+    private enum PackageTab { case details, version }
+    @State private var tab = PackageTab.details
     @State private var fetched: PluginPackage?
     @State private var fetchedIdentity: String?
     @State private var fetchError: Error?
     @State private var retry = 0
+    @State private var didAttemptSourceRecovery = false
     @State private var showModify = false
     @State private var queueAfterModify = false
     @State private var deleteAfterModify = false
@@ -60,7 +63,10 @@ struct PluginPackageDetailView: View {
                 } description: {
                     Text(LocalizedStringKey(PluginBrowserMessage.key(for: fetchError)))
                 } actions: {
-                    Button("AUTO_BROWSER_RETRY") { retry += 1 }.accessibilityIdentifier("plugins.package.retry")
+                    Button("AUTO_BROWSER_RETRY") {
+                        didAttemptSourceRecovery = false
+                        retry += 1
+                    }.accessibilityIdentifier("plugins.package.retry")
                 }
             } else if entry != nil {
                 ProgressView("AUTO_BROWSER_LOADING").frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -122,116 +128,153 @@ struct PluginPackageDetailView: View {
     }
 
     private func ready(_ package: PluginPackage) -> some View {
-        ScrollViewReader { proxy in
-            List {
-                PluginPackageHero(name: package.manifest.name, targetHosts: PluginBrowserModel.targetHosts(package.manifest),
-                                  actionTitle: selected != nil ? "AUTO_BROWSER_MODIFY" : queued ? "AUTO_BROWSER_QUEUED" : "AUTO_BROWSER_GET",
-                                  isActionEnabled: !busy && (selected != nil || record != nil), isWorking: busy)
-                {
-                    if selected != nil {
-                        showModify = true
-                    } else if queued {
+        List {
+            PluginPackageHero(name: package.manifest.name, targetHosts: PluginBrowserModel.targetHosts(package.manifest),
+                              actionTitle: selected != nil ? "AUTO_BROWSER_MODIFY" : queued ? "AUTO_BROWSER_QUEUED" : "AUTO_BROWSER_GET",
+                              isActionEnabled: !busy && (selected != nil || record != nil), isWorking: busy)
+            {
+                if selected != nil {
+                    showModify = true
+                } else if queued {
+                    model.openQueue()
+                } else if let record {
+                    if !model.enqueueGet(package: package, record: record) {
                         model.openQueue()
-                    } else if let record {
-                        if !model.enqueueGet(package: package, record: record) {
-                            model.openQueue()
-                        }
                     }
                 }
-                .listRowInsets(EdgeInsets()).listRowSeparator(.hidden)
-                HStack(spacing: 0) {
-                    Button("AUTO_BROWSER_DETAILS") { withAnimation { proxy.scrollTo("package.details", anchor: .top) } }
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                    Button("AUTO_VERSION") { withAnimation { proxy.scrollTo("package.version", anchor: .top) } }
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .font(.subheadline.weight(.semibold))
-                .buttonStyle(.borderless)
-                .listRowSeparator(.visible)
-                Section {
-                    if let summary = package.manifest.summary {
-                        Text(verbatim: summary).textSelection(.enabled)
-                    }
-                    if let author = package.manifest.author {
-                        LabeledContent("AUTO_AUTHOR") { Text(verbatim: author).textSelection(.enabled) }
-                    }
-                }
-                .id("package.details")
-                if let selected, package.manifest.schemaVersion == 2 {
-                    Section {
-                        Toggle("AUTO_BROWSER_ENABLED", isOn: Binding(
-                            get: { model.controller.isActive(selected.id) },
-                            set: { enabled in changeActivation(enabled, revision: selected) },
-                        ))
-                        .disabled(busy || model.controller.installationState == nil)
-                        .accessibilityIdentifier("plugins.package.enabled")
-                    }
-                }
-                Section {
-                    LabeledContent("AUTO_VERSION") { Text(verbatim: package.manifest.version).accessibilityIdentifier("plugins.package.version") }
-                    if let selected, let record, case .available = model.updateComparison(for: selected, record: record) {
-                        Button("AUTO_BROWSER_UPDATE") { prepareUpdate(selected, record: record) }
-                            .disabled(busy).accessibilityIdentifier("plugins.package.update")
-                    }
-                }
-                .id("package.version")
-                if let record {
-                    Section {
-                        NavigationLink {
-                            PluginRepositoryCategoriesView(model: model, sourceURL: record.url)
-                        } label: { Text(verbatim: record.displayName) }
-                        TrustBadgeLabel(badge: AutomationTrustBadge(record.trust)).font(.body)
-                    } header: { Text("AUTO_BROWSER_REPOSITORY") }
-                } else if family.source != "local" {
-                    Section {
-                        Text(verbatim: family.source).font(.footnote).textSelection(.enabled)
-                    } header: { Text("AUTO_BROWSER_REPOSITORY") }
-                }
-                Section {
-                    if !PluginBrowserModel.sourceFiles(in: package).isEmpty {
-                        NavigationLink("AUTO_BROWSER_SCRIPTS") { PluginScriptFilesView(model: model, package: package) }
-                            .accessibilityIdentifier("plugins.package.scripts")
-                    }
-                    Button { showJSON = true } label: {
-                        HStack {
-                            Text("AUTO_BROWSER_MANIFEST_JSON").foregroundStyle(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .accessibilityIdentifier("plugins.package.manifestJSON")
-                    if let selected {
-                        NavigationLink("AUTO_BROWSER_TEST") {
-                            ScriptDetailView(session: ScriptSession(controller: model.controller, revision: selected), testOnly: true)
-                        }
-                        .accessibilityIdentifier("plugins.package.test")
-                    }
-                } header: { Text("AUTO_BROWSER_CONTENTS") }
-                if let key = model.controller.activationErrorKey {
-                    Section { Text(LocalizedStringKey(key)).foregroundStyle(AutomationStatusColor.error) }
-                }
-                if let error = model.updateError {
-                    Section { Text(LocalizedStringKey(PluginBrowserMessage.key(for: error))).foregroundStyle(AutomationStatusColor.error) }
-                        .accessibilityIdentifier("plugins.package.updateError")
-                }
-                PluginBrowserErrors(controller: model.controller)
             }
-            .listStyle(.plain)
-            .accessibilityIdentifier("plugins.package.detail")
+            .listRowInsets(EdgeInsets()).listRowSeparator(.hidden)
+            HStack(spacing: 0) {
+                tabButton(.details, title: "AUTO_BROWSER_DETAILS", id: "plugins.package.tab.details")
+                tabButton(.version, title: "AUTO_VERSION", id: "plugins.package.tab.version")
+            }
+            .listRowInsets(EdgeInsets()).listRowSeparator(.visible)
+            switch tab {
+                case .details: details(package)
+                case .version: version(package)
+            }
+            if let key = model.controller.activationErrorKey {
+                Section { Text(LocalizedStringKey(key)).foregroundStyle(AutomationStatusColor.error) }
+            }
+            if let error = model.updateError {
+                Section { Text(LocalizedStringKey(PluginBrowserMessage.key(for: error))).foregroundStyle(AutomationStatusColor.error) }
+                    .accessibilityIdentifier("plugins.package.updateError")
+            }
+            PluginBrowserErrors(controller: model.controller)
+        }
+        .listStyle(.plain)
+        .accessibilityIdentifier("plugins.package.detail")
+    }
+
+    private func tabButton(_ value: PackageTab, title: LocalizedStringKey, id: String) -> some View {
+        let isSelected = tab == value
+        return Button { tab = value } label: {
+            Text(title)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .foregroundStyle(isSelected ? PluginBrowserColor.accent : .secondary)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(isSelected ? PluginBrowserColor.accent : .clear).frame(height: 2)
+                }
+                .contentShape(Rectangle())
+        }
+        .font(.subheadline.weight(.semibold))
+        .buttonStyle(.borderless)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier(id)
+    }
+
+    @ViewBuilder private func details(_ package: PluginPackage) -> some View {
+        if package.manifest.summary != nil || package.manifest.author != nil {
+            Section {
+                if let summary = package.manifest.summary {
+                    Text(verbatim: summary).textSelection(.enabled)
+                }
+                if let author = package.manifest.author {
+                    LabeledContent("AUTO_AUTHOR") { Text(verbatim: author).textSelection(.enabled) }
+                }
+            }
+        }
+        if let selected, package.manifest.schemaVersion == 2 {
+            Section {
+                Toggle("AUTO_BROWSER_ENABLED", isOn: Binding(
+                    get: { model.controller.isActive(selected.id) },
+                    set: { enabled in changeActivation(enabled, revision: selected) },
+                ))
+                .disabled(busy || model.controller.installationState == nil)
+                .accessibilityIdentifier("plugins.package.enabled")
+            }
+        }
+        if let record {
+            Section {
+                NavigationLink {
+                    PluginRepositoryCategoriesView(model: model, sourceURL: record.url)
+                } label: { Text(verbatim: record.displayName) }
+                TrustBadgeLabel(badge: AutomationTrustBadge(record.trust)).font(.body)
+            } header: { Text("AUTO_BROWSER_REPOSITORY") }
+        } else if family.source != "local" {
+            Section {
+                Text(verbatim: family.source).font(.footnote).textSelection(.enabled)
+            } header: { Text("AUTO_BROWSER_REPOSITORY") }
+        }
+        Section {
+            if !PluginBrowserModel.sourceFiles(in: package).isEmpty {
+                NavigationLink("AUTO_BROWSER_SCRIPTS") { PluginScriptFilesView(model: model, package: package) }
+                    .accessibilityIdentifier("plugins.package.scripts")
+            }
+            Button { showJSON = true } label: {
+                HStack {
+                    Text("AUTO_BROWSER_MANIFEST_JSON").foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .accessibilityIdentifier("plugins.package.manifestJSON")
+            if let selected {
+                NavigationLink("AUTO_BROWSER_TEST") {
+                    ScriptDetailView(session: ScriptSession(controller: model.controller, revision: selected), testOnly: true)
+                }
+                .accessibilityIdentifier("plugins.package.test")
+            }
+        } header: { Text("AUTO_BROWSER_CONTENTS") }
+    }
+
+    @ViewBuilder private func version(_ package: PluginPackage) -> some View {
+        Section {
+            LabeledContent("AUTO_VERSION") { Text(verbatim: package.manifest.version).accessibilityIdentifier("plugins.package.version") }
+            if let selected, let record, case .available = model.updateComparison(for: selected, record: record) {
+                Button("AUTO_BROWSER_UPDATE") { prepareUpdate(selected, record: record) }
+                    .disabled(busy).accessibilityIdentifier("plugins.package.update")
+            }
         }
     }
 
     private func loadAvailablePackage() async {
-        guard selected == nil, let record, let entry else { return }
         let identity = fetchIdentity
         fetched = nil; fetchedIdentity = nil; fetchError = nil
+        guard selected == nil, let record, let entry else { return }
         do {
             let package = try await model.fetchPackage(entry: entry, record: record)
             try Task.checkCancellation()
             guard identity == fetchIdentity else { return }
             fetched = package; fetchedIdentity = identity
-        } catch is CancellationError {} catch { fetchError = error }
+        } catch is CancellationError {} catch {
+            guard !Task.isCancelled, identity == fetchIdentity else { return }
+            if !didAttemptSourceRecovery {
+                didAttemptSourceRecovery = true
+                do {
+                    if try await model.recoverPackageSource(after: error, record: record) { return }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard !Task.isCancelled, identity == fetchIdentity else { return }
+                    fetchError = error
+                    return
+                }
+            }
+            guard !Task.isCancelled, identity == fetchIdentity else { return }
+            fetchError = error
+        }
     }
 
     private func changeActivation(_ enabled: Bool, revision: InstalledRevision) {

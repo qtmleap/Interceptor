@@ -42,16 +42,37 @@ final class AutomationUITests: XCTestCase {
             enqueueGet(app)
 
             selectTab("packages", app: app)
-            XCTAssertFalse(app.buttons.matching(identifier: "plugins.package." + Self.multiID).firstMatch.exists, "GET must not install")
-            XCTAssertFalse(app.buttons.matching(identifier: "plugins.package." + Self.summaryID).firstMatch.exists)
+            XCTAssertTrue(packageRow(Self.multiID, app: app).waitForExistence(timeout: 5), "a catalog entry is discoverable with nothing installed")
+            let packageList = scrollContainer(app, "plugins.packages")
+            let multiRow = reach(packageRow(Self.multiID, app: app), in: packageList)
+            XCTAssertNotEqual(multiRow.value as? String, japanese ? "インストール済み" : "Installed", "GET must not install")
+            let summaryRow = reach(packageRow(Self.summaryID, app: app), in: packageList)
+            XCTAssertNotEqual(summaryRow.value as? String, japanese ? "インストール済み" : "Installed")
+            let search = app.searchFields.firstMatch
+            XCTAssertEqual(search.placeholderValue, japanese ? "パッケージを検索" : "Search for Packages")
+            search.tap()
+            search.typeText("no such package anywhere")
+            XCTAssertTrue(packageRow(Self.multiID, app: app).waitForNonExistence(timeout: 5), "search filters the aggregated catalog")
+            search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "no such package anywhere".count))
+            XCTAssertTrue(packageRow(Self.multiID, app: app).waitForExistence(timeout: 5))
+            reach(packageRow(Self.multiID, app: app), in: scrollContainer(app, "plugins.packages")).tap()
+            XCTAssertTrue(scrollContainer(app, "plugins.package.detail").waitForExistence(timeout: 15))
+            XCTAssertTrue(app.buttons["plugins.package.tab.details"].isSelected, "Details is the default panel")
+            XCTAssertFalse(app.staticTexts["plugins.package.version"].exists)
+            app.buttons["plugins.package.tab.version"].tap()
+            XCTAssertTrue(app.buttons["plugins.package.tab.version"].isSelected)
+            XCTAssertFalse(app.buttons["plugins.package.tab.details"].isSelected)
+            XCTAssertTrue(app.staticTexts["plugins.package.version"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons.matching(identifier: "plugins.package.manifestJSON").firstMatch.exists, "Details content is hidden on Version")
+            goBack(app, from: "Multi-file hooks")
             openQueue(app)
             XCTAssertEqual(queueRows(app).count, 2, "both immutable candidates share one confirmation")
             if !japanese { attach("Batch queue before installation en") }
             confirmQueue(app)
             selectTab("packages", app: app)
-            XCTAssertTrue(app.buttons.matching(identifier: "plugins.package." + Self.multiID).firstMatch.waitForExistence(timeout: 5))
-            XCTAssertTrue(app.buttons.matching(identifier: "plugins.package." + Self.summaryID).firstMatch.exists)
-            XCTAssertEqual(app.buttons.matching(identifier: "plugins.package." + Self.multiID).firstMatch.value as? String, japanese ? "インストール済み" : "Installed")
+            XCTAssertTrue(packageRows(Self.multiID, app: app).firstMatch.waitForExistence(timeout: 5))
+            XCTAssertTrue(packageRows(Self.summaryID, app: app).firstMatch.exists)
+            XCTAssertEqual(packageRows(Self.multiID, app: app).firstMatch.value as? String, japanese ? "インストール済み" : "Installed")
             if !japanese { attach("Installed package list en") }
             openInstalled(Self.multiID, app: app)
             assertEnabled(false, app: app)
@@ -62,10 +83,13 @@ final class AutomationUITests: XCTestCase {
             let reopened = launch(japanese: japanese, suite: suite)
             openPlugins(reopened, japanese: japanese)
             selectTab("packages", app: reopened)
-            XCTAssertEqual(reopened.buttons.matching(identifier: "plugins.package." + Self.multiID).count, 1)
-            XCTAssertEqual(reopened.buttons.matching(identifier: "plugins.package." + Self.summaryID).count, 1)
+            XCTAssertEqual(packageRows(Self.multiID, app: reopened).count, 1)
+            XCTAssertEqual(packageRows(Self.summaryID, app: reopened).count, 1)
             openInstalled(Self.multiID, app: reopened)
             assertEnabled(false, app: reopened)
+            XCTAssertFalse(reopened.staticTexts["plugins.package.version"].exists, "Version content is hidden until its tab is selected")
+            reopened.buttons["plugins.package.tab.version"].tap()
+            XCTAssertFalse(reopened.switches["plugins.package.enabled"].exists, "Details content is hidden on the Version tab")
             let version = reopened.staticTexts["plugins.package.version"].label
             let versionTitle = japanese ? "バージョン" : "Version"
             let combinedVersion = japanese ? "\(versionTitle)、1.0.0" : "\(versionTitle), 1.0.0"
@@ -358,7 +382,7 @@ final class AutomationUITests: XCTestCase {
             confirmQueue(app)
             assertEnabled(false, app: app)
             selectTab("packages", app: app)
-            XCTAssertEqual(app.buttons.matching(identifier: "plugins.package." + Self.targetsID).count, 1, "reinstall retains one selected family")
+            XCTAssertEqual(packageRows(Self.targetsID, app: app).count, 1, "reinstall retains one selected family")
             if !japanese { attach("Installed package list without count en") }
             openInstalled(Self.targetsID, app: app)
             openModify(app)
@@ -371,8 +395,13 @@ final class AutomationUITests: XCTestCase {
             app.buttons.matching(identifier: "plugins.modify.delete").firstMatch.tap()
             XCTAssertTrue(deletion.waitForExistence(timeout: 5))
             deletion.buttons.matching(identifier: japanese ? "削除" : "Delete").firstMatch.tap()
-            XCTAssertTrue(app.buttons.matching(identifier: "plugins.package." + Self.targetsID).firstMatch.waitForNonExistence(timeout: 5))
-            XCTAssertTrue(scrollContainer(app, "plugins.packages").exists)
+            let packageList = scrollContainer(app, "plugins.packages")
+            XCTAssertTrue(packageList.waitForExistence(timeout: 5))
+            let row = reach(packageRow(Self.targetsID, app: app), in: packageList)
+            let deleted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                row.exists && row.value as? String != (japanese ? "インストール済み" : "Installed")
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [deleted], timeout: 5), .completed, "deleting keeps the catalog entry discoverable without its installed check")
         }
     }
 }
@@ -547,9 +576,20 @@ private extension AutomationUITests {
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 5))
     }
 
+    /// Packages rows carry source-qualified IDs (`plugins.package.<source>|<uuid>`), so match by manifest UUID suffix.
+    @MainActor
+    func packageRows(_ id: String, app: XCUIApplication) -> XCUIElementQuery {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plugins.package.' AND identifier ENDSWITH %@", "|" + id))
+    }
+
+    @MainActor
+    func packageRow(_ id: String, app: XCUIApplication) -> XCUIElement {
+        packageRows(id, app: app).firstMatch
+    }
+
     @MainActor
     func openInstalled(_ id: String, app: XCUIApplication) {
-        reach(app.buttons.matching(identifier: "plugins.package." + id).firstMatch, in: scrollContainer(app, "plugins.packages")).tap()
+        reach(packageRow(id, app: app), in: scrollContainer(app, "plugins.packages")).tap()
         XCTAssertTrue(scrollContainer(app, "plugins.package.detail").waitForExistence(timeout: 5))
     }
 

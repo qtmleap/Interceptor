@@ -67,7 +67,7 @@ struct PluginFileDetailView: View {
                 }
                 .accessibilityAddTraits(.isLink)
                 .accessibilityIdentifier("plugins.file.openSource")
-            } footer: { Text("AUTO_SOURCE_READ_ONLY") }
+            }
         }
         .listStyle(.plain)
         .navigationTitle(Text(verbatim: name))

@@ -87,9 +87,7 @@ struct RepositoryScriptDetailView: View {
                 selectedFile = repositoryFile(in: package)
                 isSourcePresented = true
             }
-        } header: { Text("AUTO_SOURCE") } footer: {
-            Text("AUTO_SOURCE_READ_ONLY").accessibilityIdentifier("repo.script.sourceReadOnly")
-        }
+        } header: { Text("AUTO_SOURCE") }
         Section {
             DisclosureGroup("AUTO_DECLARED_MANIFEST") {
                 Text(verbatim: (try? package.manifest.json.jsonString()) ?? "")

@@ -49,9 +49,7 @@ struct ScriptDetailView: View {
                 PluginSourceRow(fileName: session.isV2 ? session.selectedSourceFile : nil, identifier: "script.openSource") {
                     isSourcePresented = true
                 }
-            } header: { Text("AUTO_SOURCE") } footer: {
-                Text("AUTO_SOURCE_READ_ONLY").accessibilityIdentifier("script.sourceReadOnly")
-            }
+            } header: { Text("AUTO_SOURCE") }
             }
             Section {
                 if session.isV2 {

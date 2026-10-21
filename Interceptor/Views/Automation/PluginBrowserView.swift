@@ -150,7 +150,6 @@ struct PluginSourcesView: View {
     @State private var addedURL: RepositoryURL?
     @State private var pendingAddedURL: RepositoryURL?
     @State private var pendingRemoval: RepositoryRecord?
-    @State private var showsRefreshResult = false
 
     var body: some View {
         List {
@@ -166,9 +165,6 @@ struct PluginSourcesView: View {
                     Button("AUTO_BROWSER_RETRY") { Task { await model.refreshSources() } }
                         .accessibilityIdentifier("plugins.refreshRetry")
                 }
-            } else if model.didRefresh && showsRefreshResult {
-                Text("AUTO_BROWSER_REFRESHED").font(.footnote).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("plugins.refreshed")
             }
             Section {
                 ForEach(model.controller.repositories, id: \.url) { record in
@@ -204,13 +200,6 @@ struct PluginSourcesView: View {
         .accessibilityIdentifier("plugins.sources")
         .refreshable { await model.refreshSources() }
         .accessibilityAction(named: Text("AUTO_BROWSER_REFRESH")) { Task { await model.refreshSources() } }
-        .task(id: model.didRefresh) {
-            showsRefreshResult = model.didRefresh
-            guard model.didRefresh else { return }
-            do { try await Task.sleep(for: .seconds(2.5)) }
-            catch { return }
-            showsRefreshResult = false
-        }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 EditButton().disabled(model.isProcessing)
@@ -366,11 +355,15 @@ struct PluginInstalledPackagesView: View {
     @State private var pendingDelete: InstalledRevision?
     private var packages: [InstalledRevision] {
         let values = model.installedPackages(query: query).filter {
-            guard localOnly else { return true }
             if case .repository = $0.provenance.origin {
                 return false
             }; return true
         }
+        return ascending ? values : Array(values.reversed())
+    }
+
+    private var catalog: [PluginBrowserCatalogPackage] {
+        let values = model.catalogPackages(query: query)
         return ascending ? values : Array(values.reversed())
     }
 
@@ -387,7 +380,31 @@ struct PluginInstalledPackagesView: View {
                 .accessibilityIdentifier("plugins.sort")
             }
             .listRowSeparator(.hidden)
-            ForEach(packages, id: \.id) { revision in
+            if !localOnly {
+                if !model.controller.isLoaded {
+                    ProgressView("AUTO_BROWSER_LOADING").accessibilityIdentifier("plugins.loading")
+                }
+                ForEach(catalog) { item in
+                    NavigationLink {
+                        PluginPackageDetailView(model: model, family: item.id, sourceURL: item.record?.url)
+                    } label: {
+                        PluginPackageRow(name: item.name, author: item.author, version: item.version,
+                                         summary: item.summary ?? "", isInstalled: item.installed != nil)
+                            .accessibilityHint(Text(verbatim: item.record?.displayName ?? item.id.source))
+                    }
+                    .accessibilityIdentifier("plugins.package." + item.id.source + "|" + item.id.manifestID.uuidString)
+                    .swipeActions {
+                        if let installed = item.installed {
+                            Button("AUTO_BROWSER_DELETE", role: .destructive) { pendingDelete = installed }
+                                .disabled(model.isProcessing)
+                        }
+                    }
+                }
+                if catalog.isEmpty && model.controller.isLoaded {
+                    PluginPackagesEmpty(query: query, installed: true)
+                }
+            }
+            ForEach(localOnly ? packages : [], id: \.id) { revision in
                 NavigationLink {
                     PluginPackageDetailView(model: model, family: PluginBrowserFamilyID(revision))
                 } label: {
@@ -401,7 +418,7 @@ struct PluginInstalledPackagesView: View {
                         .disabled(model.isProcessing)
                 }
             }
-            if packages.isEmpty {
+            if localOnly && packages.isEmpty {
                 PluginPackagesEmpty(query: query, installed: true)
             }
         }
