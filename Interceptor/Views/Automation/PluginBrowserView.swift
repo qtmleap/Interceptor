@@ -546,6 +546,10 @@ struct PluginScriptFilesView: View {
             if let package {
                 files(package)
             } else {
+                PluginBrowserErrors(controller: model.controller)
+                if !model.controller.isLoaded {
+                    ProgressView("AUTO_BROWSER_LOADING").accessibilityIdentifier("plugins.loading")
+                }
                 ForEach(model.installedPackages(), id: \.id) { revision in
                     Section(revision.package.manifest.name) { files(revision.package) }
                 }
