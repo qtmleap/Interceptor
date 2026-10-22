@@ -19,6 +19,7 @@ final class AddRepositoryModel {
     private let controller: AutomationController
     private var task: Task<Void, Never>?
     private var token = UUID()
+    private var expectation: RepositoryAcceptanceExpectation?
 
     init(controller: AutomationController) { self.controller = controller }
 
@@ -39,9 +40,11 @@ final class AddRepositoryModel {
             do {
                 let url = try RepositoryURL(parsing: text)
                 let snap = try await client.preview(url: url, now: clock)
+                let current = try await store.load()
+                let expected = current.record(for: snap.url).map { RepositoryAcceptanceExpectation.generation($0.generation) } ?? .absent
                 let plan = try await store.preview(snap, now: clock)
                 try Task.checkCancellation()
-                self?.finishPreview(run, snap, plan)
+                self?.finishPreview(run, snap, plan, expected)
             } catch { self?.fail(run, error) }
         }
     }
@@ -64,22 +67,14 @@ final class AddRepositoryModel {
     }
 
     private func commit(pinning fingerprint: String?, acknowledge: Bool) {
-        guard phase == .previewed, let snap = snapshot, controller.storeError == nil else { return }
+        guard phase == .previewed, let snap = snapshot, let expectation, controller.storeError == nil else { return }
         let run = token; phase = .adding; error = nil
-        let (controller, clock) = (controller, controller.now)
+        let controller = controller
         task = Task { [weak self] in
             do {
                 try Task.checkCancellation()
-                let committed = await controller.mutate {
-                    if let fingerprint {
-                        _ = try await controller.store.acceptAndPin(snap, fingerprint: fingerprint, now: clock)
-                    } else {
-                        _ = try await controller.store.accept(snap, acknowledgeUnverified: acknowledge, now: clock)
-                    }
-                }
-                guard committed != nil else {
-                    throw controller.actionError ?? controller.storeError ?? AutomationInputError.storeUnavailable
-                }
+                _ = try await controller.acceptRepository(snap, expecting: expectation, pinning: fingerprint,
+                                                          acknowledgeUnverified: acknowledge)
                 self?.finishAdd(run)
             } catch { self?.fail(run, error) }
         }
@@ -94,12 +89,13 @@ final class AddRepositoryModel {
 
     private func resetPreview() {
         guard phase == .previewed || phase == .idle else { return }
-        snapshot = nil; acceptance = nil; error = nil; fingerprintText = ""; phase = .idle
+        snapshot = nil; acceptance = nil; expectation = nil; error = nil; fingerprintText = ""; phase = .idle
     }
 
-    private func finishPreview(_ run: UUID, _ snap: VerifiedSnapshot, _ plan: AcceptancePreview) {
+    private func finishPreview(_ run: UUID, _ snap: VerifiedSnapshot, _ plan: AcceptancePreview,
+                               _ expected: RepositoryAcceptanceExpectation) {
         guard run == token else { return }
-        snapshot = snap; acceptance = plan; phase = .previewed
+        snapshot = snap; acceptance = plan; expectation = expected; phase = .previewed
     }
 
     private func finishAdd(_ run: UUID) { guard run == token else { return }; phase = .added }

@@ -424,6 +424,61 @@ final class AutomationUITests: XCTestCase {
             }
         }
     }
+
+    /// Source admission must persist full content before its first package destination is opened.
+    /// Network isolation/restart is also exercised with recording clients in PluginCatalogReadTests.
+    @MainActor
+    func testPersistedPackageDetailsAcrossRelaunch() async {
+        guard let repositoryURL = await requiredRepositoryURL() else { return }
+        let browserURL = repositoryURL.deletingLastPathComponent().appendingPathComponent("browser/repository.json")
+        let japanese = ProcessInfo.processInfo.environment["INTERCEPTOR_PACKAGE_SEARCH_LANGUAGE"] == "ja"
+        let suite = "Interceptor.UITests.Catalog.\(UUID().uuidString)"
+        XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = launch(japanese: japanese, suite: suite)
+        openPlugins(app, japanese: japanese)
+        addRepository(browserURL, app: app)
+        openCategory(app, id: "category:Requests")
+        openCatalogPackage(Self.targetsID, app: app)
+        let detail = scrollContainer(app, "plugins.package.detail")
+        XCTAssertTrue(app.descendants(matching: .any)["plugins.package.hero"].label.contains("Target hosts example"))
+        XCTAssertFalse(app.progressIndicators["plugins.loading"].exists)
+        XCTAssertFalse(app.buttons["plugins.package.refresh"].exists, "admission stored the full content")
+        XCTAssertFalse(app.switches["plugins.package.enabled"].exists, "browsing does not install")
+        attach("Persisted package detail")
+        app.buttons["plugins.package.tab.version"].tap()
+        XCTAssertTrue(app.staticTexts["plugins.package.version"].exists)
+        attach("Persisted package version")
+        app.buttons["plugins.package.tab.details"].tap()
+        reach(app.buttons.matching(identifier: "plugins.package.manifestJSON").firstMatch, in: detail).tap()
+        let manifest = app.textViews["plugins.manifest.json"]
+        XCTAssertTrue(manifest.waitForExistence(timeout: 5))
+        let json = manifest.value as? String ?? ""
+        XCTAssertTrue(json.contains("Browser fixture author"))
+        XCTAssertTrue(json.contains("\n"), "stored manifest is formatted for inspection")
+        attach("Persisted manifest JSON")
+        app.buttons["plugins.manifest.close"].tap()
+        reach(app.buttons.matching(identifier: "plugins.package.scripts").firstMatch, in: detail).tap()
+        openFile(PluginRepositorySources.secondaryFile, packageID: Self.targetsID, app: app)
+        assertSource(openFileSource(app), equals: PluginRepositorySources.secondarySource)
+        app.buttons["plugins.file.closeSource"].tap()
+        app.terminate()
+
+        let reopened = launch(japanese: japanese, suite: suite)
+        defer { reopened.terminate() }
+        openPlugins(reopened, japanese: japanese)
+        selectTab("packages", app: reopened)
+        let row = reach(packageRow(Self.targetsID, app: reopened), in: scrollContainer(reopened, "plugins.packages"))
+        XCTAssertNotEqual(row.value as? String, japanese ? "インストール済み" : "Installed")
+        attach("Persisted Packages after relaunch")
+        row.tap()
+        XCTAssertTrue(scrollContainer(reopened, "plugins.package.detail").waitForExistence(timeout: 5))
+        XCTAssertTrue(reopened.descendants(matching: .any)["plugins.package.hero"].label.contains("Target hosts example"))
+        XCTAssertFalse(reopened.buttons["plugins.package.refresh"].exists)
+        XCTAssertTrue(reopened.buttons["plugins.package.hero.action"].isEnabled)
+        XCTAssertFalse(reopened.buttons["plugins.queue.open"].exists)
+    }
+
 }
 
 private extension AutomationUITests {

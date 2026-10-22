@@ -3,7 +3,7 @@ import SwiftUI
 
 /// File metadata only. The exact file's source remains hidden until Source Code is explicitly opened.
 struct PluginFileDetailView: View {
-    let package: PluginPackage
+    let package: PluginPackagePresentation
     let file: String
     @State private var showSource = false
     @State private var selection: String?
@@ -13,7 +13,7 @@ struct PluginFileDetailView: View {
     }
 
     private var rules: [PluginBrowserRule] {
-        PluginBrowserModel.matchingRules(in: package.manifest, file: file)
+        package.rulesByFile[file] ?? []
     }
 
     /// Hooks sharing the same traffic conditions belong to one visible target.
@@ -90,12 +90,9 @@ struct PluginFileDetailView: View {
 }
 
 struct PluginManifestJSONView: View {
-    let package: PluginPackage
+    let package: PluginPackagePresentation
     let done: () -> Void
-    private var json: String {
-        guard let data = try? package.manifest.json.data(), let raw = String(data: data, encoding: .utf8) else { return "" }
-        return JSONPrettyPrinter.format(raw, maxBytes: Limits.package, objectOnly: true)
-    }
+    private var json: String { package.manifestJSON }
 
     var body: some View {
         NavigationStack {

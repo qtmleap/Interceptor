@@ -5,7 +5,7 @@ import Foundation
 import Mudmouth
 import Observation
 
-/// Owns Settings > Plugins. First entry registers the default publisher's metadata when absent.
+/// Shared app-owned automation state. Startup registers the default publisher when absent.
 /// Imports remain explicit disabled revisions; nothing executes except `ScriptSession.run`.
 @MainActor @Observable
 final class AutomationController {
@@ -16,6 +16,22 @@ final class AutomationController {
     private(set) var storeError: Error?
     /// Transient result of the last user action.
     var actionError: Error?
+
+    let packageCatalog: (any PackageCatalogStoring)?
+    /// The display database is independent of authority, trust, and installation storage.
+    private(set) var packageCatalogError: Error?
+    /// Invalidates database presentation reads even when authority remains Equatable-equal.
+    private(set) var packageCatalogRevision: UInt64 = 0
+    @ObservationIgnored private var successfulPackageProjectionReceipt: UInt64?
+    @ObservationIgnored private var pendingPackageLeaseIDs = Set<UUID>()
+    @ObservationIgnored private var isDrainingPackageLeases = false
+    private(set) var packageCatalogBackfillErrors: [String: Error] = [:]
+    private(set) var isBackfillingPackages = false
+    @ObservationIgnored private let packageSynchronization: PackageCatalogSynchronization?
+    private let automaticPackageBackfill: Bool
+    @ObservationIgnored private var startupTask: Task<Void, Never>?
+    @ObservationIgnored private var packageBackfillTask: Task<Void, Never>?
+    @ObservationIgnored private var attemptedPackageBackfills = Set<String>()
 
     let store: any AutomationStoring
     let client: any RepositoryFetching
@@ -44,11 +60,17 @@ final class AutomationController {
 
     init(store: any AutomationStoring, client: any RepositoryFetching, executor: any ScriptRunning,
          clock: @escaping @Sendable () -> Date = { Date() }, defaultRepository: DefaultRepository? = nil,
+         packageCatalog: (any PackageCatalogStoring)? = nil, packageCatalogError: Error? = nil,
+         automaticPackageBackfill: Bool = true,
          activationStore: PluginActivationStore? = nil,
          installationCoordinator: (any InstallationCoordinating)? = nil, installationAvailable: Bool = true,
          hasCaptureConsent: @escaping @Sendable () -> Bool = { CaptureAuthorization.isGranted },
          stopCapture: @escaping @MainActor () -> Void = { Mudmouth.default.stopVPNTunnel() })
     {
+        self.packageCatalog = packageCatalog
+        self.packageCatalogError = packageCatalogError
+        self.automaticPackageBackfill = automaticPackageBackfill
+        packageSynchronization = packageCatalog.map { PackageCatalogSynchronization(database: $0, client: client) }
         self.store = installationCoordinator == nil ? store : CoordinatorCatalogStore(base: store)
         self.client = client; self.executor = executor; self.clock = clock
         self.defaultRepository = defaultRepository
@@ -98,29 +120,25 @@ final class AutomationController {
         }
     }
 
+    /// Startup work belongs to the app lifetime, independently of Plugins presentation.
+    func start() async {
+        if startupTask == nil { startupTask = Task { await self.load() } }
+        await startupTask?.value
+    }
+
     func load() async {
         defer { isLoaded = true }
         if installationCoordinator != nil {
-            await refreshCatalog()
-            guard storeError == nil else { return }
+            guard await refreshCatalog() else { return }
         } else {
             let approvals = await readActivationBeforeCatalog()
-            do { catalog = try await store.load(); storeError = nil } catch {
-                catalog = Catalog(); storeError = error
-                return
-            }
+            guard await refreshCatalog() else { return }
             await reconcileActivation(approvals, catalog: catalog)
         }
-        guard let source = defaultRepository, catalog.record(for: source.url) == nil else { return }
         do {
-            let snapshot = try await client.preview(url: source.url, now: now)
-            try Task.checkCancellation()
-            _ = try await store.seedIfAbsent(snapshot, expectedURL: source.url, expectedRepositoryID: source.repositoryID,
-                                             expectedFingerprint: source.fingerprint, now: now)
-            await refreshCatalog()
-            actionError = nil
+            try await bootstrapDefaultRepository()
         } catch is CancellationError {
-            // Leaving Plugins cancels this entry's fetch; the next entry may retry.
+            // Explicit initialization may be cancelled before the authoritative commit.
         } catch {
             actionError = error
             if installationCoordinator != nil {
@@ -130,6 +148,21 @@ final class AutomationController {
                 catalog = Catalog()
             }
         }
+    }
+
+    /// Explicit Sources refresh may retry an unavailable first-run publisher; tombstones remain final.
+    func retryDefaultRepository() async throws {
+        guard await refreshCatalog() else {
+            throw storeError ?? installationError ?? AutomationInputError.storeUnavailable
+        }
+        try await bootstrapDefaultRepository()
+    }
+
+    private func bootstrapDefaultRepository() async throws {
+        guard let source = defaultRepository, catalog.record(for: source.url) == nil else { return }
+        let snapshot = try await client.preview(url: source.url, now: now)
+        _ = try await seedRepository(snapshot, descriptor: source)
+        actionError = nil
     }
 
     /// Re-reads the store's authoritative state after a mutation.
@@ -148,7 +181,6 @@ final class AutomationController {
             return false
         }
         guard receipt == projectionReceipt else { return false }
-        catalog = loaded
         storeError = nil
         projectionFailureReceipt = nil
         if installationCoordinator != nil {
@@ -157,7 +189,13 @@ final class AutomationController {
                 return observation.receipt == projectionReceipt
             } catch { return false } // The receipt-owning read publishes a current failure itself.
         }
-        return true
+        let synchronized = await synchronizePackageCatalog(visible: loaded.visibleRepositories, installed: loaded.revisions, receipt: receipt)
+        guard receipt == projectionReceipt else { return false }
+        publishPackageCatalogRevision(receipt: receipt, synchronized: synchronized)
+        catalog = loaded
+        schedulePackageBackfill()
+        await drainPendingPackageLeases()
+        return receipt == projectionReceipt
     }
 
     var selectionGeneration: UUID? { installationState?.selectionGeneration }
@@ -199,7 +237,15 @@ final class AutomationController {
         let receipt = nextProjectionReceipt()
         do {
             let state = try await withInstallation(honorCancellation: honorCancellation) { try $0.state() }
-            if receipt == projectionReceipt { applyInstallation(state) }
+            if receipt == projectionReceipt {
+                let synchronized = await synchronizePackageCatalog(visible: state.catalog.visibleRepositories, installed: state.installed, receipt: receipt)
+                if receipt == projectionReceipt {
+                    publishPackageCatalogRevision(receipt: receipt, synchronized: synchronized)
+                    applyInstallation(state)
+                    schedulePackageBackfill()
+                    await drainPendingPackageLeases()
+                }
+            }
             return (state, receipt)
         } catch is CancellationError {
             // Cancelling a request is not evidence that durable authority became unreadable.
@@ -213,6 +259,7 @@ final class AutomationController {
                 projectionFailureReceipt = receipt
                 installationError = error
                 installationState = nil
+                catalog = Catalog() // Source visibility cannot be published with an unknown selection.
                 activationSnapshot = nil
             }
             throw error
@@ -347,6 +394,7 @@ final class AutomationController {
             do {
                 let current = try await readInstallation()
                 _ = try await performInstallationMutation { try $0.delete(revisionID: id, expectedSelectionGeneration: current.selectionGeneration) }
+                await prunePackageCatalog()
                 // The historical delete fulfilled only the pending intent it observed at admission.
                 // Identical bytes can have been reinstalled and revoked again before receipt delivery.
                 if pendingRevocationReceipts[id] == ownedPendingReceipt { clearPendingRevocation(id) }
@@ -367,6 +415,7 @@ final class AutomationController {
         if needsRevocation {
             await revokeActivation(id: id)
         }
+        await prunePackageCatalog()
     }
 
     func refreshActivation() async {
@@ -387,8 +436,7 @@ final class AutomationController {
         let approvals = await readActivationBeforeCatalog()
         // The later catalog read cannot falsely orphan a grant imported and approved by another window
         // between reads. Reconcile only the earlier snapshot, never expand it from a newer read.
-        do { catalog = try await store.load(); storeError = nil }
-        catch { storeError = error; return }
+        guard await refreshCatalog() else { return }
         await reconcileActivation(approvals, catalog: catalog)
     }
 
@@ -459,7 +507,16 @@ final class AutomationController {
             // catalog read; a newly imported/approved grant cannot become a false orphan.
             let approvals = await readActivationBeforeCatalog()
             let current: Catalog
-            do { current = try await store.load(); catalog = current; storeError = nil }
+            do {
+                current = try await store.load()
+                let receipt = nextProjectionReceipt()
+                let synchronized = await synchronizePackageCatalog(visible: current.visibleRepositories, installed: current.revisions, receipt: receipt)
+                guard receipt == projectionReceipt else { throw AutomationError.staleSnapshot }
+                publishPackageCatalogRevision(receipt: receipt, synchronized: synchronized)
+                catalog = current; storeError = nil
+                schedulePackageBackfill()
+                await drainPendingPackageLeases()
+            }
             catch { storeError = error; throw error }
             guard current.revisions.contains(where: { $0.id == revision.id && $0.package.bytes == revision.package.bytes }) else {
                 throw AutomationError.staleSnapshot
@@ -534,7 +591,210 @@ final class AutomationController {
     }
 
     func deleteRepository(_ url: RepositoryURL) async {
-        await mutate { try await store.remove(url) }
+        guard let _: Void = await mutate({ try await store.remove(url) }) else { return }
+        await prunePackageCatalog()
+        if catalog.record(for: url)?.visible == false { packageCatalogBackfillErrors.removeValue(forKey: url.canonical) }
+    }
+
+    // MARK: Package metadata lifecycle
+
+    /// All source publication paths stage package content before Core's authoritative transaction.
+    func acceptRepository(_ snapshot: VerifiedSnapshot, expecting: RepositoryAcceptanceExpectation,
+                          pinning fingerprint: String?, acknowledgeUnverified: Bool) async throws -> RepositoryRecord {
+        try await ingestRepository(snapshot, acknowledgeUnverified: acknowledgeUnverified, preflight: {
+            let current = try await self.store.load().record(for: snapshot.url)
+            switch expecting {
+            case .absent:
+                guard current == nil else { throw AutomationError.staleSnapshot }
+            case .generation(let generation):
+                guard current?.generation == generation else { throw AutomationError.staleSnapshot }
+            }
+            if let fingerprint {
+                guard case .signed(let key) = snapshot.signature, key.hex == fingerprint.lowercased() else {
+                    throw AutomationError.fingerprintMismatch
+                }
+            }
+        }) {
+            if let fingerprint {
+                return try await self.store.acceptAndPin(snapshot, fingerprint: fingerprint, now: self.now, expecting: expecting)
+            }
+            return try await self.store.accept(snapshot, acknowledgeUnverified: acknowledgeUnverified, now: self.now, expecting: expecting)
+        }
+    }
+
+    func refreshRepository(_ snapshot: VerifiedSnapshot, expectedGeneration: UUID,
+                           acknowledgeUnverified: Bool = false) async throws -> RepositoryRecord {
+        try await ingestRepository(snapshot, acknowledgeUnverified: acknowledgeUnverified, preflight: {
+            let current = try await self.store.load().record(for: snapshot.url)
+            guard current?.visible == true, current?.generation == expectedGeneration else {
+                throw AutomationError.staleSnapshot
+            }
+        }) {
+            try await self.store.refresh(snapshot, expectedGeneration: expectedGeneration,
+                                         acknowledgeUnverified: acknowledgeUnverified, now: self.now)
+        }
+    }
+
+    private func seedRepository(_ snapshot: VerifiedSnapshot, descriptor: DefaultRepository) async throws -> RepositoryRecord {
+        guard snapshot.url == descriptor.url else { throw AutomationError.invalidURL }
+        guard snapshot.index.id == descriptor.repositoryID else { throw AutomationError.repositoryIdentityChanged }
+        guard case .signed(let key) = snapshot.signature, key.hex == descriptor.fingerprint else {
+            throw AutomationError.fingerprintMismatch
+        }
+        return try await ingestRepository(snapshot, acknowledgeUnverified: true) {
+            try await self.store.seedIfAbsent(snapshot, expectedURL: descriptor.url, expectedRepositoryID: descriptor.repositoryID,
+                                              expectedFingerprint: descriptor.fingerprint, now: self.now)
+        }
+    }
+
+    private func ingestRepository(_ snapshot: VerifiedSnapshot, acknowledgeUnverified: Bool,
+                                  preflight: () async throws -> Void = {},
+                                  publish: () async throws -> RepositoryRecord) async throws -> RepositoryRecord {
+        guard storeError == nil else { throw AutomationInputError.storeUnavailable }
+        let leaseID = UUID()
+        do {
+            try await preflight()
+            // Trust/identity/time failures must precede content downloads; Core repeats checks at commit.
+            let preview = try await store.preview(snapshot, now: now)
+            guard acknowledgeUnverified || !preview.requiresAcknowledgment else { throw AutomationError.acknowledgmentRequired }
+            if let packageSynchronization {
+                try await packageSynchronization.stage(snapshot, installed: scripts, leaseID: leaseID)
+            } else if let packageCatalogError {
+                throw packageCatalogError // A production database-open failure is never an opt-out.
+            }
+            try Task.checkCancellation()
+            let record = try await publish()
+            // No cancellation check after confirmed authoritative publication.
+            await refreshCatalog()
+            await finishPackageLease(leaseID)
+            if isCurrentPackageSnapshot(snapshot) { packageCatalogBackfillErrors.removeValue(forKey: snapshot.url.canonical) }
+            actionError = nil
+            return record
+        } catch {
+            await refreshCatalog()
+            await finishPackageLease(leaseID)
+            let failure = recordPackageFailure(error)
+            if !(error is CancellationError) { actionError = failure }
+            throw failure
+        }
+    }
+
+    private func recordPackageFailure(_ error: Error) -> Error {
+        if let failure = error as? PackageCatalogStorageFailure {
+            packageCatalogError = failure.underlying
+            return failure.underlying
+        }
+        return error
+    }
+
+    private func synchronizePackageCatalog(visible: [RepositoryRecord], installed: [InstalledRevision], receipt: UInt64) async -> Bool {
+        guard let packageCatalog else { return false }
+        do {
+            try await packageCatalog.synchronize(visible: visible, installed: installed, receipt: receipt)
+            guard receipt == projectionReceipt else { return false }
+            packageCatalogError = nil
+            return true
+        } catch {
+            if receipt == projectionReceipt { packageCatalogError = error }
+            return false
+        }
+    }
+
+    /// The caller publishes matching authority in this same actor turn, without an intervening await.
+    private func publishPackageCatalogRevision(receipt: UInt64, synchronized: Bool) {
+        guard synchronized, receipt == projectionReceipt else { return }
+        successfulPackageProjectionReceipt = receipt
+        packageCatalogRevision += 1
+    }
+
+    private func finishPackageLease(_ leaseID: UUID) async {
+        guard packageCatalog != nil else { return }
+        pendingPackageLeaseIDs.insert(leaseID)
+        await drainPendingPackageLeases()
+    }
+
+    private func prunePackageCatalog() async {
+        // This ID owns no lease. It schedules the same safe reference-based maintenance.
+        await finishPackageLease(UUID())
+    }
+
+    private func drainPendingPackageLeases() async {
+        guard let packageCatalog, !isDrainingPackageLeases else { return }
+        isDrainingPackageLeases = true
+        defer { isDrainingPackageLeases = false }
+        while let leaseID = pendingPackageLeaseIDs.first {
+            // Failed or superseded authority/selection projection cannot release staged content.
+            guard successfulPackageProjectionReceipt == projectionReceipt else { return }
+            let receipt = projectionReceipt
+            let visible = catalog.visibleRepositories
+            do {
+                try await packageCatalog.finish(leaseID: leaseID, visible: visible)
+                pendingPackageLeaseIDs.remove(leaseID)
+            } catch {
+                if receipt == projectionReceipt { packageCatalogError = error }
+                return // A later successful projection retries the retained IDs.
+            }
+        }
+    }
+
+    private func isCurrentPackageSnapshot(_ snapshot: VerifiedSnapshot) -> Bool {
+        catalog.record(for: snapshot.url).map {
+            $0.visible && $0.payloadDigest == snapshot.payloadDigest && $0.repositoryID == snapshot.index.id
+        } == true
+    }
+
+    private func schedulePackageBackfill() {
+        guard automaticPackageBackfill, let packageCatalog, let packageSynchronization, packageBackfillTask == nil else { return }
+        let pending: [VerifiedSnapshot]
+        do {
+            pending = try repositories.compactMap { record in
+                guard let snapshot = record.snapshot,
+                      !attemptedPackageBackfills.contains(packageBackfillIdentity(snapshot)),
+                      try !packageCatalog.isComplete(snapshot) else { return nil }
+                return snapshot
+            }
+        } catch { packageCatalogError = error; return }
+        guard !pending.isEmpty else { return }
+        isBackfillingPackages = true
+        packageBackfillTask = Task { [weak self] in
+            guard let self else { return }
+            for snapshot in pending {
+                let leaseID = UUID()
+                var failure: Error?
+                var didStart = false
+                do {
+                    try await packageSynchronization.stage(snapshot, installed: scripts, leaseID: leaseID) {
+                        let identity = self.packageBackfillIdentity(snapshot)
+                        guard self.isCurrentPackageSnapshot(snapshot), !self.attemptedPackageBackfills.contains(identity) else { return false }
+                        do { if try packageCatalog.isComplete(snapshot) { return false } }
+                        catch { throw PackageCatalogStorageFailure(underlying: error) }
+                        self.attemptedPackageBackfills.insert(identity)
+                        didStart = true
+                        return true
+                    }
+                } catch { failure = error }
+                guard didStart || failure != nil else { continue }
+                await refreshCatalog()
+                await finishPackageLease(leaseID)
+                guard isCurrentPackageSnapshot(snapshot) else { continue }
+                if let failure {
+                    do {
+                        if try !packageCatalog.isComplete(snapshot) {
+                            packageCatalogBackfillErrors[snapshot.url.canonical] = recordPackageFailure(failure)
+                        }
+                    } catch { packageCatalogError = error }
+                } else {
+                    packageCatalogBackfillErrors.removeValue(forKey: snapshot.url.canonical)
+                }
+            }
+            packageBackfillTask = nil
+            isBackfillingPackages = false
+            if !Task.isCancelled { schedulePackageBackfill() }
+        }
+    }
+
+    private func packageBackfillIdentity(_ snapshot: VerifiedSnapshot) -> String {
+        snapshot.url.canonical + "|" + snapshot.index.id.uuidString + "|" + snapshot.payloadDigest
     }
 
     // MARK: Stable file location
@@ -561,8 +821,18 @@ final class AutomationController {
 
     static func live() -> AutomationController {
         let catalogURL = defaultStoreURL(), activationURL = AutomationSharedConfiguration.activationURL()
+        let database: PackageCatalogDatabase?
+        let databaseError: Error?
+        do {
+            database = try PackageCatalogDatabase(url: catalogURL.deletingLastPathComponent().appendingPathComponent("PackageCatalog"))
+            databaseError = nil
+        } catch {
+            database = nil
+            databaseError = error
+        }
         return AutomationController(store: AutomationStore(fileURL: catalogURL), client: RepositoryClient(), executor: JavaScriptExecutor(),
                              defaultRepository: testStoreName == nil ? .official : nil,
+                             packageCatalog: database, packageCatalogError: databaseError,
                              activationStore: activationURL.map { PluginActivationStore(fileURL: $0, catalogURL: catalogURL) },
                              installationCoordinator: InstallationCoordinator(catalogURL: catalogURL, activationURL: activationURL),
                              installationAvailable: activationURL != nil)

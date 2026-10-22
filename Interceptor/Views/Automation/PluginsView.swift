@@ -4,15 +4,21 @@ import UIKit
 
 /// Presented full screen from Settings, with its own three destinations and one shared queue.
 struct PluginsView: View {
-    @State private var model: PluginBrowserModel
-
-    init() {
-        _model = State(initialValue: PluginBrowserModel(controller: AutomationController.live()))
-    }
+    @Environment(AutomationController.self) private var controller
 
     var body: some View {
-        PluginBrowserView(model: model)
+        SharedPluginsBrowser(controller: controller)
     }
+}
+
+private struct SharedPluginsBrowser: View {
+    @State private var model: PluginBrowserModel
+
+    init(controller: AutomationController) {
+        _model = State(initialValue: PluginBrowserModel(controller: controller))
+    }
+
+    var body: some View { PluginBrowserView(model: model) }
 }
 
 struct TrustBadgeLabel: View {

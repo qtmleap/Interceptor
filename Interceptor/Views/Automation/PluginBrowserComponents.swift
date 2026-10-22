@@ -121,9 +121,11 @@ struct PluginPackageHero: View {
                         .font(.title2.bold())
                         .accessibilityAddTraits(.isHeader)
                         .accessibilityIdentifier("plugins.package.hero.name")
-                    Text("AUTO_BROWSER_TARGET_HOSTS")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if !targetHosts.isEmpty {
+                        Text("AUTO_BROWSER_TARGET_HOSTS")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     ForEach(Array(targetHosts.enumerated()), id: \.offset) { _, host in
                         Text(verbatim: host)
                             .font(.subheadline.weight(.semibold))

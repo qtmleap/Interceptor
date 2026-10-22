@@ -1,0 +1,17 @@
+# Persistent package catalog
+
+The user requires repository-scoped package information to be stored in a database when a source is added or refreshed. Packages, Search, categories and detail navigation query that database. They must not fetch or validate package JSON on navigation or search. Sources pull-to-refresh is the update boundary.
+
+Use an app-only SwiftData database beside the existing catalog. It is a display/content projection; the existing catalog, trust pins, sequence high-water marks, installation coordinator and execution grants retain authority. Never migrate or reset those stores as part of this change.
+
+Ingest validated package bytes and typed presentation fields before publishing a new accepted source. Address source snapshots by canonical URL, repository UUID and payload digest. Only snapshots matching the currently visible accepted record are queryable. The existing accept/refresh CAS remains the single publication point. Preserve the previous source on download, validation, cancellation or DB-write failure.
+
+Store exact raw bytes separately from queryable metadata. Share content by SHA-256. A GET action revalidates those local bytes against the current trusted index before queuing. Viewing, searching and source/manifest inspection use typed stored presentation data and never call the downloader or package validator. Ingesting metadata never installs or enables a package.
+
+Database queries preserve source-qualified identities, selected installed metadata priority, installed repository orphans and category membership. Use FetchDescriptor predicates over persisted display/search fields. Keep Japanese, case, diacritic, width and literal wildcard behavior covered by native tests. Keep the package ModelContainer separate from the existing traffic database.
+
+Keep the facade and query contexts on MainActor; perform staging through a serialized background writer with contexts created on that executor. Never transfer managed objects between executors. Use fresh read contexts to avoid stale identity maps and disable autosave. Do not hold a write transaction across network operations or await. File permissions, backup exclusion and iOS protection apply to the store and sidecars. Keep raw payloads in separate models from list/detail metadata. Keep source work bounded by existing limits (16 sources, 100 entries/source, 262144 bytes/package) and at most three simultaneous fetches. Prune unreferenced content without deleting active staging leases.
+
+For existing sources, seed the known index metadata offline. Backfill missing content once per controller launch/source digest, independently of detail navigation; reuse matching installed or stored bytes. A failed upgrade backfill keeps useful known metadata and an explicit finite refresh state. A completed DB survives controller/process recreation and works offline. Do not silently delete a corrupt database; preserve its files and keep authority stores untouched. Transient IO, permissions, locked-device or busy errors are not corruption.
+
+Acceptance evidence: restart/offline list, database search and full detail with zero network/validation calls; Japanese/case/width/literal wildcard search parity; same UUID in different sources; exact bytes and typed DTO round-trip; source refresh/remove/pin/CAS/failure/cancellation; installed priority and retained orphans; no automatic install/activation; safe bounds and staging cleanup. Native affected states must be checked and the verified Debug build installed on the authorized M3.

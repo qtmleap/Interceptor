@@ -7,6 +7,11 @@ struct PluginBrowserFamilyID: Hashable, Sendable {
     let source: String
     let manifestID: UUID
 
+    init(source: String, manifestID: UUID) {
+        self.source = source
+        self.manifestID = manifestID
+    }
+
     init(repository: RepositoryURL, manifestID: UUID) {
         source = repository.canonical
         self.manifestID = manifestID
@@ -53,13 +58,7 @@ struct PluginBrowserCategory: Identifiable, Equatable, Sendable {
     var id: String { name.map { "category:" + $0 } ?? "uncategorized" }
 }
 
-struct PluginBrowserRule: Equatable, Sendable {
-    let hook: String
-    let hosts: [String]
-    let methods: [String]?
-    let path: PluginSubscription.PathMatch?
-    let status: ClosedRange<Int>?
-}
+typealias PluginBrowserRule = PackageCatalogRule
 
 struct PluginBrowserUpdate: Equatable, Sendable {
     let package: PluginPackage
@@ -71,7 +70,7 @@ struct PluginBrowserUpdate: Equatable, Sendable {
 }
 
 enum PluginBrowserError: Error, Equatable, Sendable {
-    case busy, emptyQueue, queueLimit, staleQueue, updateUnavailable
+    case busy, emptyQueue, queueLimit, staleQueue, updateUnavailable, catalogUnavailable
 }
 
 /// UI state only. Selection and execution always come from the controller's durable coordinator.
@@ -86,21 +85,81 @@ final class PluginBrowserModel {
     private(set) var updateError: Error?
     private(set) var isRefreshing = false
     private(set) var refreshErrors: [String: Error] = [:]
+    private struct CatalogPresentationKey: Hashable {
+        let family: PluginBrowserFamilyID
+        let generation: UUID
+    }
+    @ObservationIgnored private var presentationRevision: UInt64?
+    @ObservationIgnored private var catalogPresentations: [CatalogPresentationKey: PluginPackagePresentation] = [:]
+    @ObservationIgnored private var presentationOrder: [CatalogPresentationKey] = []
+    @ObservationIgnored private var installedPresentations: [String: PluginPackagePresentation] = [:]
+    @ObservationIgnored private(set) var catalogReadError: Error?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
 
     init(controller: AutomationController) { self.controller = controller }
 
     var canDismissQueue: Bool { !isProcessing }
 
+    var hasSourceRefreshFailures: Bool {
+        !refreshErrors.isEmpty || controller.repositories.contains { controller.packageCatalogBackfillErrors[$0.url.canonical] != nil }
+    }
+
+    /// Explicit Get/Update reads exact local bytes and revalidates against current authority.
+    /// Presentation never calls this path.
     func fetchPackage(entry: IndexEntry, record: RepositoryRecord) async throws -> PluginPackage {
-        guard let snapshot = record.snapshot, snapshot.index.plugins.contains(entry) else { throw AutomationError.staleSnapshot }
-        let package = try await controller.client.fetchPackage(entry: entry, from: snapshot)
+        guard let current = currentRecord(record), current.generation == record.generation,
+              let snapshot = current.snapshot, snapshot.index.plugins.contains(entry) else { throw AutomationError.staleSnapshot }
+        guard let database = controller.packageCatalog else { throw PluginBrowserError.catalogUnavailable }
+        guard let bytes = try database.packageBytes(in: current, entry: entry) else { throw PluginBrowserError.catalogUnavailable }
         try Task.checkCancellation()
-        let checked = try await Task.detached(priority: .userInitiated) {
-            try PluginPackage.validate(package.bytes, against: entry)
-        }.value
+        let validation = Task.detached(priority: .userInitiated) { try PluginPackage.validate(bytes, against: entry) }
+        let checked = try await withTaskCancellationHandler { try await validation.value } onCancel: { validation.cancel() }
         try Task.checkCancellation()
+        guard currentRecord(record)?.generation == current.generation else { throw AutomationError.staleSnapshot }
         return checked
+    }
+
+    /// Synchronous database read, suitable for the first NavigationLink render.
+    func packagePresentation(for family: PluginBrowserFamilyID, record: RepositoryRecord?) throws -> PluginPackagePresentation? {
+        if let selected = selectedRevision(for: family) { return presentation(of: selected) }
+        guard let record, let current = currentRecord(record), current.repositoryID == record.repositoryID else { return nil }
+        let revision = controller.packageCatalogRevision
+        if presentationRevision != revision {
+            catalogPresentations.removeAll(keepingCapacity: true)
+            presentationOrder.removeAll(keepingCapacity: true)
+            presentationRevision = revision
+        }
+        let key = CatalogPresentationKey(family: family, generation: current.generation)
+        if let cached = catalogPresentations[key] { return cached }
+        guard let database = controller.packageCatalog else { throw PluginBrowserError.catalogUnavailable }
+        let detail = try database.detail(in: current, entryID: family.manifestID)
+        if let detail {
+            catalogPresentations[key] = detail
+            presentationOrder.append(key)
+            if presentationOrder.count > 16 {
+                catalogPresentations.removeValue(forKey: presentationOrder.removeFirst())
+            }
+        }
+        return detail
+    }
+
+    func presentation(of revision: InstalledRevision) -> PluginPackagePresentation {
+        if let cached = installedPresentations[revision.id] { return cached }
+        let value = PluginPackagePresentation(revision.package)
+        installedPresentations = installedPresentations.filter { id, _ in controller.scripts.contains { $0.id == id } }
+        installedPresentations[revision.id] = value
+        return value
+    }
+
+    @discardableResult
+    func enqueueGet(entry: IndexEntry, record: RepositoryRecord) async -> Bool {
+        do {
+            let package = try await fetchPackage(entry: entry, record: record)
+            return enqueueGet(package: package, record: record)
+        } catch {
+            queueError = error
+            return false
+        }
     }
 
     func recoverPackageSource(after failure: Error, record: RepositoryRecord) async throws -> Bool {
@@ -115,8 +174,7 @@ final class PluginBrowserModel {
         let snapshot = try await controller.client.preview(url: record.url, now: controller.now)
         try Task.checkCancellation()
         do {
-            _ = try await controller.store.refresh(snapshot, expectedGeneration: record.generation,
-                                                   acknowledgeUnverified: false, now: controller.now)
+            _ = try await controller.refreshRepository(snapshot, expectedGeneration: record.generation)
         } catch {
             guard (error as? AutomationError) == .staleSnapshot else { throw error }
             await controller.refreshCatalog()
@@ -305,81 +363,92 @@ final class PluginBrowserModel {
         await controller.refreshCatalog()
         if let error = controller.storeError { refreshErrors["catalog"] = error; return }
         let records = controller.repositories
+        do { try await controller.retryDefaultRepository() }
+        catch is CancellationError { return }
+        catch { refreshErrors["default"] = error }
         for record in records {
             do {
                 let snapshot = try await controller.client.preview(url: record.url, now: controller.now)
                 try Task.checkCancellation()
-                _ = try await controller.store.refresh(snapshot, expectedGeneration: record.generation,
-                                                         acknowledgeUnverified: false, now: controller.now)
-            } catch { refreshErrors[record.url.canonical] = error }
+                _ = try await controller.refreshRepository(snapshot, expectedGeneration: record.generation)
+            } catch is CancellationError { return }
+            catch { refreshErrors[record.url.canonical] = error }
         }
         await controller.refreshCatalog()
     }
 
     func categories(in record: RepositoryRecord) -> [PluginBrowserCategory] {
-        let entries = currentRecord(record)?.snapshot?.index.plugins ?? []
-        let grouped = Dictionary(grouping: entries, by: \.category)
-        return grouped.map { PluginBrowserCategory(name: $0.key, count: $0.value.count) }.sorted {
-            guard let left = $0.name else { return false }
-            guard let right = $1.name else { return true }
-            return left.localizedStandardCompare(right) == .orderedAscending
-        }
+        _ = controller.packageCatalogRevision
+        guard let current = currentRecord(record) else { return [] }
+        do {
+            guard let database = controller.packageCatalog else { throw PluginBrowserError.catalogUnavailable }
+            let values = try database.categories(in: current)
+            catalogReadError = nil
+            return values.map { PluginBrowserCategory(name: $0.name, count: $0.count) }
+        } catch { catalogReadError = error; return [] }
     }
 
     func catalogEntries(in record: RepositoryRecord, category: PluginBrowserCategory? = nil, query: String = "") -> [IndexEntry] {
-        let entries = currentRecord(record)?.snapshot?.index.plugins ?? []
-        return entries.filter { entry in
-            (category == nil || entry.category == category?.name) && Self.matches(query, name: entry.name, author: entry.author, summary: entry.summary)
-        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        guard let current = currentRecord(record) else { return [] }
+        let filter: PackageCatalogCategoryFilter = category.map { .category($0.name) } ?? .all
+        return databaseRows(query: query, source: current.url.canonical, category: filter).compactMap { row in
+            current.snapshot?.index.plugins.first { $0.id == row.manifestID }
+        }
     }
 
-    /// One source's category rows. Membership follows the latest Index entries; display and search follow the global projection
-    /// (selected local manifest when installed). Installed orphans stay global-only. Never fetches.
+    /// Membership and search are database predicates over the current source projection.
     func catalogPackages(in record: RepositoryRecord, category: PluginBrowserCategory, query: String = "") -> [PluginBrowserCatalogPackage] {
-        let members = Set(catalogEntries(in: record, category: category).map(\.id))
-        let source = record.url.canonical
-        return catalogPackages(query: query).filter { $0.id.source == source && $0.entry != nil && members.contains($0.id.manifestID) }
+        guard let current = currentRecord(record) else { return [] }
+        return projectedPackages(databaseRows(query: query, source: current.url.canonical, category: .category(category.name)))
     }
 
-    /// Cached catalogs of all visible sources plus installed repository orphans. Never fetches.
     func catalogPackages(query: String = "") -> [PluginBrowserCatalogPackage] {
-        let records = controller.repositories
-        let installed = installedPackages().filter {
-            if case .repository = $0.provenance.origin { return true }
-            return false
+        let listed = projectedPackages(databaseRows(query: query, source: nil, category: .all))
+        // A display-store failure must not hide management of an authoritative selection.
+        // Search and source/category membership always remain database operations.
+        guard query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return listed }
+        let returned = Set(listed.map(\.id))
+        let recovery: [PluginBrowserCatalogPackage] = controller.scripts.compactMap { selected in
+            guard case .repository(let url, _) = selected.provenance.origin else { return nil }
+            let family = PluginBrowserFamilyID(selected)
+            guard !returned.contains(family) else { return nil }
+            let record = controller.repositories.first { $0.url == url }
+            let manifest = selected.package.manifest
+            return PluginBrowserCatalogPackage(id: family,
+                entry: record?.snapshot?.index.plugins.first { $0.id == family.manifestID },
+                record: record, installed: selected, name: manifest.name, version: manifest.version,
+                author: manifest.author, summary: manifest.summary)
         }
-        let selectedByFamily = Dictionary(installed.map { (PluginBrowserFamilyID($0), $0) },
-                                          uniquingKeysWith: { first, _ in first })
-        var rows: [PluginBrowserCatalogPackage] = []
-        var listed = Set<PluginBrowserFamilyID>()
-        for record in records {
-            for entry in record.snapshot?.index.plugins ?? [] {
-                let family = PluginBrowserFamilyID(repository: record.url, manifestID: entry.id)
-                guard listed.insert(family).inserted else { continue }
-                let selected = selectedByFamily[family]
-                let manifest = selected?.package.manifest
-                rows.append(PluginBrowserCatalogPackage(
-                    id: family, entry: entry, record: record, installed: selected,
-                    name: manifest?.name ?? entry.name, version: manifest?.version ?? entry.version,
-                    author: selected == nil ? entry.author : manifest?.author,
-                    summary: selected == nil ? entry.summary : manifest?.summary,
-                ))
-            }
-        }
-        for revision in installed {
-            let family = PluginBrowserFamilyID(revision)
-            guard listed.insert(family).inserted else { continue }
-            let manifest = revision.package.manifest
-            rows.append(PluginBrowserCatalogPackage(
-                id: family, entry: nil, record: records.first { $0.url.canonical == family.source }, installed: revision,
-                name: manifest.name, version: manifest.version, author: manifest.author, summary: manifest.summary,
-            ))
-        }
-        return rows.filter { Self.matches(query, name: $0.name, author: $0.author, summary: $0.summary) }.sorted {
+        guard !recovery.isEmpty else { return listed }
+        return (listed + recovery).sorted {
             let order = $0.name.localizedStandardCompare($1.name)
             if order != .orderedSame { return order == .orderedAscending }
             if $0.id.source != $1.id.source { return $0.id.source < $1.id.source }
             return $0.id.manifestID.uuidString < $1.id.manifestID.uuidString
+        }
+    }
+
+    private func databaseRows(query: String, source: String?, category: PackageCatalogCategoryFilter) -> [PackageCatalogRow] {
+        _ = controller.packageCatalogRevision
+        do {
+            guard let database = controller.packageCatalog else { throw PluginBrowserError.catalogUnavailable }
+            let rows = try database.rows(visible: controller.repositories, installed: controller.scripts,
+                                         query: query, source: source, category: category)
+            catalogReadError = nil
+            return rows
+        } catch { catalogReadError = error; return [] }
+    }
+
+    private func projectedPackages(_ rows: [PackageCatalogRow]) -> [PluginBrowserCatalogPackage] {
+        let records = Dictionary(controller.repositories.map { ($0.url.canonical, $0) }, uniquingKeysWith: { first, _ in first })
+        let selected = Dictionary(controller.scripts.map { (PluginBrowserFamilyID($0), $0) }, uniquingKeysWith: { first, _ in first })
+        return rows.map { row in
+            let record = records[row.source]
+            let family = PluginBrowserFamilyID(source: row.source, manifestID: row.manifestID)
+            return PluginBrowserCatalogPackage(id: family,
+                entry: record?.snapshot?.index.plugins.first { $0.id == row.manifestID },
+                record: record, installed: selected[family],
+                name: row.name, version: row.version, author: row.author, summary: row.summary)
         }
     }
 
@@ -417,14 +486,6 @@ final class PluginBrowserModel {
     }
 
     nonisolated static func matchingRules(in manifest: PluginManifest, file: String) -> [PluginBrowserRule] {
-        if manifest.schemaVersion == 2 {
-            return manifest.matches.flatMap { match in
-                match.hooks.keys.sorted().filter { match.hooks[$0] == file }.map {
-                    PluginBrowserRule(hook: $0, hosts: match.hosts, methods: match.methods, path: match.path, status: match.status)
-                }
-            }
-        }
-        guard file == "script.js" else { return [] }
-        return manifest.subscriptions.map { .init(hook: $0.phase.rawValue, hosts: $0.hosts, methods: $0.methods, path: $0.path, status: $0.status) }
+        PluginPackagePresentation.matchingRules(in: manifest, file: file)
     }
 }

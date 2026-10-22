@@ -13,6 +13,10 @@ protocol AutomationStoring: Sendable {
     func preview(_ snapshot: VerifiedSnapshot, now: Date) async throws -> AcceptancePreview
     func accept(_ snapshot: VerifiedSnapshot, acknowledgeUnverified: Bool, now: Date) async throws -> RepositoryRecord
     func acceptAndPin(_ snapshot: VerifiedSnapshot, fingerprint: String, now: Date) async throws -> RepositoryRecord
+    func accept(_ snapshot: VerifiedSnapshot, acknowledgeUnverified: Bool, now: Date,
+                expecting: RepositoryAcceptanceExpectation) async throws -> RepositoryRecord
+    func acceptAndPin(_ snapshot: VerifiedSnapshot, fingerprint: String, now: Date,
+                      expecting: RepositoryAcceptanceExpectation) async throws -> RepositoryRecord
     func refresh(_ snapshot: VerifiedSnapshot, expectedGeneration: UUID, acknowledgeUnverified: Bool, now: Date) async throws -> RepositoryRecord
     func pin(_ url: RepositoryURL, fingerprint: String) async throws -> RepositoryRecord
     func remove(_ url: RepositoryURL) async throws
@@ -25,6 +29,15 @@ protocol AutomationStoring: Sendable {
 }
 
 extension AutomationStoring {
+    /// Old doubles must not silently bypass the reviewed source's admission condition.
+    func accept(_ snapshot: VerifiedSnapshot, acknowledgeUnverified: Bool, now: Date,
+                expecting: RepositoryAcceptanceExpectation) async throws -> RepositoryRecord {
+        throw AutomationError.staleSnapshot
+    }
+    func acceptAndPin(_ snapshot: VerifiedSnapshot, fingerprint: String, now: Date,
+                      expecting: RepositoryAcceptanceExpectation) async throws -> RepositoryRecord {
+        throw AutomationError.staleSnapshot
+    }
     /// Fail closed for doubles that predate refresh.
     func refresh(_ snapshot: VerifiedSnapshot, expectedGeneration: UUID, acknowledgeUnverified: Bool, now: Date) async throws -> RepositoryRecord {
         throw AutomationError.staleSnapshot
@@ -65,6 +78,14 @@ struct CoordinatorCatalogStore: AutomationStoring {
     }
     func acceptAndPin(_ snapshot: VerifiedSnapshot, fingerprint: String, now: Date) async throws -> RepositoryRecord {
         try await base.acceptAndPin(snapshot, fingerprint: fingerprint, now: now)
+    }
+    func accept(_ snapshot: VerifiedSnapshot, acknowledgeUnverified: Bool, now: Date,
+                expecting: RepositoryAcceptanceExpectation) async throws -> RepositoryRecord {
+        try await base.accept(snapshot, acknowledgeUnverified: acknowledgeUnverified, now: now, expecting: expecting)
+    }
+    func acceptAndPin(_ snapshot: VerifiedSnapshot, fingerprint: String, now: Date,
+                      expecting: RepositoryAcceptanceExpectation) async throws -> RepositoryRecord {
+        try await base.acceptAndPin(snapshot, fingerprint: fingerprint, now: now, expecting: expecting)
     }
     func refresh(_ snapshot: VerifiedSnapshot, expectedGeneration: UUID, acknowledgeUnverified: Bool, now: Date) async throws -> RepositoryRecord {
         try await base.refresh(snapshot, expectedGeneration: expectedGeneration, acknowledgeUnverified: acknowledgeUnverified, now: now)

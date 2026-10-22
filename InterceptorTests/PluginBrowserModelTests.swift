@@ -59,14 +59,20 @@ final class PluginBrowserModelTests: XCTestCase {
         let store = AutomationStore(fileURL: catalogURL)
         let snapshot = try repositorySnapshot ?? AutomationFixtures.snapshot(packages: packages)
         let record = try await store.accept(snapshot, acknowledgeUnverified: true, now: AutomationFixtures.now)
+        let database = try PackageCatalogDatabase(url: fixtureDirectory.appendingPathComponent("PackageCatalog"))
+        let lease = UUID()
+        try await database.stage(snapshot, packages: packages, leaseID: lease)
         let coordinator = InstallationCoordinator(catalogURL: catalogURL, activationURL: activationURL)
         let client = FakeRepositoryClient(snapshot: publishedSnapshot ?? snapshot, packages: publishedPackages ?? packages)
+        // These authority/CAS tests add sources directly and intentionally seed index-only rows.
+        // Missing-content migration and automatic backfill are covered by the dedicated lifecycle/read tests.
         let controller = AutomationController(store: store, client: clientWrapper?(client) ?? client, executor: FakeScriptRunner(),
-                                              clock: { AutomationFixtures.now },
+                                              clock: { AutomationFixtures.now }, packageCatalog: database, automaticPackageBackfill: false,
                                               activationStore: PluginActivationStore(fileURL: activationURL),
                                               installationCoordinator: coordinatorWrapper?(coordinator) ?? coordinator,
                                               hasCaptureConsent: { true }, stopCapture: stopCapture)
         await controller.load()
+        try await database.finish(leaseID: lease, visible: controller.repositories)
         return (controller, PluginBrowserModel(controller: controller), store, coordinator, record, client)
     }
 
@@ -507,12 +513,18 @@ final class PluginBrowserModelTests: XCTestCase {
         await original.activate(selected, expectedGeneration: try XCTUnwrap(original.activationSnapshot?.generation))
         let newer = try revised(old, version: "2.0.0", marker: "\n// reviewed new bytes")
         let snapshot = try AutomationFixtures.snapshot(packages: [newer], sequence: 2)
+        let database = try XCTUnwrap(original.packageCatalog)
+        let lease = UUID()
+        try await database.stage(snapshot, packages: [newer], leaseID: lease)
         let refreshed = try await original.store.refresh(snapshot, expectedGeneration: record.generation,
                                                 acknowledgeUnverified: false, now: AutomationFixtures.now)
+        await original.refreshCatalog()
+        try await database.finish(leaseID: lease, visible: original.repositories)
         // Historical bytes must not make the selected old installation look current.
         _ = try await store.install(newer, from: snapshot, expectedGeneration: refreshed.generation, now: AutomationFixtures.now)
         let controller = AutomationController(store: store, client: FakeRepositoryClient(snapshot: snapshot, packages: [newer]),
                                               executor: FakeScriptRunner(), clock: { AutomationFixtures.now },
+                                              packageCatalog: try PackageCatalogDatabase(url: directory.appendingPathComponent("PackageCatalog")),
                                               activationStore: PluginActivationStore(fileURL: directory.appendingPathComponent("activation.json")),
                                               installationCoordinator: coordinator, hasCaptureConsent: { true }, stopCapture: {})
         await controller.load()
@@ -551,7 +563,7 @@ final class PluginBrowserModelTests: XCTestCase {
         XCTAssertEqual(controller.catalog.record(for: record.url), record)
     }
 
-    func testPackageRecoveryRefreshesOnlyMetadataAndKeepsQueueFrozen() async throws {
+    func testExplicitSourceRefreshStoresContentAndKeepsQueueFrozen() async throws {
         let old = try AutomationFixtures.package(name: "Published package")
         let newer = try revised(old, version: "1.0.1", marker: "\n// published new bytes")
         let fresh = try AutomationFixtures.snapshot(packages: [newer], sequence: 2)
@@ -566,10 +578,11 @@ final class PluginBrowserModelTests: XCTestCase {
         XCTAssertNotEqual(refreshed.generation, record.generation)
         XCTAssertEqual(refreshed.snapshot, fresh)
         XCTAssertEqual(client.previewCount, 1)
-        XCTAssertEqual(client.packageCount, 0, "Recovery only refreshes metadata; the new view identity owns the next download")
+        XCTAssertEqual(client.packageCount, 1, "Refresh persists new content before publishing the source")
         let entry = try XCTUnwrap(refreshed.snapshot?.index.plugins.first)
         let downloaded = try await model.fetchPackage(entry: entry, record: refreshed)
         XCTAssertEqual(downloaded.bytes, newer.bytes)
+        XCTAssertEqual(client.packageCount, 1, "Get reads the stored payload without another request")
         let after = try await Task.detached { try coordinator.state() }.value
         XCTAssertEqual(after.installed, before.installed)
         XCTAssertEqual(after.activation, before.activation)

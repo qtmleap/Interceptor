@@ -5323,6 +5323,22 @@
         }
       }
     },
+    "AUTO_BROWSER_REFRESH_DETAILS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refresh Sources to load package details."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sourcesを更新すると、詳細を表示できます。"
+          }
+        }
+      }
+    },
     "AUTO_BROWSER_REFRESH" : {
       "localizations" : {
         "en" : {

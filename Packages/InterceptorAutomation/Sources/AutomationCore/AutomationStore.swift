@@ -106,9 +106,29 @@ public actor AutomationStore {
         try accept(snapshot, acknowledgeUnverified: true, fingerprint: fingerprint, now: now)
     }
 
-    private func accept(_ snapshot: VerifiedSnapshot, acknowledgeUnverified: Bool, fingerprint: String?, now: Date) throws -> RepositoryRecord {
+    public func accept(_ snapshot: VerifiedSnapshot, acknowledgeUnverified: Bool, now: Date,
+                       expecting: RepositoryAcceptanceExpectation) throws -> RepositoryRecord {
+        try accept(snapshot, acknowledgeUnverified: acknowledgeUnverified, fingerprint: nil, now: now, expecting: expecting)
+    }
+
+    public func acceptAndPin(_ snapshot: VerifiedSnapshot, fingerprint: String, now: Date,
+                             expecting: RepositoryAcceptanceExpectation) throws -> RepositoryRecord {
+        try accept(snapshot, acknowledgeUnverified: true, fingerprint: fingerprint, now: now, expecting: expecting)
+    }
+
+    private func accept(_ snapshot: VerifiedSnapshot, acknowledgeUnverified: Bool, fingerprint: String?, now: Date,
+                        expecting: RepositoryAcceptanceExpectation? = nil) throws -> RepositoryRecord {
         try transact { cat in
+            try Task.checkCancellation()
             let existing = cat.record(for: snapshot.url)
+            switch expecting {
+            case .absent?:
+                guard existing == nil else { throw AutomationError.staleSnapshot }
+            case .generation(let generation)?:
+                guard existing?.generation == generation else { throw AutomationError.staleSnapshot }
+            case nil:
+                break
+            }
             let plan = try TrustPlanner.plan(existing: existing, snapshot: snapshot, now: now)
             if plan.requiresAck && !acknowledgeUnverified { throw AutomationError.acknowledgmentRequired }
             var trust = plan.trust
@@ -135,6 +155,7 @@ public actor AutomationStore {
     public func refresh(_ snapshot: VerifiedSnapshot, expectedGeneration: UUID, acknowledgeUnverified: Bool, now: Date) throws -> RepositoryRecord {
         try file.locked {
             var cat = try reload()
+            try Task.checkCancellation()
             guard let existing = cat.record(for: snapshot.url), existing.visible,
                   existing.generation == expectedGeneration else { throw AutomationError.staleSnapshot }
             let plan = try TrustPlanner.plan(existing: existing, snapshot: snapshot, now: now)

@@ -73,7 +73,6 @@ struct PluginBrowserView: View {
         }
         .tint(PluginBrowserColor.accent)
         .interactiveDismissDisabled(model.isProcessing)
-        .task { await model.controller.load() }
         .sheet(isPresented: Binding(get: { model.isQueuePresented }, set: {
             if !$0 {
                 _ = model.dismissQueue()
@@ -204,13 +203,13 @@ struct PluginSourcesView: View {
 
     var body: some View {
         List {
-            PluginBrowserErrors(controller: model.controller)
+            PluginBrowserErrors(controller: model.controller, queryError: model.catalogReadError)
             if !model.controller.isLoaded {
                 ProgressView("AUTO_BROWSER_LOADING").accessibilityIdentifier("plugins.loading")
             }
-            if model.isRefreshing {
+            if model.isRefreshing || model.controller.isBackfillingPackages {
                 ProgressView("AUTO_BROWSER_REFRESHING").accessibilityIdentifier("plugins.refreshing")
-            } else if !model.refreshErrors.isEmpty {
+            } else if model.hasSourceRefreshFailures {
                 Section {
                     Text("AUTO_BROWSER_REFRESH_FAILED").foregroundStyle(AutomationStatusColor.error)
                     Button("AUTO_BROWSER_RETRY") { Task { await model.refreshSources() } }
@@ -317,10 +316,12 @@ struct PluginRepositoryCategoriesView: View {
     }
 
     var body: some View {
+        let categories = current.map { model.categories(in: $0) } ?? []
         List {
+            PluginBrowserErrors(controller: model.controller, queryError: model.catalogReadError)
             if let current {
                 Section {
-                    ForEach(model.categories(in: current)) { category in
+                    ForEach(categories) { category in
                         NavigationLink {
                             PluginCatalogPackagesView(model: model, sourceURL: sourceURL, category: category)
                         } label: {
@@ -333,7 +334,7 @@ struct PluginRepositoryCategoriesView: View {
                         }
                         .accessibilityIdentifier("plugins.category." + category.id)
                     }
-                    if model.categories(in: current).isEmpty {
+                    if categories.isEmpty {
                         Text("AUTO_BROWSER_CATALOG_EMPTY").foregroundStyle(.secondary)
                     }
                 } header: { Text("AUTO_BROWSER_CATEGORIES") }
@@ -358,9 +359,10 @@ struct PluginCatalogPackagesView: View {
     }
 
     var body: some View {
+        let rows = current.map { model.catalogPackages(in: $0, category: category, query: query) } ?? []
         List {
-            if let current {
-                let rows = model.catalogPackages(in: current, category: category, query: query)
+            PluginBrowserErrors(controller: model.controller, queryError: model.catalogReadError)
+            if current != nil {
                 ForEach(rows, id: \.id) { item in
                     PluginCatalogPackageLink(model: model, item: item, identifier: "plugins.catalog.package." + item.id.manifestID.uuidString)
                 }
@@ -408,7 +410,7 @@ struct PluginPackageSearchView: View {
         let results = trimmed.isEmpty ? [] : model.catalogPackages(query: trimmed)
         let loaded = model.controller.isLoaded
         List {
-            PluginBrowserErrors(controller: model.controller)
+            PluginBrowserErrors(controller: model.controller, queryError: model.catalogReadError)
             if !loaded {
                 ProgressView("AUTO_BROWSER_LOADING").accessibilityIdentifier("plugins.loading")
             }
@@ -451,8 +453,9 @@ struct PluginInstalledPackagesView: View {
     }
 
     var body: some View {
+        let catalogRows = localOnly ? [] : catalog
         List {
-            PluginBrowserErrors(controller: model.controller)
+            PluginBrowserErrors(controller: model.controller, queryError: model.catalogReadError)
             HStack {
                 Spacer()
                 Picker("AUTO_BROWSER_SORT", selection: $ascending) {
@@ -467,7 +470,7 @@ struct PluginInstalledPackagesView: View {
                 if !model.controller.isLoaded {
                     ProgressView("AUTO_BROWSER_LOADING").accessibilityIdentifier("plugins.loading")
                 }
-                ForEach(catalog) { item in
+                ForEach(catalogRows) { item in
                     PluginCatalogPackageLink(model: model, item: item, identifier: "plugins.package." + item.id.source + "|" + item.id.manifestID.uuidString)
                         .swipeActions {
                             if let installed = item.installed {
@@ -521,18 +524,18 @@ struct PluginInstalledPackagesView: View {
 
 struct PluginScriptFilesView: View {
     let model: PluginBrowserModel
-    var package: PluginPackage?
+    var package: PluginPackagePresentation?
     var body: some View {
         List {
             if let package {
                 files(package)
             } else {
-                PluginBrowserErrors(controller: model.controller)
+                PluginBrowserErrors(controller: model.controller, queryError: model.catalogReadError)
                 if !model.controller.isLoaded {
                     ProgressView("AUTO_BROWSER_LOADING").accessibilityIdentifier("plugins.loading")
                 }
                 ForEach(model.installedPackages(), id: \.id) { revision in
-                    Section(revision.package.manifest.name) { files(revision.package) }
+                    Section(revision.package.manifest.name) { files(model.presentation(of: revision)) }
                 }
             }
         }
@@ -542,8 +545,8 @@ struct PluginScriptFilesView: View {
         .accessibilityIdentifier("plugins.scripts")
     }
 
-    private func files(_ package: PluginPackage) -> some View {
-        ForEach(PluginBrowserModel.sourceFiles(in: package), id: \.self) { file in
+    private func files(_ package: PluginPackagePresentation) -> some View {
+        ForEach(package.sourceFileNames, id: \.self) { file in
             NavigationLink {
                 PluginFileDetailView(package: package, file: file)
             } label: {
@@ -577,8 +580,9 @@ struct PluginPackagesEmpty: View {
 
 struct PluginBrowserErrors: View {
     let controller: AutomationController
+    var queryError: Error?
     var body: some View {
-        if let error = controller.storeError ?? controller.installationError ?? controller.actionError {
+        if let error = controller.storeError ?? controller.installationError ?? controller.packageCatalogError ?? controller.actionError ?? queryError {
             Section { Text(LocalizedStringKey(PluginBrowserMessage.key(for: error))).foregroundStyle(AutomationStatusColor.error) }
                 .accessibilityIdentifier("plugins.error")
         }
@@ -594,6 +598,7 @@ enum PluginBrowserMessage {
                 case .queueLimit: return "AUTO_BROWSER_QUEUE_LIMIT"
                 case .staleQueue: return "AUTO_BROWSER_QUEUE_CHANGED"
                 case .updateUnavailable: return "AUTO_BROWSER_UPDATE_UNAVAILABLE"
+                case .catalogUnavailable: return "AUTO_BROWSER_REFRESH_DETAILS"
             }
         }
         if let error = error as? InstallationError {
