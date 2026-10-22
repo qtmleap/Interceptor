@@ -40,7 +40,11 @@ struct PluginPackageApprovalView: View {
                     LabeledContent("AUTO_APPROVAL_RESPONSE_JSON") {
                         Text(LocalizedStringKey(package.manifest.writeResponseBody ? "AUTO_APPROVAL_CAN_CHANGE" : "AUTO_APPROVAL_CANNOT_CHANGE"))
                     }
-                } footer: { Text("AUTO_ALERT_WEBHOOK") }
+                } footer: {
+                    if package.manifest.outbound.isEmpty {
+                        Text("AUTO_ALERT_WEBHOOK")
+                    }
+                }
                 Section {
                     if fields.isEmpty {
                         Text("AUTO_READ_NONE")
@@ -57,15 +61,18 @@ struct PluginPackageApprovalView: View {
                                     Text(verbatim: binding).font(.headline)
                                     Text(verbatim: "GET " + endpoint.url).font(.footnote).textSelection(.enabled)
                                     LabeledContent("AUTO_APPROVAL_OUTBOUND_HEADERS") {
-                                        if endpoint.headers.isEmpty { Text("AUTO_READ_NONE") }
-                                        else { Text(verbatim: endpoint.headers.joined(separator: ", ")) }
+                                        if endpoint.headers.isEmpty {
+                                            Text("AUTO_READ_NONE")
+                                        } else {
+                                            Text(verbatim: endpoint.headers.joined(separator: ", "))
+                                        }
                                     }.font(.footnote)
                                 }
                                 .accessibilityIdentifier("plugins.approval.outbound.\(binding)")
                             }
                         }
                     } header: { Text("AUTO_APPROVAL_OUTBOUND") }
-                      footer: { Text("AUTO_APPROVAL_OUTBOUND_FOOTER") }
+                        footer: { Text("AUTO_APPROVAL_OUTBOUND_FOOTER") }
                 }
                 Section {
                     HashText(value: package.revision, identifier: "plugins.approval.revision")

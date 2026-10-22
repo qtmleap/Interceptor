@@ -4672,13 +4672,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "These recipients may receive any data this plugin is allowed to read."
+            "value" : "Any readable data, including sign-in information, may be sent to these APIs."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "これらの送信先へ、読み取りを許可したすべてのデータを送信できます。"
+            "value" : "読み取りを許可したデータは、認証情報も含めて外部APIへ送信される可能性があります。"
           }
         }
       }
