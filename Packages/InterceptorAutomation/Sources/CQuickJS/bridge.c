@@ -77,6 +77,15 @@ typedef struct {
     JSValue cb;     // callback for the invoked phase, or JS_UNDEFINED
 } Reg;
 
+#define MAX_OUT 4
+#define MAX_INTENTS 16
+#define OUT_MAX_VALUE 4096u
+#define OUT_MAX_TOTAL 8192u
+
+typedef struct { Str name; Str *headers; size_t nheaders; } OutDecl;
+// Snapshot copy of one validated Interceptor.send call; never references JS memory.
+typedef struct { Str binding; Str *names; Str *values; size_t n; } Intent;
+
 typedef struct RunState {
     QJSCancelToken *token;
     uint64_t deadline_ns;
@@ -105,6 +114,12 @@ typedef struct RunState {
     size_t n_rd_query;
     int read_body_json;
     int body_writable;   // enter phase with the manifest write grant for the invoked leg
+    // v2 only: declared outbound bindings and the HTTP intents recorded by Interceptor.send.
+    int in_callback;     // set only while the host invokes a registered callback
+    int nout;
+    OutDecl out[MAX_OUT];
+    Intent *intents;
+    size_t nintents, max_intents;
 } RunState;
 
 static uint64_t now_ns(void) {
@@ -1256,16 +1271,117 @@ done:
     return JS_ThrowTypeError(ctx, "invalid Interceptor.attach");
 }
 
+static void intent_free(Intent *it) {
+    str_free(&it->binding);
+    strs_free(it->names, it->n);
+    strs_free(it->values, it->n);
+    memset(it, 0, sizeof(*it));
+}
+
+static void intents_free(RunState *st) {
+    for (size_t i = 0; i < st->nintents; i++) intent_free(&st->intents[i]);
+    free(st->intents);
+    st->intents = NULL;
+    st->nintents = 0;
+}
+
+// Interceptor.send(binding, {headers}): validates immediately and records a snapshot copy. Performs no I/O,
+// returns undefined. Any violation (including a call outside a callback) is a sticky failure.
+static JSValue js_send(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    static const char *const ok_keys[] = {"headers"};
+    (void)this_val;
+    RunState *st = JS_GetContextOpaque(ctx);
+    JSValue opt[1], hv = JS_UNDEFINED;
+    const OutDecl *decl = NULL;
+    Intent it;
+    JSPropertyEnum *tab = NULL;
+    uint32_t cnt = 0;
+    size_t total = 0;
+    int ok = 0;
+    memset(&it, 0, sizeof(it));
+    opt[0] = JS_UNDEFINED;
+    if (!st || !st->in_callback || argc != 2 || !st->intents || st->nintents >= st->max_intents) goto done;
+    if (!get_str(ctx, argv[0], &it.binding, 32)) goto done;
+
+    for (int i = 0; i < st->nout; i++) if (str_cmp(&st->out[i].name, &it.binding) == 0) decl = &st->out[i];
+    if (!decl) goto done;
+    if (!read_obj(st, ctx, argv[1], ok_keys, 1, 1u, opt)) goto done;
+    hv = opt[0];
+    if (JS_GetClassID(hv) != st->cls_object) goto done;
+    if (JS_GetOwnPropertyNames(ctx, &tab, &cnt, hv, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) { tab = NULL; goto done; }
+    if (cnt > 8) goto done;
+    it.names = calloc(cnt ? cnt : 1, sizeof(Str));
+    it.values = calloc(cnt ? cnt : 1, sizeof(Str));
+    if (!it.names || !it.values) { st->oom = 1; goto done; }
+    for (uint32_t i = 0; i < cnt; i++) {
+        JSValue key = JS_AtomToValue(ctx, tab[i].atom), val = JS_UNDEFINED;
+        int good = JS_IsString(key) && get_str(ctx, key, &it.names[i], 128) && in_set(decl->headers, decl->nheaders, &it.names[i]);
+        it.n = i + 1;
+        if (good) good = own_data(ctx, hv, tab[i].atom, &val) && get_str(ctx, val, &it.values[i], OUT_MAX_VALUE);
+        if (good) {
+            total += it.values[i].n;
+            for (size_t k = 0; k < it.values[i].n; k++) {
+                unsigned char c = (unsigned char)it.values[i].s[k];
+                if (!(c == '\t' || (c >= 0x20 && c <= 0x7E))) good = 0;
+            }
+            if (total > OUT_MAX_TOTAL) good = 0;
+        }
+        JS_FreeValue(ctx, key);
+        JS_FreeValue(ctx, val);
+        if (!good) goto done;
+    }
+    // Canonical order: sorted by header name (names are unique own keys).
+    for (size_t i = 1; i < it.n; i++)
+        for (size_t j = i; j > 0 && str_cmp(&it.names[j - 1], &it.names[j]) > 0; j--) {
+            Str t = it.names[j]; it.names[j] = it.names[j - 1]; it.names[j - 1] = t;
+            t = it.values[j]; it.values[j] = it.values[j - 1]; it.values[j - 1] = t;
+        }
+    st->intents[st->nintents++] = it;
+    memset(&it, 0, sizeof(it));
+    ok = 1;
+done:
+    if (tab) JS_FreePropertyEnum(ctx, tab, cnt);
+    JS_FreeValue(ctx, opt[0]);
+    intent_free(&it);
+    if (ok) return JS_UNDEFINED;
+    if (st) st->attach_failed = 1;
+    return JS_ThrowTypeError(ctx, "invalid Interceptor.send");
+}
+
+// {"type":"http","binding":..,"headers":{..}}; values are printable ASCII, escaped for JSON.
+static void emit_intent(Buf *b, const Intent *it) {
+    b_str(b, "{\"type\":\"http\",\"binding\":\"");
+    b_put(b, it->binding.s, it->binding.n);
+    b_str(b, "\",\"headers\":{");
+    for (size_t i = 0; i < it->n; i++) {
+        if (i) b_ch(b, ',');
+        b_ch(b, '"');
+        b_put(b, it->names[i].s, it->names[i].n);
+        b_str(b, "\":\"");
+        for (size_t k = 0; k < it->values[i].n; k++) {
+            unsigned char c = (unsigned char)it->values[i].s[k];
+            if (c == '"' || c == '\\') { b_ch(b, '\\'); b_ch(b, (char)c); }
+            else if (c == '\t') b_str(b, "\\t");
+            else b_ch(b, (char)c);
+        }
+        b_ch(b, '"');
+    }
+    b_str(b, "}}");
+}
+
 static int install_interceptor(JSContext *ctx) {
     JSValue global = JS_GetGlobalObject(ctx);
     JSValue ns = JS_NewObject(ctx);
     JSValue fn = JS_NewCFunction(ctx, js_attach, "attach", 1);
-    int ok = !JS_IsException(ns) && !JS_IsException(fn) &&
-             JS_DefinePropertyValueStr(ctx, ns, "attach", fn, JS_PROP_ENUMERABLE) > 0;   // read-only, fixed
-    fn = JS_UNDEFINED;
+    JSValue sfn = JS_NewCFunction(ctx, js_send, "send", 2);
+    int ok = !JS_IsException(ns) && !JS_IsException(fn) && !JS_IsException(sfn);
+    // JS_DefinePropertyValueStr consumes the value on success and failure.
+    if (ok) ok = JS_DefinePropertyValueStr(ctx, ns, "attach", fn, JS_PROP_ENUMERABLE) > 0;   // read-only, fixed
+    else JS_FreeValue(ctx, fn);
+    if (ok) ok = JS_DefinePropertyValueStr(ctx, ns, "send", sfn, JS_PROP_ENUMERABLE) > 0;
+    else JS_FreeValue(ctx, sfn);
     if (ok) ok = JS_DefinePropertyValueStr(ctx, global, "Interceptor", ns, 0) > 0;
     else JS_FreeValue(ctx, ns);
-    JS_FreeValue(ctx, fn);
     JS_FreeValue(ctx, global);
     return ok;
 }
@@ -1554,6 +1670,88 @@ static int get_list(RunState *st, JSContext *ctx, JSValueConst arr, size_t min, 
     return get_str_set(st, ctx, arr, max, out, count);
 }
 
+// MARK: outbound declarations (mirrors AutomationCore.PluginOutboundPolicy)
+
+static int out_header_ok(const Str *s) {
+    if (s->n == 0 || s->n > 128) return 0;
+    for (size_t i = 0; i < s->n; i++) {
+        char c = s->s[i];
+        if (!c || !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || strchr("!#$%&'*+-.^_`|~", c))) return 0;
+    }
+    static const char *const denied[] = {"host", "content-length", "transfer-encoding", "connection", "upgrade",
+                                         "te", "trailer", "expect", "keep-alive", "set-cookie"};
+    for (size_t i = 0; i < sizeof(denied) / sizeof(denied[0]); i++)
+        if (s->n == strlen(denied[i]) && memcmp(s->s, denied[i], s->n) == 0) return 0;
+    return !(s->n >= 6 && memcmp(s->s, "proxy-", 6) == 0);
+}
+
+// https://<lowercase DNS host, >= 2 labels, alphabetic TLD>/<encoded path>; default port, no userinfo/query/fragment.
+static int out_url_ok(const Str *u) {
+    static const char prefix[] = "https://";
+    const size_t pl = sizeof(prefix) - 1;
+    if (u->n > 2048 || u->n <= pl || memcmp(u->s, prefix, pl) != 0) return 0;
+    const char *rest = u->s + pl;
+    const char *slash = memchr(rest, '/', u->n - pl);
+    if (!slash) return 0;
+    Str host = {(char *)rest, (size_t)(slash - rest)}, path = {(char *)slash, u->n - pl - host.n};
+    if (!host_ok(&host)) return 0;
+    const char *dot = NULL;
+    for (size_t i = 0; i < host.n; i++) if (host.s[i] == '.') dot = host.s + i;
+    if (!dot) return 0;
+    const char *tld = dot + 1;
+    size_t tn = (size_t)(host.s + host.n - tld);
+    int has_letter = 0;
+    for (size_t i = 0; i < tn; i++) if (tld[i] >= 'a' && tld[i] <= 'z') has_letter = 1;
+    if (!has_letter) return 0;
+    if ((tn == 5 && memcmp(tld, "local", 5) == 0) || (tn == 9 && memcmp(tld, "localhost", 9) == 0)) return 0;
+    if (!encoded_path_ok(&path, 1024)) return 0;
+    for (size_t i = 0; i < path.n; i++) if (path.s[i] == '%') {
+        int v = hexval((unsigned char)path.s[i + 1]) << 4 | hexval((unsigned char)path.s[i + 2]);
+        if (v < 0x20 || v == 0x7F || v == 0x5C) return 0;
+        i += 2;
+    }
+    return 1;
+}
+
+static void out_free(OutDecl *d) {
+    str_free(&d->name);
+    strs_free(d->headers, d->nheaders);
+    memset(d, 0, sizeof(*d));
+}
+
+// `v` -> optional strict {binding:{url,method:'GET',headers:[...]}} (<= 4 bindings). Takes copies into st->out.
+static int parse_outbound(RunState *st, JSContext *ctx, JSValueConst v) {
+    static const char *const ok_keys[] = {"url", "method", "headers"};
+    if (JS_GetClassID(v) != st->cls_object) return 0;
+    JSPropertyEnum *tab;
+    uint32_t cnt;
+    if (JS_GetOwnPropertyNames(ctx, &tab, &cnt, v, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) return 0;
+    int ok = cnt <= MAX_OUT;
+    for (uint32_t i = 0; i < cnt && ok; i++) {
+        JSValue key = JS_AtomToValue(ctx, tab[i].atom), val = JS_UNDEFINED, f[3];
+        OutDecl *d = &st->out[st->nout];
+        Str url = {NULL, 0};
+        int good = JS_IsString(key) && get_str(ctx, key, &d->name, 32) && binding_ok(&d->name);
+        st->nout++;
+        if (good) good = own_data(ctx, v, tab[i].atom, &val);
+        if (good) {
+            good = read_obj(st, ctx, val, ok_keys, 3, 7u, f);
+            if (good) {
+                good = str_eq(ctx, f[1], "GET") && get_str(ctx, f[0], &url, 2048) && out_url_ok(&url) &&
+                       get_list(st, ctx, f[2], 0, 8, &d->headers, &d->nheaders);
+                for (size_t h = 0; good && h < d->nheaders; h++) good = out_header_ok(&d->headers[h]);
+                for (int k = 0; k < 3; k++) JS_FreeValue(ctx, f[k]);
+            }
+        }
+        str_free(&url);
+        JS_FreeValue(ctx, key);
+        JS_FreeValue(ctx, val);
+        ok = good;
+    }
+    JS_FreePropertyEnum(ctx, tab, cnt);
+    return ok;
+}
+
 static int load_read(RunState *st, JSContext *ctx, JSValueConst v) {
     static const char *const rk[] = {"metadata", "headers", "queryKeys", "body"};
     static const char *const bk[] = {"mode"};
@@ -1600,14 +1798,14 @@ done:
 static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *write_request, int *write_response) {
     static const char *const mk[] = {"schemaVersion", "id", "name", "version", "matches", "read", "write",
                                      "endpointBindings", "settings", "author", "summary", "category",
-                                     "publishedAt"};
+                                     "publishedAt", "outbound"};
     static const char *const wk[] = {"requestBody", "responseBody"};
-    JSValue f[13], w[2];
+    JSValue f[14], w[2];
     Str s = {NULL, 0}, *bind = NULL;
     size_t nbind = 0;
     int ok = 0;
     w[0] = w[1] = JS_UNDEFINED;
-    if (!read_obj(st, ctx, root, mk, 13, 0x1FFu, f)) return 0;
+    if (!read_obj(st, ctx, root, mk, 14, 0x1FFu, f)) return 0;
     if (JS_VALUE_GET_TAG(f[0]) != JS_TAG_INT || JS_VALUE_GET_INT(f[0]) != 2) goto done;
     if (!get_str(ctx, f[1], &s, 36) || !uuid_ok(&s)) goto done;
     str_free(&s);
@@ -1656,6 +1854,7 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
     *write_response = JS_VALUE_GET_BOOL(w[1]);
     if (!get_list(st, ctx, f[7], 0, 4, &bind, &nbind)) goto done;
     for (size_t i = 0; i < nbind; i++) if (!binding_ok(&bind[i])) goto done;
+    if (!JS_IsUndefined(f[13]) && !parse_outbound(st, ctx, f[13])) goto done;
     if (JS_GetClassID(f[8]) != st->cls_object) goto done;
     {
         Buf settings = {NULL, 0, 0, 0};
@@ -1666,7 +1865,7 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
 done:
     str_free(&s);
     strs_free(bind, nbind);
-    for (int i = 0; i < 13; i++) JS_FreeValue(ctx, f[i]);
+    for (int i = 0; i < 14; i++) JS_FreeValue(ctx, f[i]);
     JS_FreeValue(ctx, w[0]);
     JS_FreeValue(ctx, w[1]);
     return ok;
@@ -2108,19 +2307,33 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
         v.out.p = malloc(v.out.cap + 1);
         if (!v.out.p) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
         b_str(&v.out, "{\"actions\":[");
+        st.max_intents = limits->max_actions < MAX_INTENTS ? limits->max_actions : MAX_INTENTS;
+        st.intents = calloc(st.max_intents + 1, sizeof(Intent));
+        if (!st.intents) { free(v.out.p); status = QJS_MEMORY_OR_STACK; goto cleanup; }
         for (int i = 0; i < st.nregs && ok; i++) {
             if (!JS_IsFunction(ctx, st.regs[i].cb)) continue;
             JSValueConst argv[2];
             argv[0] = legv;
             argv[1] = cfgv;
+            size_t first_intent = st.nintents;
+            st.in_callback = 1;
             JSValue ret = JS_Call(ctx, st.regs[i].cb, JS_UNDEFINED, 2, argv);
+            st.in_callback = 0;
             if (JS_IsException(ret)) {
                 status = classify_exception(ctx, &st, QJS_SCRIPT_ERROR);
                 free(v.out.p);
                 goto cleanup;
             }
             if (st.attach_failed) { JS_FreeValue(ctx, ret); free(v.out.p); status = QJS_SCRIPT_ERROR; goto cleanup; }
-            if (!JS_IsUndefined(ret)) ok = emit_actions(&v, ret);
+            // Recorded sends first (FIFO), then returned legacy actions; both share the action cap.
+            for (size_t k = first_intent; k < st.nintents && ok; k++) {
+                if (v.nactions >= v.max_actions) { ok = v_fail(&v); break; }
+                if (v.nactions) b_ch(&v.out, ',');
+                emit_intent(&v.out, &st.intents[k]);
+                v.nactions++;
+                if (v.out.overflow) ok = v_fail(&v);
+            }
+            if (ok && !JS_IsUndefined(ret)) ok = emit_actions(&v, ret);
             JS_FreeValue(ctx, ret);
         }
         if (ok) b_ch(&v.out, ']');
@@ -2188,6 +2401,8 @@ cleanup:
     strs_free(st.rd_headers, st.n_rd_headers);
     strs_free(st.rd_query, st.n_rd_query);
     if (have_id) ident_free(&id);
+    intents_free(&st);
+    for (int i = 0; i < st.nout; i++) out_free(&st.out[i]);
     free(original.p);
     free(src);
     free(ev);

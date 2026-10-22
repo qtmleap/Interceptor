@@ -41,6 +41,8 @@ public struct PluginManifest: Equatable, Sendable {
     /// Optional publisher-declared static release date (`yyyy-MM-ddTHH:mm:ssZ`, UTC whole seconds). Display only; not a
     /// trust, ordering or freshness claim. Covered by the package bytes/revision hash.
     public let publishedAt: Date?
+    /// Schema 2 only: fixed GET destinations keyed by binding name. Empty when absent. Grants nothing by itself.
+    public let outbound: [String: PluginOutboundEndpoint]
     public let json: JSONValue
 
     public let schemaVersion: Int64
@@ -57,7 +59,8 @@ public struct PluginManifest: Equatable, Sendable {
         let f = try JSONFields(v, required: isV2
                                ? ["schemaVersion", "id", "name", "version", "matches", "read", "write", "endpointBindings", "settings"]
                                : ["schemaVersion", "id", "name", "version", "subscriptions", "read", "endpointBindings", "settings"],
-                               optional: ["author", "summary", "category", "publishedAt"], error: bad)
+                               optional: isV2 ? ["author", "summary", "category", "publishedAt", "outbound"]
+                                              : ["author", "summary", "category", "publishedAt"], error: bad)
         let name = try f.string("name"), version = try f.string("version")
         guard Text.isDisplayName(name) else { throw bad }
         _ = try SemVer(parsing: version)
@@ -84,6 +87,8 @@ public struct PluginManifest: Equatable, Sendable {
 
         let bindings = try f.strings("endpointBindings")
         guard bindings.count <= 4, Set(bindings).count == bindings.count, bindings.allSatisfy(PluginManifest.isBindingName) else { throw bad }
+
+        let outbound = try f.has("outbound") ? PluginOutboundEndpoint.validatingAll(f.value("outbound")) : [:]
 
         let settings = try f.value("settings")
         guard case .object = settings, settings.nesting <= Limits.settingsDepth,
@@ -114,6 +119,7 @@ public struct PluginManifest: Equatable, Sendable {
 
         id = try f.uuid("id")
         self.publishedAt = publishedAt
+        self.outbound = outbound
         self.author = author
         self.summary = summary
         self.category = category
