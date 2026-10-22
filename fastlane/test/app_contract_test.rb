@@ -20,6 +20,19 @@ check "all configured required checks are actual pull request jobs" do
   end
 end
 
+check "release and verification use the same pinned Mudmouth revision" do
+  root = File.expand_path("../..", __dir__)
+  simulator = YAML.safe_load(File.read(File.join(root, ".github/workflows/ios.yml")), aliases: false)
+  testflight = YAML.safe_load(File.read(File.join(root, ".github/workflows/testflight.yaml")), aliases: false)
+  revision = ReleaseConfig::SIBLINGS.fetch("Mudmouth")
+  assert simulator.fetch("env").fetch("MUDMOUTH_REV") == revision, "simulator dependency differs from release configuration"
+  siblings = testflight.fetch("jobs").fetch("deploy").fetch("steps").select do |step|
+    step.dig("with", "repository") == "qtmleap/Mudmouth"
+  end
+  assert siblings.length == 1, "expected one Mudmouth checkout"
+  assert siblings.first.fetch("with").fetch("ref") == revision, "TestFlight dependency differs from release configuration"
+end
+
 check "the local deployment adapter retains credential-free independent cleanup" do
   root = File.expand_path("../..", __dir__)
   source = File.read(File.join(root, "fastlane/adapter.rb"))
