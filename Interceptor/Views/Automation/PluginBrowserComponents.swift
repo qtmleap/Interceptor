@@ -93,6 +93,12 @@ struct PluginRepositoryRow: View {
     }
 }
 
+/// The caller routes Reinstall through the queue and Delete through its confirmation.
+struct PluginPackageModifyActions {
+    let onReinstall: () -> Void
+    let onDelete: () -> Void
+}
+
 /// Hosts must come from every declared match of the fetched package.
 /// Loading/error presentation belongs to the caller, before this ready-state hero.
 struct PluginPackageHero: View {
@@ -103,7 +109,9 @@ struct PluginPackageHero: View {
     var actionTitle: LocalizedStringKey?
     var isActionEnabled = true
     var isWorking = false
+    var modifyActions: PluginPackageModifyActions? = nil
     var action: () -> Void = {}
+    @State private var showModify = false
 
     @Environment(\.horizontalSizeClass)
     private var horizontalSizeClass
@@ -140,7 +148,13 @@ struct PluginPackageHero: View {
             if let actionTitle {
                 HStack {
                     Spacer(minLength: 0)
-                    Button(action: action) {
+                    Button {
+                        if modifyActions != nil {
+                            showModify = true
+                        } else {
+                            action()
+                        }
+                    } label: {
                         HStack(spacing: 8) {
                             if isWorking {
                                 ProgressView().tint(.white).accessibilityHidden(true)
@@ -158,6 +172,16 @@ struct PluginPackageHero: View {
                     .contentShape(Rectangle())
                     .disabled(!isActionEnabled || isWorking)
                     .accessibilityIdentifier("plugins.package.hero.action")
+                    .confirmationDialog(Text(verbatim: name), isPresented: $showModify, titleVisibility: .hidden) {
+                        Button("AUTO_BROWSER_REINSTALL") { modifyActions?.onReinstall() }
+                            .disabled(!isActionEnabled || isWorking)
+                            .accessibilityIdentifier("plugins.modify.reinstall")
+                        Button("AUTO_BROWSER_DELETE", role: .destructive) { modifyActions?.onDelete() }
+                            .disabled(!isActionEnabled || isWorking)
+                            .accessibilityIdentifier("plugins.modify.delete")
+                        Button("AUTO_BROWSER_CANCEL", role: .cancel) {}
+                            .accessibilityIdentifier("plugins.modify.cancel")
+                    }
                 }
             }
         }
@@ -350,54 +374,6 @@ struct PluginInstallSheetContent: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(Color(uiColor: .systemBackground))
-    }
-}
-
-/// The parent routes Delete through its short confirmation and Reinstall through the real queue.
-struct PluginModifySheetContent: View {
-    let packageName: String
-    var isBusy = false
-    let onReinstall: () -> Void
-    let onDelete: () -> Void
-    let onCancel: () -> Void
-
-    var body: some View {
-        VStack(spacing: 8) {
-            VStack(spacing: 0) {
-                Button(action: onReinstall) {
-                    Text("AUTO_BROWSER_REINSTALL")
-                        .frame(maxWidth: .infinity, minHeight: 56)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityIdentifier("plugins.modify.reinstall")
-                Divider()
-                Button(role: .destructive, action: onDelete) {
-                    Text("AUTO_BROWSER_DELETE")
-                        .frame(maxWidth: .infinity, minHeight: 56)
-                        .contentShape(Rectangle())
-                }
-                .foregroundStyle(AutomationStatusColor.error)
-                .accessibilityIdentifier("plugins.modify.delete")
-            }
-            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
-            Button(role: .cancel, action: onCancel) {
-                Text("AUTO_BROWSER_CANCEL")
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .contentShape(Rectangle())
-            }
-            .fontWeight(.semibold)
-            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
-            .keyboardShortcut(.cancelAction)
-            .accessibilityIdentifier("plugins.modify.cancel")
-        }
-        .font(.title3)
-        .buttonStyle(.plain)
-        .foregroundStyle(PluginBrowserColor.accent)
-        .padding(8)
-        .disabled(isBusy)
-        .interactiveDismissDisabled(isBusy)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text(verbatim: packageName))
     }
 }
 

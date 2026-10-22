@@ -9,15 +9,11 @@ struct PluginPackageDetailView: View {
     @State private var tab = PackageTab.details
     @State private var isPreparingGet = false
     @State private var getError: Error?
-    @State private var showModify = false
-    @State private var queueAfterModify = false
-    @State private var deleteAfterModify = false
     @State private var showDelete = false
     @State private var showJSON = false
     @State private var approval: PluginPackageApprovalRequest?
     @State private var isChangingActivation = false
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
 
     private var selected: InstalledRevision? {
@@ -62,27 +58,6 @@ struct PluginPackageDetailView: View {
         }
         .navigationTitle(Text(verbatim: selected?.package.manifest.name ?? entry?.name ?? String(localized: "AUTO_BROWSER_PACKAGES")))
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showModify, onDismiss: {
-            if queueAfterModify {
-                queueAfterModify = false; model.openQueue()
-            }
-            if deleteAfterModify {
-                deleteAfterModify = false; showDelete = true
-            }
-        }) {
-            PluginModifySheetContent(packageName: selected?.package.manifest.name ?? "", isBusy: busy) {
-                guard let selected else { return }
-                _ = model.enqueueReinstall(selected)
-                queueAfterModify = true
-                showModify = false
-            } onDelete: {
-                deleteAfterModify = true
-                showModify = false
-            } onCancel: { showModify = false }
-                .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.height(205)])
-                .presentationDragIndicator(.hidden)
-                .presentationBackground(.clear)
-        }
         .sheet(item: $approval) { request in
             PluginPackageApprovalView(package: request.package,
                                       confirmTitle: request.isUpdate ? "AUTO_BROWSER_UPDATE" : "AUTO_ACTIVATE_CONFIRM",
@@ -116,11 +91,19 @@ struct PluginPackageDetailView: View {
         List {
             PluginPackageHero(name: package.manifest.name, targetHosts: package.manifest.targetHosts,
                               actionTitle: selected != nil ? "AUTO_BROWSER_MODIFY" : queued ? "AUTO_BROWSER_QUEUED" : "AUTO_BROWSER_GET",
-                              isActionEnabled: !busy && package.isComplete && (selected != nil || record != nil), isWorking: busy)
+                              isActionEnabled: !busy && package.isComplete && (selected != nil || record != nil), isWorking: busy,
+                              modifyActions: selected.map { _ in
+                                  PluginPackageModifyActions(onReinstall: {
+                                      guard !busy, let selected else { return }
+                                      _ = model.enqueueReinstall(selected)
+                                      model.openQueue()
+                                  }, onDelete: {
+                                      guard !busy, selected != nil else { return }
+                                      showDelete = true
+                                  })
+                              })
             {
-                if selected != nil {
-                    showModify = true
-                } else if queued {
+                if queued {
                     model.openQueue()
                 } else if let record, let entry {
                     isPreparingGet = true

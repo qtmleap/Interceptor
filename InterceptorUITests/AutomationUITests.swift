@@ -369,12 +369,10 @@ final class AutomationUITests: XCTestCase {
             assertEnabled(false, app: app)
             if japanese { attach("Installed package detail reviewed ja") }
             openModify(app)
-            XCTAssertTrue(app.buttons.matching(identifier: "plugins.modify.cancel").firstMatch.waitForExistence(timeout: 5))
             if !japanese { attach("Installed package actions en") }
-            app.buttons.matching(identifier: "plugins.modify.cancel").firstMatch.tap()
-            XCTAssertTrue(app.buttons.matching(identifier: "plugins.modify.cancel").firstMatch.waitForNonExistence(timeout: 5))
+            cancelModify(app)
             openModify(app)
-            app.buttons.matching(identifier: "plugins.modify.reinstall").firstMatch.tap()
+            modifyButton(.reinstall, app: app).tap()
             XCTAssertTrue(scrollContainer(app, "plugins.queue.items").waitForExistence(timeout: 5))
             XCTAssertEqual(queueRows(app).count, 1)
             confirmQueue(app)
@@ -384,13 +382,13 @@ final class AutomationUITests: XCTestCase {
             if !japanese { attach("Installed package list without count en") }
             openInstalled(Self.targetsID, app: app)
             openModify(app)
-            app.buttons.matching(identifier: "plugins.modify.delete").firstMatch.tap()
+            modifyButton(.delete, app: app).tap()
             let deletion = app.alerts.firstMatch
             XCTAssertTrue(deletion.waitForExistence(timeout: 5))
             deletion.buttons.matching(identifier: japanese ? "キャンセル" : "Cancel").firstMatch.tap()
             assertEnabled(false, app: app)
             openModify(app)
-            app.buttons.matching(identifier: "plugins.modify.delete").firstMatch.tap()
+            modifyButton(.delete, app: app).tap()
             XCTAssertTrue(deletion.waitForExistence(timeout: 5))
             deletion.buttons.matching(identifier: japanese ? "削除" : "Delete").firstMatch.tap()
             let packageList = scrollContainer(app, "plugins.packages")
@@ -401,6 +399,67 @@ final class AutomationUITests: XCTestCase {
             }, object: nil)
             XCTAssertEqual(XCTWaiter.wait(for: [deleted], timeout: 5), .completed, "deleting keeps the catalog entry discoverable without its installed check")
         }
+    }
+
+    /// Focused native menu regression, independent of the broader two-language catalog flow.
+    @MainActor
+    func testInstalledPackageModifyDialogActions() async throws {
+        guard let repositoryURL = await requiredRepositoryURL() else { return }
+        XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = launch(japanese: false, suite: "Interceptor.UITests.\(UUID().uuidString)")
+        defer { app.terminate() }
+        installMulti(repositoryURL, app: app, japanese: false)
+        selectTab("packages", app: app)
+        openInstalled(Self.multiID, app: app)
+        let detail = scrollContainer(app, "plugins.package.detail")
+
+        openModify(app)
+        cancelModify(app)
+        assertEnabled(false, app: app)
+
+        openModify(app)
+        modifyButton(.reinstall, app: app).tap()
+        let queue = scrollContainer(app, "plugins.queue.items")
+        XCTAssertTrue(queue.waitForExistence(timeout: 5), "Reinstall dismisses the native menu and opens its queue")
+        XCTAssertEqual(queueRows(app).count, 1)
+        XCTAssertTrue(app.buttons["plugins.queue.confirm"].isEnabled)
+        XCTAssertFalse(app.descendants(matching: .any)["plugins.queue.status"].exists, "Reinstall has not confirmed installation")
+        app.buttons["plugins.queue.close"].tap()
+        XCTAssertTrue(queue.waitForNonExistence(timeout: 5))
+        assertEnabled(false, app: app)
+        XCTAssertTrue(app.buttons["plugins.queue.open"].exists, "dismissing the queue retains the pending reinstall")
+        openQueue(app)
+        XCTAssertEqual(queueRows(app).count, 1)
+        app.buttons["plugins.queue.clear"].tap()
+        let cleared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.queueRows(app).count == 0
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [cleared], timeout: 5), .completed)
+        app.buttons["plugins.queue.close"].tap()
+        XCTAssertTrue(queue.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["plugins.queue.open"].waitForNonExistence(timeout: 5))
+
+        openModify(app)
+        modifyButton(.delete, app: app).tap()
+        let deletion = app.alerts.firstMatch
+        XCTAssertTrue(deletion.waitForExistence(timeout: 5), "Delete dismisses the native menu and opens the existing confirmation")
+        deletion.buttons["Cancel"].tap()
+        XCTAssertTrue(deletion.waitForNonExistence(timeout: 5))
+        assertEnabled(false, app: app)
+        openModify(app)
+        modifyButton(.delete, app: app).tap()
+        XCTAssertTrue(deletion.waitForExistence(timeout: 5))
+        deletion.buttons["Delete"].tap()
+        XCTAssertTrue(detail.waitForNonExistence(timeout: 5), "deleting the selected package returns to Packages")
+        let packageList = scrollContainer(app, "plugins.packages")
+        XCTAssertTrue(packageList.waitForExistence(timeout: 5))
+        let row = reach(packageRow(Self.multiID, app: app), in: packageList)
+        let deleted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            row.exists && row.value as? String != "Installed"
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [deleted], timeout: 5), .completed,
+                       "only the final Delete confirmation removes the installed package")
     }
 
     /// Dedicated cached global package search. CI loops both locales; a native run may select one cell with
@@ -482,6 +541,18 @@ final class AutomationUITests: XCTestCase {
 }
 
 private extension AutomationUITests {
+    enum ModifyAction: String {
+        case reinstall, delete, cancel
+
+        var labels: [String] {
+            switch self {
+                case .reinstall: ["Reinstall", "再インストール"]
+                case .delete: ["Delete", "削除"]
+                case .cancel: ["Cancel", "キャンセル"]
+            }
+        }
+    }
+
     func requiredRepositoryURL() async -> URL? {
         guard let url = await repositoryFixtureURLIfReady() else {
             XCTFail("Run ci-plugin-repository-fixture.py around this test command on its selected disposable simulator")
@@ -671,7 +742,63 @@ private extension AutomationUITests {
     @MainActor
     func openModify(_ app: XCUIApplication) {
         reach(app.buttons.matching(identifier: "plugins.package.hero.action").firstMatch, in: scrollContainer(app, "plugins.package.detail")).tap()
-        XCTAssertTrue(app.buttons.matching(identifier: "plugins.modify.cancel").firstMatch.waitForExistence(timeout: 5))
+        let presented = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.modifyButton(.reinstall, app: app).isHittable && self.modifyButton(.delete, app: app).isHittable
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [presented], timeout: 5), .completed)
+    }
+
+    /// UIKit's adaptive dialog can expose localized labels without SwiftUI's button identifiers.
+    @MainActor
+    func modifyButton(_ action: ModifyAction, app: XCUIApplication) -> XCUIElement {
+        let identified = app.buttons.matching(identifier: "plugins.modify." + action.rawValue).firstMatch
+        if identified.exists { return identified }
+        let presentations = app.popovers.allElementsBoundByIndex + app.sheets.allElementsBoundByIndex + app.alerts.allElementsBoundByIndex
+        for presentation in presentations {
+            let reinstall = presentation.buttons.matching(NSPredicate(format: "label IN %@", ModifyAction.reinstall.labels)).firstMatch
+            guard reinstall.exists else { continue }
+            let localized = presentation.buttons.matching(NSPredicate(format: "label IN %@", action.labels)).firstMatch
+            if localized.exists { return localized }
+        }
+        return identified
+    }
+
+    @MainActor
+    func cancelModify(_ app: XCUIApplication) {
+        let reinstall = modifyButton(.reinstall, app: app)
+        let delete = modifyButton(.delete, app: app)
+        // Native presentation depends on the active layout, including compact popovers on newer iOS.
+        // Follow the visible control instead of assuming an iPhone always has a Cancel row.
+        if modifyButton(.cancel, app: app).isHittable {
+            modifyButton(.cancel, app: app).tap()
+        } else {
+            let menuButtons = reinstall.frame.union(delete.frame)
+            let menu = app.popovers.allElementsBoundByIndex.map(\.frame).filter {
+                $0.contains(menuButtons) && $0.width * $0.height < app.frame.width * app.frame.height * 0.8
+            }.min { $0.width * $0.height < $1.width * $1.height }
+                ?? menuButtons.insetBy(dx: -24, dy: -24)
+            let visible = scrollContainer(app, "plugins.package.detail").frame.intersection(app.frame)
+            guard !visible.isEmpty, !menuButtons.isEmpty else {
+                XCTFail("Cannot observe the native menu and its dismissal area")
+                return
+            }
+            // Derive one bounded outside tap from the observed native frames, rather than a device-specific point.
+            let candidates = [
+                CGPoint(x: visible.minX + visible.width * 0.1, y: visible.maxY - visible.height * 0.1),
+                CGPoint(x: visible.maxX - visible.width * 0.1, y: visible.maxY - visible.height * 0.1),
+                CGPoint(x: visible.minX + visible.width * 0.1, y: visible.minY + visible.height * 0.1),
+            ]
+            guard let point = candidates.first(where: { visible.contains($0) && !menu.contains($0) }) else {
+                XCTFail("No observed point lies outside the native Modify popover")
+                return
+            }
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: point.x - app.frame.minX, dy: point.y - app.frame.minY)).tap()
+        }
+        let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !self.modifyButton(.reinstall, app: app).exists && !self.modifyButton(.delete, app: app).exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
     }
 
     @MainActor
