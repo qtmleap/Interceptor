@@ -1,6 +1,6 @@
-# Authenticated secondary API calls — proposed design
+# Authenticated secondary API calls
 
-Status: proposal for human review. This document does not claim that the native capability exists. The user selected one-way secondary requests and clarified the flow: obtain credentials from a GET response, then use them to call another API. The secondary response does not change the original traffic.
+Status: approved for implementation; native delivery verification is in progress. The user selected one-way secondary requests and clarified the flow: obtain credentials from a GET response, then use them to call another API. The secondary response does not change the original traffic.
 
 ## Developer contract
 
@@ -44,6 +44,8 @@ Each binding has a fixed HTTPS destination, GET method and explicit permitted he
 
 Limit declarations to four bindings. C and Swift validate strict supported keys, canonical header names, at most eight headers, no CR/LF, at most 4 KiB per header value and 8 KiB of header values in one operation. Output remains within the existing 32 KiB result budget. The existing two-action per-VM cap includes send intents and legacy declarative intents together. The same two-send limit applies to the complete composed phase, so multiple approved revisions cannot multiply the native dispatch count.
 
+The first implementation uses canonical HTTPS URLs with an explicit path and no explicit port, query, userinfo or fragment. URLs are limited to 2,048 bytes and encoded paths to 1,024 bytes. Hostnames have at least two lowercase DNS labels, with a letter in the final label; `.local`, `.localhost` and IP literals are rejected. Percent-encoded paths may contain UTF-8 bytes, but encoded controls, DEL and backslashes are rejected. Declared header names are unique lowercase HTTP tokens, limited to 128 bytes each. Framing/hop-by-hop headers, `set-cookie`, pseudo-headers and `proxy-*` are forbidden. Values contain printable ASCII or HTAB. These rules are shared by Swift, C and the SDK.
+
 Calls during source registration, unknown bindings, undeclared headers, invalid values and limit violations cause a sticky phase failure even if the script catches the immediate exception. They never dispatch. Intents are emitted through the existing validated C-result boundary. The helper does not send from inside the callback.
 
 All approved revisions in a phase finish and all result/mutation validation succeeds before any intent is committed. Failure in a later revision discards earlier intents and mutations. Authorization and capture consent are checked again before committing intents and immediately before network admission. An onEnter intent may be admitted after its phase commits; it does not imply a later successful original write. An onLeave intent can only originate from an actually invoked leave callback after successful local forwarding.
@@ -75,4 +77,4 @@ The earlier captured-header/bodyless-request case remains a separate follow-up. 
 
 `GET /auth/credentials` returns the existing public synthetic bearer token as `accessToken`, `tokenType: "Bearer"` and the existing fixed Set-Cookie. Existing `/auth/bearer` checks the token. New `/auth/cookie` checks exactly one expected `fixture_session` name/value pair; unrelated cookies may coexist. Missing, incorrect, duplicated or comma-joined session cookies receive 401 with no Bearer challenge. Cookie names are case-sensitive: a differently cased name alone does not authenticate, and it does not invalidate an otherwise valid exact-case session cookie. The server keeps no state and does not reflect incoming credentials. Global 64 KiB/no-store/405 behavior remains unchanged.
 
-This origin preparation is independently testable. Native and SDK implementation begins after this proposed API/design is reviewed; no native outbound pass is claimed before that work exists.
+This origin preparation is independently testable. Native delivery, Rust intent conformance and the public origin contract require separate evidence; an origin-only pass does not establish plugin delivery.

@@ -14,7 +14,7 @@ struct SyntheticResult {
         else {
             throw JavaScriptExecutionError.invalidResult
         }
-        let validated = try ValidatedAction.parse(JSONValue.object(["actions": actions]).data())
+        let validated = try ValidatedAction.parse(JSONValue.object(["actions": actions]).data(), manifest: manifest)
         var preview: String?
         if let mutation = object["mutation"] {
             guard manifest.schemaVersion == 2, manifest.read.body == .json,

@@ -104,7 +104,11 @@
 				Structs/CaptureHostList.swift,
 				Automation/AutomationSharedConfiguration.swift,
 				Automation/HTTPPluginProcessor.swift,
+				Automation/HTTPPluginOutboundDispatcher.swift,
+				Automation/HTTPPluginOutboundTransport.swift,
+				Automation/HTTPPluginOutboundProbe.swift,
 				Automation/TunnelAuthorizationMonitor.swift,
+				Automation/TunnelLifecycle.swift,
 			);
 			target = 10F701B82E491546006ECDD2 /* PacketTunnel */;
 		};

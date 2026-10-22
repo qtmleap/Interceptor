@@ -4635,6 +4635,54 @@
         }
       }
     },
+    "AUTO_APPROVAL_OUTBOUND" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send to external APIs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外部APIへの送信"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_OUTBOUND_HEADERS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outgoing headers"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信するヘッダー"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_OUTBOUND_FOOTER" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These recipients may receive any data this plugin is allowed to read."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これらの送信先へ、読み取りを許可したすべてのデータを送信できます。"
+          }
+        }
+      }
+    },
     "AUTO_ALERT_WEBHOOK" : {
       "localizations" : {
         "en" : {

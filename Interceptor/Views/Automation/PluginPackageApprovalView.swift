@@ -49,6 +49,24 @@ struct PluginPackageApprovalView: View {
                         HashText(value: field, identifier: "plugins.approval.read.\(index)")
                     }
                 } header: { Text("AUTO_APPROVAL_READ_DATA") }
+                if !package.manifest.outbound.isEmpty {
+                    Section {
+                        ForEach(package.manifest.outbound.keys.sorted(), id: \.self) { binding in
+                            if let endpoint = package.manifest.outbound[binding] {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(verbatim: binding).font(.headline)
+                                    Text(verbatim: "GET " + endpoint.url).font(.footnote).textSelection(.enabled)
+                                    LabeledContent("AUTO_APPROVAL_OUTBOUND_HEADERS") {
+                                        if endpoint.headers.isEmpty { Text("AUTO_READ_NONE") }
+                                        else { Text(verbatim: endpoint.headers.joined(separator: ", ")) }
+                                    }.font(.footnote)
+                                }
+                                .accessibilityIdentifier("plugins.approval.outbound.\(binding)")
+                            }
+                        }
+                    } header: { Text("AUTO_APPROVAL_OUTBOUND") }
+                      footer: { Text("AUTO_APPROVAL_OUTBOUND_FOOTER") }
+                }
                 Section {
                     HashText(value: package.revision, identifier: "plugins.approval.revision")
                 } header: { Text("AUTO_ALERT_REVISION") }

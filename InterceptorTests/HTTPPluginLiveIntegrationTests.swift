@@ -26,6 +26,51 @@ final class HTTPPluginLiveIntegrationTests: XCTestCase, @unchecked Sendable {
         try FileManager.default.removeItem(at: directory)
     }
 
+    func testGETCredentialsReachProtectedAPIsThroughRealDirectTLSWithoutReenteringProxy() async throws {
+        let secondary = LiveOutboundTransport()
+        let complete = expectation(description: "both protected APIs accepted the issued credentials")
+        complete.expectedFulfillmentCount = 2
+        let source = """
+        Interceptor.attach({response:{onLeave(res){
+          Interceptor.send('bearer',{headers:{authorization:'Bearer '+res.body.accessToken}});
+          Interceptor.send('cookie',{headers:{cookie:res.headers['set-cookie'].split(';')[0]}});
+        }}});
+        """
+        let outbound: JSONValue = .object([
+            "bearer": .object(["url": .string("https://api.example.com/auth/bearer"), "method": .string("GET"), "headers": .array([.string("authorization")])]),
+            "cookie": .object(["url": .string("https://api.example.com/auth/cookie"), "method": .string("GET"), "headers": .array([.string("cookie")])]),
+        ])
+        let package = try package([
+            Route(method: "GET", path: "/auth/credentials", source: source),
+            Route(method: "GET", path: "/auth/bearer", source: "Interceptor.attach({response:{onLeave(){throw new Error('secondary request reentered the proxy');}}});"),
+        ], readHeaders: ["set-cookie"], outbound: outbound)
+        try await withNetwork(package: package, outboundTransport: secondary, outboundObserver: { binding, outcome in
+            XCTAssertTrue(["bearer", "cookie"].contains(binding))
+            XCTAssertEqual(outcome, .response(200))
+            complete.fulfill()
+        }) { network in
+            secondary.use(try network.directOutboundTransport())
+            let response = try await network.roundTrip(path: "/auth/credentials", body: Data(), method: .GET)
+            XCTAssertEqual(response.status, 200)
+            XCTAssertEqual(try Self.json(response.body), .object(["accessToken": .string("interceptor-test-token")]))
+            await fulfillment(of: [complete], timeout: 5)
+            let requests = network.originRequests.value
+            XCTAssertEqual(requests.count, 3)
+            XCTAssertTrue(requests.allSatisfy { $0.method == "GET" && $0.body.isEmpty })
+            XCTAssertEqual(requests.first { $0.path == "/auth/bearer" }?.headers["authorization"], "Bearer interceptor-test-token")
+            XCTAssertNil(requests.first { $0.path == "/auth/bearer" }?.headers["cookie"])
+            XCTAssertEqual(requests.first { $0.path == "/auth/cookie" }?.headers["cookie"], "fixture_session=dummy-session-not-a-secret")
+            XCTAssertNil(requests.first { $0.path == "/auth/cookie" }?.headers["authorization"])
+            XCTAssertEqual(network.destinations.value.count, 1, "only the original CONNECT traverses the production proxy")
+            XCTAssertTrue(network.processor.records.value.allSatisfy { $0.request.path == "/auth/credentials" && $0.error == nil })
+            XCTAssertEqual(network.processor.records.value.filter { $0.phase == .responseLeave }.count, 1)
+            let count = network.processor.records.value.count
+            _ = try await network.roundTrip(path: "/auth/credentials-unmatched", body: Data(), method: .GET)
+            XCTAssertEqual(network.processor.records.value.count, count, "nonmatching JSON must not invoke the credential hook")
+            XCTAssertEqual(network.originRequests.value.count, 4, "nonmatching traffic must not trigger secondary requests")
+        }
+    }
+
     func testRealTLSFourPhasesUseForwardedJSONAndCONNECTAuthorityAcrossFiles() async throws {
         let routes = [
             Route(path: "/search", source: Self.fourPhaseSource),
@@ -369,14 +414,15 @@ private extension HTTPPluginLiveIntegrationTests {
 
     struct Route {
         var host = "api.example.com"
+        var method = "POST"
         let path: String
         let source: String
         var file: String {
-            "hooks/\(host)\(path)/POST.js"
+            "hooks/\(host)\(path)/\(method).js"
         }
     }
 
-    func package(_ routes: [Route]) throws -> PluginPackage {
+    func package(_ routes: [Route], readHeaders: [String] = [], outbound: JSONValue? = nil) throws -> PluginPackage {
         let matches: [JSONValue] = routes.map { route in
             var hooks: [String: JSONValue] = [:]
             for leg in ["request", "response"] {
@@ -393,18 +439,20 @@ private extension HTTPPluginLiveIntegrationTests {
                 }
             }
             return .object([
-                "hosts": .array([.string(route.host)]), "methods": .array([.string("POST")]),
+                "hosts": .array([.string(route.host)]), "methods": .array([.string(route.method)]),
                 "path": .object(["kind": .string("exact"), "value": .string(route.path)]), "hooks": .object(hooks),
             ])
         }
-        let manifest: JSONValue = .object([
+        var fields: [String: JSONValue] = [
             "schemaVersion": .integer(2), "id": .string(UUID().uuidString), "name": .string("Live TLS fixture"), "version": .string("1.0.0"),
             "matches": .array(matches),
             "read": .object(["metadata": .array(["method", "host", "path", "status"].map(JSONValue.string)),
-                             "headers": .array([]), "queryKeys": .array([]), "body": .object(["mode": .string("json")])]),
+                             "headers": .array(readHeaders.map(JSONValue.string)), "queryKeys": .array([]), "body": .object(["mode": .string("json")])]),
             "write": .object(["requestBody": .bool(true), "responseBody": .bool(true)]),
             "endpointBindings": .array([]), "settings": .object([:]),
-        ])
+        ]
+        if let outbound { fields["outbound"] = outbound }
+        let manifest = JSONValue.object(fields)
         let files = Dictionary(uniqueKeysWithValues: routes.map { ($0.file, JSONValue.string($0.source)) })
         return try PluginPackage.validate(JSONValue.object(["manifest": manifest, "sourceFiles": .object(files)]).data())
     }
@@ -421,20 +469,25 @@ private extension HTTPPluginLiveIntegrationTests {
     func withNetwork(
         package: PluginPackage,
         afterSuccess: (@Sendable (PluginActivationStore, Locked<Bool>, HTTPPluginPhase) async throws -> Void)? = nil,
+        outboundTransport: (any HTTPPluginOutboundTransport)? = nil,
+        outboundObserver: (@Sendable (String, HTTPPluginOutboundOutcome) -> Void)? = nil,
         body: (Network) async throws -> Void,
     ) async throws {
         let (store, revisions) = try await AutomationFixtures.activationContext(packages: [package], activationURL: directory.appendingPathComponent(UUID().uuidString + ".json"))
         let empty = try await store.snapshot()
         let snapshot = try await store.activate(package, revisionID: XCTUnwrap(revisions.first).id, expectedGeneration: empty.generation)
         let consent = Locked(true)
-        let adapter = HTTPPluginProcessor(store: store, snapshot: snapshot, hasCaptureConsent: { consent.value })
+        let adapter = HTTPPluginProcessor(store: store, snapshot: snapshot, hasCaptureConsent: { consent.value },
+                                          outboundTransport: outboundTransport ?? HTTPPluginDirectTransport(), outboundObserver: outboundObserver)
         let processor = WitnessingProcessor(delegate: adapter, afterSuccess: { phase in try await afterSuccess?(store, consent, phase) })
         let network = Network(processor: processor, consent: consent)
         do {
             try await network.start()
             try await body(network)
+            adapter.shutdown()
             await network.stop()
         } catch {
+            adapter.shutdown()
             await network.stop()
             throw error
         }
@@ -535,7 +588,23 @@ private struct WireResponse: Sendable {
     let informationalStatuses: [Int]
 }
 
-private struct OriginRequest: Sendable { let hostHeader: String?; let body: Data }
+private struct OriginRequest: Sendable {
+    let hostHeader: String?
+    let body: Data
+    let method: String
+    let path: String
+    let headers: [String: String]
+}
+
+/// Only the socket mapping and fixture trust root are injected; delivery uses the production transport.
+private final class LiveOutboundTransport: HTTPPluginOutboundTransport, @unchecked Sendable {
+    private let target = Locked<HTTPPluginDirectTransport?>(nil)
+    func use(_ transport: HTTPPluginDirectTransport) { target.update { $0 = transport } }
+    func perform(_ request: HTTPPluginOutboundRequest, isAuthorized: @escaping @Sendable () async -> Bool) async -> HTTPPluginOutboundOutcome {
+        guard let transport = target.value else { return .failed }
+        return await transport.perform(request, isAuthorized: isAuthorized)
+    }
+}
 private struct Destination: Sendable { let host: String; let port: Int }
 
 private final class Network: @unchecked Sendable {
@@ -557,6 +626,12 @@ private final class Network: @unchecked Sendable {
     private var clientContext: NIOSSLContext?
     private var serverContext: NIOSSLContext?
     private var upstream: HTTPProxyUpstream?
+    private var originPort: Int?
+
+    func directOutboundTransport() throws -> HTTPPluginDirectTransport {
+        let port = try XCTUnwrap(originPort), context = try XCTUnwrap(clientContext)
+        return HTTPPluginDirectTransport(testingResolver: { _ in try SocketAddress(ipAddress: "127.0.0.1", port: port) }, testingTLSContext: context)
+    }
 
     func start() async throws {
         let certificates = try NIOSSLCertificate.fromPEMBytes(Array(TestTLS.certificate.utf8))
@@ -585,6 +660,7 @@ private final class Network: @unchecked Sendable {
             .bind(host: "127.0.0.1", port: 0).get()
         ownedChannels.update { $0.append(origin) }
         let originPort = try XCTUnwrap(origin.localAddress?.port)
+        self.originPort = originPort
         let destinations = destinations
         let upstream = HTTPProxyUpstream(address: { host, port in
             destinations.update { $0.append(Destination(host: host, port: port)) }
@@ -661,10 +737,10 @@ private final class Network: @unchecked Sendable {
     }
 
     func roundTrip(path: String, hostHeader: String = "api.example.com", body: Data = Data(#"{"limit":20}"#.utf8),
-                   chunked: Bool = false) async throws -> WireResponse
+                   chunked: Bool = false, method: HTTPMethod = .POST) async throws -> WireResponse
     {
         let client = try await tlsClient()
-        return try await request(path: path, hostHeader: hostHeader, client: client, body: body, chunked: chunked)
+        return try await request(path: path, hostHeader: hostHeader, client: client, body: body, chunked: chunked, method: method)
     }
 
     func expectContinueThenEligible(path: String) async throws -> [WireResponse] {
@@ -702,7 +778,7 @@ private final class Network: @unchecked Sendable {
 
     private func request(
         path: String, hostHeader: String = "api.example.com", client: Channel, expectsContinue: Bool = false,
-        body: Data = Data(#"{"limit":20}"#.utf8), chunked: Bool = false,
+        body: Data = Data(#"{"limit":20}"#.utf8), chunked: Bool = false, method: HTTPMethod = .POST,
     ) async throws -> WireResponse {
         let response = ResponseCollector(loop: client.eventLoop, expectsContinue: expectsContinue)
         try await client.pipeline.addHandler(response).get()
@@ -717,7 +793,7 @@ private final class Network: @unchecked Sendable {
         if expectsContinue {
             headers.add(name: "Expect", value: "100-continue")
         }
-        let head = HTTPRequestHead(version: .http1_1, method: .POST, uri: path, headers: headers)
+        let head = HTTPRequestHead(version: .http1_1, method: method, uri: path, headers: headers)
         if let continued = response.continued {
             try await client.writeAndFlush(HTTPClientRequestPart.head(head)).get()
             // A real client does not send its body until 100 crosses both TLS legs.
@@ -921,13 +997,26 @@ private final class OriginHandler: ChannelInboundHandler, @unchecked Sendable {
                 }
             case let .body(buffer): body.append(contentsOf: buffer.readableBytesView)
             case .end:
-                requests.update { $0.append(OriginRequest(hostHeader: head?.headers.first(name: "host"), body: body)) }
+                let receivedHeaders = Dictionary(head?.headers.map { ($0.name.lowercased(), $0.value) } ?? [], uniquingKeysWith: { first, _ in first })
+                requests.update { $0.append(OriginRequest(hostHeader: head?.headers.first(name: "host"), body: body,
+                    method: head?.method.rawValue ?? "", path: head?.uri ?? "", headers: receivedHeaders)) }
                 do {
                     if head?.headers.first(name: "expect") == "100-continue" {
                         context.write(wrapOutboundOut(.head(HTTPResponseHead(version: .http1_1, status: .init(statusCode: 103)))), promise: nil)
                     }
                     let response: Data
-                    if head?.uri == "/large-json" {
+                    var status = HTTPResponseStatus.ok
+                    if head?.uri == "/auth/credentials" {
+                        response = Data(#"{"accessToken":"interceptor-test-token"}"#.utf8)
+                    } else if head?.uri == "/auth/bearer" || head?.uri == "/auth/cookie" {
+                        let valid = head?.uri == "/auth/bearer"
+                            ? receivedHeaders["authorization"] == "Bearer interceptor-test-token"
+                            : receivedHeaders["cookie"] == "fixture_session=dummy-session-not-a-secret"
+                        status = valid ? .ok : .unauthorized
+                        response = Data((valid ? #"{"authenticated":true}"# : #"{"authenticated":false}"#).utf8)
+                    } else if head?.uri == "/auth/credentials-unmatched" {
+                        response = Data(#"{"accessToken":"unmatched"}"#.utf8)
+                    } else if head?.uri == "/large-json" {
                         response = body
                     } else {
                         let parsedRequest = try JSONValue(parsing: body)
@@ -935,8 +1024,11 @@ private final class OriginHandler: ChannelInboundHandler, @unchecked Sendable {
                     }
                     let chunked = head?.uri == "/large-json" && head?.headers.first(name: "transfer-encoding") == "chunked"
                     var headers = HTTPHeaders([("Content-Type", "application/json")])
+                    if head?.uri == "/auth/credentials" {
+                        headers.add(name: "Set-Cookie", value: "fixture_session=dummy-session-not-a-secret; Path=/; Secure; HttpOnly; SameSite=Lax")
+                    }
                     headers.add(name: chunked ? "Transfer-Encoding" : "Content-Length", value: chunked ? "chunked" : String(response.count))
-                    let head = HTTPResponseHead(version: .http1_1, status: .ok, headers: headers)
+                    let head = HTTPResponseHead(version: .http1_1, status: status, headers: headers)
                     context.write(wrapOutboundOut(.head(head)), promise: nil)
                     let parts = chunked ? [response.prefix(response.count / 2), response.dropFirst(response.count / 2)] : [response]
                     for part in parts {

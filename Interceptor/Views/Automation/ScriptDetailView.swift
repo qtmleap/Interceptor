@@ -331,7 +331,13 @@ struct ScriptDetailView: View {
                 }
                 ForEach(actions) { action in
                     VStack(alignment: .leading, spacing: 4) {
-                        HashText(value: action.endpointID.uuidString)
+                        switch action.kind {
+                            case let .webhook(endpointID): HashText(value: endpointID.uuidString)
+                            case let .http(binding, destination):
+                                Text(verbatim: binding).font(.headline)
+                                Text(verbatim: "GET " + destination).font(.footnote).textSelection(.enabled)
+                                Text("AUTO_APPROVAL_OUTBOUND_HEADERS").font(.footnote).foregroundStyle(.secondary)
+                        }
                         if testOnly {
                             jsonViewer("JSON", json: action.json, id: "script.actionJSON.\(action.id)")
                         } else {

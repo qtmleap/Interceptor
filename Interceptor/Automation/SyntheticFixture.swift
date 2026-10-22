@@ -74,14 +74,35 @@ enum SyntheticFixture {
     }
 }
 
-/// One validated, display-only webhook intent. It is never queued or delivered.
+/// One validated, display-only intent. Dry runs never construct a dispatcher or transport.
 struct ValidatedAction: Equatable, Identifiable {
+    enum Kind: Equatable {
+        case webhook(UUID)
+        case http(binding: String, destination: String)
+    }
     let id: Int
-    let endpointID: UUID
+    let kind: Kind
     let json: String
+
+    var endpointID: UUID? {
+        if case let .webhook(id) = kind { return id }
+        return nil
+    }
+    var outboundBinding: String? {
+        if case let .http(binding, _) = kind { return binding }
+        return nil
+    }
+    var destination: String? {
+        if case let .http(_, destination) = kind { return destination }
+        return nil
+    }
 
     /// Re-validates the runtime's result bytes: `{actions:[{type:"webhook",endpointId:UUID,json:any}]}`, max 2.
     static func parse(_ data: Data) throws -> [ValidatedAction] {
+        try parse(data, manifest: nil)
+    }
+
+    static func parse(_ data: Data, manifest: PluginManifest?) throws -> [ValidatedAction] {
         guard data.count <= JavaScriptLimits.maxResultBytes,
               let root = try? JSONValue(parsing: data), let object = root.objectValue, Set(object.keys) == ["actions"],
               let actions = object["actions"]?.arrayValue, actions.count <= JavaScriptLimits.maxActions
@@ -89,10 +110,18 @@ struct ValidatedAction: Equatable, Identifiable {
             throw JavaScriptExecutionError.invalidResult
         }
         return try actions.enumerated().map { index, action in
+            if action.objectValue?["type"]?.stringValue == "http" {
+                guard let manifest, manifest.schemaVersion == 2,
+                      let intent = try? PluginOutboundIntent.validating(action, manifest: manifest)
+                else { throw JavaScriptExecutionError.invalidResult }
+                let payload = JSONValue.object(intent.headers.mapValues(JSONValue.string))
+                return try ValidatedAction(id: index, kind: .http(binding: intent.binding, destination: intent.endpoint.url),
+                                           json: payload.jsonString())
+            }
             guard let a = action.objectValue, Set(a.keys) == ["type", "endpointId", "json"], a["type"]?.stringValue == "webhook",
                   let id = a["endpointId"]?.stringValue.flatMap(UUID.init(uuidString:)), let payload = a["json"],
                   let text = try? payload.jsonString() else { throw JavaScriptExecutionError.invalidResult }
-            return ValidatedAction(id: index, endpointID: id, json: text)
+            return ValidatedAction(id: index, kind: .webhook(id), json: text)
         }
     }
 }

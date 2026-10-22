@@ -13,14 +13,23 @@ final class HTTPPluginProcessor: HTTPPluginProcessing, Sendable {
     // The single executor rejects overlapping runs, so whole phases are admitted one at a time.
     private let admission = HTTPPluginPhaseAdmission()
     private let hasCaptureConsent: @Sendable () -> Bool
+    private let outbound: HTTPPluginOutboundDispatcher
     private static let bodyLimit = 24 * 1024
 
+    private struct PhaseResult {
+        var body: Data?
+        var intents: [PluginOutboundIntent] = []
+    }
+
     init(store: PluginActivationStore, snapshot: PluginActivationSnapshot,
-         hasCaptureConsent: @escaping @Sendable () -> Bool = { CaptureAuthorization.isGranted })
+         hasCaptureConsent: @escaping @Sendable () -> Bool = { CaptureAuthorization.isGranted },
+         outboundTransport: any HTTPPluginOutboundTransport = HTTPPluginDirectTransport(),
+         outboundObserver: HTTPPluginOutboundDispatcher.Observer? = nil)
     {
         self.store = store
         self.snapshot = snapshot
         self.hasCaptureConsent = hasCaptureConsent
+        outbound = HTTPPluginOutboundDispatcher(transport: outboundTransport, observer: outboundObserver)
     }
 
     func matches(_ request: HTTPPluginRequest) -> Bool {
@@ -38,14 +47,25 @@ final class HTTPPluginProcessor: HTTPPluginProcessing, Sendable {
     }
 
     func isAuthorized() async -> Bool {
-        guard hasCaptureConsent() else { return false }
-        return await store.isCurrent(admitted: snapshot)
+        guard outbound.isActive, hasCaptureConsent() else { return false }
+        let current = await store.isCurrent(admitted: snapshot)
+        return current && outbound.isActive
+    }
+
+    /// Synchronous so tunnel shutdown/revocation cannot leave a window for new outbound admission.
+    func shutdown() {
+        outbound.shutdown()
+        executor.cancel()
+    }
+
+    func waitUntilStopped() async -> Bool {
+        await outbound.waitUntilStopped()
     }
 
     func process(_ phase: HTTPPluginPhase, request: HTTPPluginRequest, response: HTTPPluginResponse?) async throws -> Data? {
         try await admission.acquire()
         // No await inside a defer: release explicitly on every path.
-        let result: Data?
+        let result: PhaseResult
         do {
             // A grant can race with cancellation; honor the cancellation, but never keep the permit.
             if Task.isCancelled {
@@ -57,11 +77,16 @@ final class HTTPPluginProcessor: HTTPPluginProcessing, Sendable {
             throw error
         }
         await admission.release()
-        return result
+        // The complete phase, including every result and mutation, is validated before any send.
+        // No networking is awaited while a phase or VM permit is held.
+        guard !Task.isCancelled else { throw JavaScriptExecutionError.cancelled }
+        guard await isAuthorized() else { throw Failure.revoked }
+        outbound.submit(result.intents) { [self] in await isAuthorized() }
+        return result.body
     }
 
     private func processAdmitted(_ phase: HTTPPluginPhase, request: HTTPPluginRequest,
-                                 response: HTTPPluginResponse?) async throws -> Data?
+                                 response: HTTPPluginResponse?) async throws -> PhaseResult
     {
         guard await isAuthorized() else { throw Failure.revoked }
         guard let hook = JavaScriptHook(rawValue: phase.rawValue) else { throw Failure.invalidResult }
@@ -70,9 +95,10 @@ final class HTTPPluginProcessor: HTTPPluginProcessing, Sendable {
         let original = isResponse ? response?.body : request.body
         // Transport admits only complete eligible JSON messages. Retain the bounded/bodyless guard;
         // filtering below does not admit streaming or unsupported traffic to hooks.
-        guard let original, !original.isEmpty, original.count <= Self.bodyLimit else { return nil }
+        guard let original, !original.isEmpty, original.count <= Self.bodyLimit else { return PhaseResult() }
         var body = original
         var receivedMutation = false
+        var intents: [PluginOutboundIntent] = []
         for approved in snapshot.revisions {
             guard await isAuthorized() else { throw Failure.revoked }
             let package = approved.package, manifest = package.manifest
@@ -117,11 +143,26 @@ final class HTTPPluginProcessor: HTTPPluginProcessing, Sendable {
             guard await isAuthorized() else { throw Failure.revoked }
             guard output.count <= JavaScriptLimits.maxResultBytes,
                   let fields = try JSONValue(parsing: output).objectValue,
-                  Set(fields.keys).isSubset(of: ["actions", "mutation"]), fields["actions"]?.arrayValue != nil
+                  Set(fields.keys).isSubset(of: ["actions", "mutation"]), let actions = fields["actions"]?.arrayValue,
+                  actions.count <= JavaScriptLimits.maxActions
             else {
                 throw Failure.invalidResult
             }
-            // Actions remain declarative intents. No delivery API exists in this adapter.
+            for action in actions {
+                if action.objectValue?["type"]?.stringValue == "http" {
+                    guard manifest.schemaVersion == 2,
+                          let intent = try? PluginOutboundIntent.validating(action, manifest: manifest)
+                    else { throw Failure.invalidResult }
+                    intents.append(intent)
+                    guard intents.count <= JavaScriptLimits.maxActions else { throw Failure.invalidResult }
+                } else {
+                    // Legacy webhook actions remain display-only, but must still cross a strict boundary.
+                    guard let fields = action.objectValue, Set(fields.keys) == ["type", "endpointId", "json"],
+                          fields["type"]?.stringValue == "webhook",
+                          fields["endpointId"]?.stringValue.flatMap(UUID.init(uuidString:)) != nil,
+                          fields["json"] != nil else { throw Failure.invalidResult }
+                }
+            }
             if let mutation = fields["mutation"] {
                 guard isEnter, manifest.read.body == .json,
                       isResponse ? manifest.writeResponseBody : manifest.writeRequestBody,
@@ -136,9 +177,9 @@ final class HTTPPluginProcessor: HTTPPluginProcessing, Sendable {
             }
         }
         guard await isAuthorized() else { throw Failure.revoked }
-        guard isEnter, receivedMutation else { return nil }
-        guard try JSONValue(parsing: body) != JSONValue(parsing: original) else { return nil }
-        return body
+        guard isEnter, receivedMutation else { return PhaseResult(intents: intents) }
+        guard try JSONValue(parsing: body) != JSONValue(parsing: original) else { return PhaseResult(intents: intents) }
+        return PhaseResult(body: body, intents: intents)
     }
 
     private static func headers(_ values: [String: String], granted: [String]) throws -> JSONValue {
