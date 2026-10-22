@@ -289,6 +289,9 @@ private struct OutboundObservedRequest: Sendable {
     let userAgentValues: [String]
     let headerNames: Set<String>
     let bodyBytes: Int
+    let body: Data
+    let contentLengthValues: [String]
+    let contentTypeValues: [String]
 }
 
 private final class OutboundLocked<Value>: @unchecked Sendable {
@@ -379,6 +382,7 @@ private final class OutboundOriginHandler: ChannelInboundHandler, @unchecked Sen
     private let requests: OutboundLocked<[OutboundObservedRequest]>
     private var head: HTTPRequestHead?
     private var bodyBytes = 0
+    private var body = Data()
     init(requests: OutboundLocked<[OutboundObservedRequest]>) {
         self.requests = requests
     }
@@ -386,14 +390,18 @@ private final class OutboundOriginHandler: ChannelInboundHandler, @unchecked Sen
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         switch unwrapInboundIn(data) {
             case let .head(head): self.head = head
-            case let .body(body): bodyBytes += body.readableBytes
+            case let .body(buffer):
+                bodyBytes += buffer.readableBytes
+                body.append(contentsOf: buffer.readableBytesView)
             case .end:
                 guard let head else { context.close(promise: nil); return }
                 requests.change { $0.append(.init(method: head.method.rawValue, path: head.uri,
                                                   host: head.headers.first(name: "host"), authorization: head.headers.first(name: "authorization"),
                                                   cookie: head.headers.first(name: "cookie"), userAgentValues: head.headers["user-agent"],
                                                   headerNames: Set(head.headers.map { $0.name.lowercased() }),
-                                                  bodyBytes: bodyBytes))
+                                                  bodyBytes: bodyBytes, body: body,
+                                                  contentLengthValues: head.headers["content-length"],
+                                                  contentTypeValues: head.headers["content-type"]))
                 }
                 guard head.uri != "/silent" else { return }
                 let status: HTTPResponseStatus = if head.uri == "/redirect" {
@@ -478,4 +486,186 @@ private enum OutboundTestTLS {
     8dGM84PBndNFgTq8i6d/JHx1qQ==
     -----END PRIVATE KEY-----
     """
+}
+
+// MARK: - Outbound method and JSON body framing (phase 1, written before the transport supports it)
+
+extension HTTPPluginOutboundTransportTests {
+    private func request(
+        _ method: String = "GET", body: String? = nil, headers: [String: String] = [:], path: String = "/echo",
+    ) -> HTTPPluginOutboundRequest {
+        .init(host: "api.example.com", path: path, headers: headers, method: method, jsonBody: body.map { Data($0.utf8) })
+    }
+
+    func testLegacyInitializerDefaultsToBodylessGET() async throws {
+        let legacy = HTTPPluginOutboundRequest(host: "api.example.com", path: "/echo", headers: [:])
+        XCTAssertEqual(legacy.method, "GET")
+        XCTAssertNil(legacy.jsonBody)
+        try await withOrigin { origin in
+            let result = await origin.transport.perform(
+                .init(host: "api.example.com", path: "/echo", headers: [:], method: "GET", jsonBody: nil), isAuthorized: { true },
+            )
+            XCTAssertEqual(result, .response(200))
+            let observed = try XCTUnwrap(origin.requests.value.first)
+            XCTAssertEqual(observed.method, "GET")
+            XCTAssertEqual(observed.headerNames, ["host", "connection"], "GET wire framing must not gain content headers")
+            XCTAssertEqual(observed.bodyBytes, 0)
+            XCTAssertTrue(observed.contentLengthValues.isEmpty)
+            XCTAssertTrue(observed.contentTypeValues.isEmpty)
+        }
+    }
+
+    func testPOSTAndPUTSendExactJSONBytesWithActualContentLengthAndSingleContentType() async throws {
+        let bodies = [#"{"name":"日本語","escaped":"a\"b\\c\n","n":1.50e+2}"#, #"[1,2,3]"#, #""x""#]
+        for method in ["POST", "PUT"] {
+            for body in bodies {
+                try await withOrigin { origin in
+                    let result = await origin.transport.perform(request(method, body: body), isAuthorized: { true })
+                    XCTAssertEqual(result, .response(200), method)
+                    let observed = try XCTUnwrap(origin.requests.value.first)
+                    XCTAssertEqual(observed.method, method)
+                    XCTAssertEqual(observed.body, Data(body.utf8), "body must be the exact caller-serialized bytes")
+                    XCTAssertEqual(observed.contentLengthValues, [String(body.utf8.count)])
+                    XCTAssertEqual(observed.bodyBytes, body.utf8.count)
+                    XCTAssertEqual(observed.contentTypeValues, ["application/json"])
+                    XCTAssertEqual(observed.headerNames, ["host", "connection", "content-length", "content-type"])
+                    XCTAssertEqual(observed.host, "api.example.com")
+                }
+            }
+        }
+    }
+
+    func testDeclaredExactJSONContentTypeIsNotDuplicatedAndHeaderGrantsStillApply() async throws {
+        try await withOrigin { origin in
+            let result = await origin.transport.perform(
+                request("POST", body: "{}", headers: ["content-type": "application/json", "authorization": "Bearer fixture-token"], path: "/auth/bearer"),
+                isAuthorized: { true },
+            )
+            XCTAssertEqual(result, .response(200))
+            let observed = try XCTUnwrap(origin.requests.value.first)
+            XCTAssertEqual(observed.contentTypeValues, ["application/json"])
+            XCTAssertEqual(observed.contentLengthValues, ["2"])
+            XCTAssertEqual(observed.authorization, "Bearer fixture-token")
+            XCTAssertEqual(observed.headerNames, ["host", "connection", "content-length", "content-type", "authorization"])
+        }
+    }
+
+    func testAbsentBodyIsEmptyWhileExplicitJSONNullIsFourBytes() async throws {
+        for method in ["POST", "PUT"] {
+            try await withOrigin { origin in
+                let empty = await origin.transport.perform(request(method), isAuthorized: { true })
+                let null = await origin.transport.perform(request(method, body: "null"), isAuthorized: { true })
+                XCTAssertEqual(empty, .response(200))
+                XCTAssertEqual(null, .response(200))
+                let seen = origin.requests.value
+                XCTAssertEqual(seen.count, 2)
+                XCTAssertEqual(seen[0].method, method)
+                XCTAssertEqual(seen[0].contentLengthValues, ["0"], "bodyless POST/PUT declares an empty body")
+                XCTAssertEqual(seen[0].bodyBytes, 0)
+                XCTAssertTrue(seen[0].contentTypeValues.isEmpty, "no JSON content type is invented without a body")
+                XCTAssertEqual(seen[1].contentLengthValues, ["4"])
+                XCTAssertEqual(seen[1].body, Data("null".utf8))
+                XCTAssertEqual(seen[1].contentTypeValues, ["application/json"])
+            }
+        }
+    }
+
+    func testBodylessPOSTForwardsAScriptDeclaredContentTypeUnderExistingGrants() async throws {
+        try await withOrigin { origin in
+            let result = await origin.transport.perform(
+                request("POST", headers: ["content-type": "text/plain"]), isAuthorized: { true },
+            )
+            XCTAssertEqual(result, .response(200))
+            let observed = try XCTUnwrap(origin.requests.value.first)
+            XCTAssertEqual(observed.contentTypeValues, ["text/plain"])
+            XCTAssertEqual(observed.contentLengthValues, ["0"])
+        }
+    }
+
+    func testRequestValidationRejectsMethodAndBodyViolationsWithoutAnyWriteOrNetwork() async throws {
+        XCTAssertTrue(request("GET").isValid)
+        XCTAssertTrue(request("POST").isValid)
+        XCTAssertTrue(request("PUT", body: "{}").isValid)
+        let invalid: [(String, HTTPPluginOutboundRequest)] = [
+            ("GET with body", request("GET", body: "{}")),
+            ("GET with null body", request("GET", body: "null")),
+            ("DELETE", request("DELETE")),
+            ("PATCH", request("PATCH", body: "{}")),
+            ("lowercase post", request("post", body: "{}")),
+            ("lowercase put", request("put")),
+            ("lowercase get", request("get")),
+            ("empty method", request("")),
+            ("padded method", request("POST ")),
+            ("invalid UTF-8", .init(host: "api.example.com", path: "/", headers: [:], method: "POST", jsonBody: Data([0x22, 0xFF, 0x22]))),
+            ("empty body", .init(host: "api.example.com", path: "/", headers: [:], method: "POST", jsonBody: Data())),
+            ("invalid JSON", request("POST", body: "{")),
+            ("trailing JSON", request("POST", body: "{} {}")),
+            ("bare word", request("POST", body: "undefined")),
+            ("NaN", request("POST", body: "NaN")),
+            ("duplicate keys", request("POST", body: #"{"a":1,"a":2}"#)),
+            ("uppercase header remains denied", request("POST", body: "{}", headers: ["Content-Type": "application/json"])),
+            ("mismatched content type", request("POST", body: "{}", headers: ["content-type": "text/plain"])),
+            ("mismatched case content type", request("PUT", body: "{}", headers: ["Content-Type": "Application/JSON"])),
+            ("content type with charset", request("POST", body: "{}", headers: ["content-type": "application/json; charset=utf-8"])),
+            ("content-length remains denied", request("POST", body: "{}", headers: ["content-length": "2"])),
+            ("transfer-encoding remains denied", request("POST", body: "{}", headers: ["transfer-encoding": "chunked"])),
+        ]
+        for (name, candidate) in invalid {
+            XCTAssertFalse(candidate.isValid, name)
+        }
+        try await withOrigin { origin in
+            for (name, candidate) in invalid {
+                let result = await origin.transport.perform(candidate, isAuthorized: { true })
+                XCTAssertEqual(result, .rejected, name)
+            }
+            XCTAssertTrue(origin.requests.value.isEmpty, "rejected requests never reach the wire")
+        }
+    }
+
+    func testJSONDepthAndSizeBoundaries() async throws {
+        func nested(_ depth: Int) -> String {
+            String(repeating: "[", count: depth) + String(repeating: "]", count: depth)
+        }
+        func string(bytes: Int) -> String { #"""# + String(repeating: "x", count: bytes - 2) + #"""# }
+        XCTAssertTrue(request("POST", body: nested(16)).isValid, "depth 16 is allowed")
+        XCTAssertFalse(request("POST", body: nested(17)).isValid, "depth 17 is rejected")
+        XCTAssertTrue(request("POST", body: string(bytes: 8192)).isValid, "exactly 8192 bytes is allowed")
+        XCTAssertFalse(request("POST", body: string(bytes: 8193)).isValid, "8193 bytes is rejected")
+        // Multi-byte scalars are counted in UTF-8 bytes, not characters.
+        let multibyte = #"""# + String(repeating: "日", count: 2730) + #"""# // 2 + 8190 = 8192 bytes
+        XCTAssertEqual(multibyte.utf8.count, 8192)
+        XCTAssertTrue(request("PUT", body: multibyte).isValid)
+        XCTAssertFalse(request("PUT", body: #"""# + String(repeating: "日", count: 2731) + #"""#).isValid, "8195 bytes")
+
+        try await withOrigin { origin in
+            let maximal = string(bytes: 8192)
+            let accepted = await origin.transport.perform(request("POST", body: maximal), isAuthorized: { true })
+            XCTAssertEqual(accepted, .response(200))
+            XCTAssertEqual(origin.requests.value.first?.contentLengthValues, ["8192"])
+            XCTAssertEqual(origin.requests.value.first?.body, Data(maximal.utf8))
+            let rejected = await origin.transport.perform(request("POST", body: string(bytes: 8193)), isAuthorized: { true })
+            XCTAssertEqual(rejected, .rejected)
+            XCTAssertEqual(origin.requests.value.count, 1)
+        }
+    }
+
+    func testRevokedAuthorizationNeverWritesABody() async throws {
+        try await withOrigin { origin in
+            let checks = OutboundLocked(0)
+            let result = await origin.transport.perform(request("POST", body: #"{"secret":"value"}"#), isAuthorized: {
+                checks.change { $0 += 1; return $0 < 3 }
+            })
+            XCTAssertEqual(result, .rejected)
+            XCTAssertTrue(origin.requests.value.isEmpty, "no head or body is written before post-TLS authorization succeeds")
+        }
+    }
+
+    func testPOSTRedirectIsNotFollowedAndBodyIsNotResent() async throws {
+        try await withOrigin { origin in
+            let result = await origin.transport.perform(request("POST", body: "{}", path: "/redirect"), isAuthorized: { true })
+            XCTAssertEqual(result, .response(307))
+            XCTAssertEqual(origin.requests.value.map(\.path), ["/redirect"])
+            XCTAssertEqual(origin.requests.value.map(\.method), ["POST"])
+        }
+    }
 }

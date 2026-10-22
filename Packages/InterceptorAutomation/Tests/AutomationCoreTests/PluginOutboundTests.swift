@@ -52,7 +52,7 @@ final class PluginOutboundTests: XCTestCase {
         accepts(decl())
         accepts(decl(headers: "[]"))
         rejects(decl(extra: #","body":""#))
-        rejects(decl(method: "POST"))
+        rejects(decl(method: "DELETE"))
         rejects(decl(method: "get"))
         rejects(#"{"profile":{"url":"https://api.example.com/","method":"GET"}}"#)
         rejects(#"{"profile":{"url":"https://api.example.com/","headers":[]}}"#)
@@ -189,5 +189,162 @@ final class PluginOutboundTests: XCTestCase {
 
     func testOutboundDoesNotChangeEndpointBindings() throws {
         XCTAssertEqual(try manifest().endpointBindings, ["alert"])
+    }
+
+    // MARK: POST/PUT methods and optional exact JSON body (PHASE1: RED until implemented)
+
+    private func writeManifest(method: String = "POST") throws -> PluginManifest {
+        try manifest(decl(headers: #"["authorization","content-type"]"#, method: method))
+    }
+    private func bodyAction(_ body: String?, binding: String = "profile") -> JSONValue {
+        var extra = ""
+        if let body { extra = #","jsonBody":\#(try! JSONValue.string(body).jsonString())"# }
+        return action(binding: binding, headers: "{}", extra: extra)
+    }
+    private func intent(_ body: String?, method: String = "POST") throws -> PluginOutboundIntent {
+        try PluginOutboundIntent.validating(bodyAction(body), manifest: writeManifest(method: method))
+    }
+    private func badIntent(_ body: String?, method: String = "POST", _ e: PluginOutboundIntentError, line: UInt = #line) throws {
+        let m = try writeManifest(method: method)
+        XCTAssertThrowsError(try PluginOutboundIntent.validating(bodyAction(body), manifest: m), line: line) {
+            XCTAssertEqual($0 as? PluginOutboundIntentError, e, line: line)
+        }
+    }
+
+    func testPostAndPutDeclarationsAreAcceptedButOtherMethodsAreNot() throws {
+        accepts(decl(method: "POST"))
+        accepts(decl(method: "PUT"))
+        accepts(decl(method: "GET"))
+        XCTAssertEqual(try writeManifest(method: "PUT").outbound["profile"]?.method, "PUT")
+        for bad in ["DELETE", "PATCH", "HEAD", "OPTIONS", "post", "put", "Post", "Put", "get", "", " POST", "POST "] {
+            rejects(decl(method: bad))
+        }
+    }
+
+    func testMethodChangeAltersPackageRevision() throws {
+        let get = try PluginPackage.validate(package(outbound: decl(method: "GET"))).revision
+        let post = try PluginPackage.validate(package(outbound: decl(method: "POST"))).revision
+        let put = try PluginPackage.validate(package(outbound: decl(method: "PUT"))).revision
+        XCTAssertEqual(Set([get, post, put]).count, 3)
+    }
+
+    func testLegacyGetIntentHasNoBody() throws {
+        let i = try PluginOutboundIntent.validating(action(), manifest: manifest())
+        XCTAssertNil(i.jsonBody)
+    }
+
+    func testPostPutWithoutBodyIsValidEmptyBody() throws {
+        for method in ["POST", "PUT"] {
+            XCTAssertNil(try intent(nil, method: method).jsonBody)
+        }
+    }
+
+    func testJSONBodyIsForwardedAsExactSerializedBytesWithoutReencoding() throws {
+        // Spellings a parse/re-encode round trip would normalise (number format, escapes, key order, non-ASCII).
+        let exact = #"{"z":1e+21,"a":[0.1,1.5,4294967296],"s":"a\"b\\c\n\u0001é日本😀"}"#
+        for method in ["POST", "PUT"] {
+            let i = try intent(exact, method: method)
+            XCTAssertEqual(i.jsonBody, Data(exact.utf8))
+            XCTAssertEqual(i.endpoint.method, method)
+        }
+        XCTAssertEqual(try intent("null").jsonBody, Data("null".utf8))
+        XCTAssertEqual(try intent("0").jsonBody, Data("0".utf8))
+        XCTAssertEqual(try intent(#""x""#).jsonBody, Data(#""x""#.utf8))
+        XCTAssertEqual(try intent("[]").jsonBody, Data("[]".utf8))
+        XCTAssertEqual(try intent("{}").jsonBody, Data("{}".utf8))
+    }
+
+    func testEmptyStringBodyIsInvalidJSONNotAbsentBody() throws {
+        try badIntent("", .malformed)
+    }
+
+    func testGetRejectsAnyJSONBody() throws {
+        for body in ["null", "{}", #"{"a":1}"#] { try badIntent(body, method: "GET", .malformed) }
+    }
+
+    func testJSONBodyMustBeStrictJSONString() throws {
+        for bad in ["{", "{'a':1}", #"{"a":1,}"#, "[1,]", "01", "NaN", "Infinity", "undefined", #"{"a":1}{"b":2}"#,
+                    #"{"a":1,"a":2}"#, "\u{FEFF}{}", #""\ud800""#] {
+            try badIntent(bad, .malformed)
+        }
+        // Non-string jsonBody values.
+        let m = try writeManifest()
+        for raw in [#"{"a":1}"#, "null", "1", "[]"] {
+            let a = action(headers: "{}", extra: #","jsonBody":\#(raw)"#)
+            XCTAssertThrowsError(try PluginOutboundIntent.validating(a, manifest: m)) {
+                XCTAssertEqual($0 as? PluginOutboundIntentError, .malformed)
+            }
+        }
+    }
+
+    func testJSONBodyByteCapIsInclusiveAtUTF8Length() throws {
+        let ascii = #"{"a":""# + String(repeating: "x", count: 8184) + #""}"#
+        XCTAssertEqual(ascii.utf8.count, 8192)
+        XCTAssertEqual(try intent(ascii).jsonBody?.count, 8192)
+        let over = #"{"a":""# + String(repeating: "x", count: 8185) + #""}"#
+        XCTAssertEqual(over.utf8.count, 8193)
+        try badIntent(over, .limitExceeded)
+        // 4092 two-byte characters: 8192 UTF-8 bytes but only 4092 characters.
+        let wide = #"{"a":""# + String(repeating: "\u{e9}", count: 4092) + #""}"#
+        XCTAssertEqual(wide.utf8.count, 8192)
+        XCTAssertEqual(try intent(wide).jsonBody?.count, 8192)
+        let wider = #"{"a":""# + String(repeating: "\u{e9}", count: 4092) + #"x"}"#
+        XCTAssertEqual(wider.utf8.count, 8193)
+        try badIntent(wider, .limitExceeded)
+    }
+
+    func testJSONBodyDepthCapIs16() throws {
+        func nested(_ n: Int) -> String { String(repeating: "[", count: n) + String(repeating: "]", count: n) }
+        XCTAssertEqual(try intent(nested(16)).jsonBody, Data(nested(16).utf8))
+        try badIntent(nested(17), .limitExceeded)
+        let obj16 = String(repeating: #"{"a":"#, count: 16) + "1" + String(repeating: "}", count: 16)
+        XCTAssertNoThrow(try intent(obj16))
+        try badIntent(String(repeating: #"{"a":"#, count: 17) + "1" + String(repeating: "}", count: 17), .limitExceeded)
+    }
+
+    func testIntentKeysetIsExactWithOptionalJSONBodyOnly() throws {
+        let m = try writeManifest()
+        XCTAssertNoThrow(try PluginOutboundIntent.validating(action(headers: "{}"), manifest: m))
+        for extra in [#","body":"{}""#, #","json":{}"#, #","method":"POST""#, #","jsonBody":"{}","json":{}"#] {
+            XCTAssertThrowsError(try PluginOutboundIntent.validating(action(headers: "{}", extra: extra), manifest: m)) {
+                XCTAssertEqual($0 as? PluginOutboundIntentError, .malformed)
+            }
+        }
+    }
+
+    func testBodyDoesNotChangeHeaderValidation() throws {
+        let m = try writeManifest()
+        let a = action(headers: #"{"authorization":"Bearer abc"}"#, extra: #","jsonBody":"{}""#)
+        let i = try PluginOutboundIntent.validating(a, manifest: m)
+        XCTAssertEqual(i.headers, ["authorization": "Bearer abc"])
+        XCTAssertEqual(i.jsonBody, Data("{}".utf8))
+        XCTAssertThrowsError(try PluginOutboundIntent.validating(action(headers: #"{"x-other":"1"}"#, extra: #","jsonBody":"{}""#), manifest: m)) {
+            XCTAssertEqual($0 as? PluginOutboundIntentError, .undeclaredHeader)
+        }
+    }
+}
+
+extension PluginOutboundTests {
+    func testJSONContentTypeMustAgreeWithNativeFraming() throws {
+        let m = try manifest(decl(headers: #"["content-type"]"#, method: "POST"))
+        XCTAssertThrowsError(try PluginOutboundIntent.validating(action(headers: #"{"content-type":"text/plain"}"#, extra: #","jsonBody":"{}""#), manifest: m)) {
+            XCTAssertEqual($0 as? PluginOutboundIntentError, .invalidHeaderValue)
+        }
+        let good = try PluginOutboundIntent.validating(action(headers: #"{"content-type":"application/json"}"#, extra: #","jsonBody":"{}""#), manifest: m)
+        XCTAssertEqual(good.jsonBody, Data("{}".utf8))
+    }
+}
+
+extension PluginOutboundTests {
+    func testSharedOutboundMethodConformance() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Fixtures/outbound-conformance.json")
+        let root = try JSONValue(parsing: Data(contentsOf: url))
+        let rows = try XCTUnwrap(root.objectValue?["cases"]?.arrayValue)
+        for row in rows {
+            let fields = try XCTUnwrap(row.objectValue)
+            let outbound = try XCTUnwrap(fields["outbound"]).jsonString()
+            guard case .bool(let valid)? = fields["valid"] else { return XCTFail("invalid shared fixture") }
+            if valid { accepts(outbound) } else { rejects(outbound) }
+        }
     }
 }

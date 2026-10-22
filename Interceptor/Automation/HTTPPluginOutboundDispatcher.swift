@@ -53,7 +53,8 @@ final class HTTPPluginOutboundDispatcher: @unchecked Sendable {
                 let outcome: HTTPPluginOutboundOutcome
                 if await authorization() {
                     outcome = await transport.perform(
-                        HTTPPluginOutboundRequest(host: intent.endpoint.host, path: intent.endpoint.path, headers: intent.headers),
+                        HTTPPluginOutboundRequest(host: intent.endpoint.host, path: intent.endpoint.path, headers: intent.headers,
+                                                  method: intent.endpoint.method, jsonBody: intent.jsonBody),
                         isAuthorized: authorization,
                     )
                 } else {

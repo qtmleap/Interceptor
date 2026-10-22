@@ -12,9 +12,25 @@ struct HTTPPluginOutboundRequest: Sendable {
     let host: String
     let path: String
     let headers: [String: String]
+    let method: String
+    /// Exact strict-JSON UTF-8 bytes captured at send time; only POST/PUT may carry one.
+    let jsonBody: Data?
+
+    init(host: String, path: String, headers: [String: String], method: String = "GET", jsonBody: Data? = nil) {
+        self.host = host
+        self.path = path
+        self.headers = headers
+        self.method = method
+        self.jsonBody = jsonBody
+    }
 
     /// Defense in depth after manifest/result validation. All HTTP framing is owned here.
     var isValid: Bool {
+        guard ["GET", "POST", "PUT"].contains(method) else { return false }
+        if let jsonBody {
+            guard method != "GET", PluginOutboundPolicy.isAllowedJSONBody(jsonBody),
+                  headers["content-type"].map({ $0 == "application/json" }) ?? true else { return false }
+        }
         guard !host.contains("/"), path.hasPrefix("/"),
               PluginOutboundPolicy.isAllowedURL("https://" + host + path),
               headers.count <= PluginOutboundPolicy.maxDeclaredHeaders else { return false }
@@ -299,11 +315,20 @@ private final class HTTPPluginOutboundExchange: @unchecked Sendable {
                 var headers = HTTPHeaders()
                 headers.add(name: "host", value: self.request.host)
                 headers.add(name: "connection", value: "close")
+                let method: HTTPMethod = self.request.method == "POST" ? .POST : self.request.method == "PUT" ? .PUT : .GET
+                let body = self.request.jsonBody
+                // Single framing builder: host owns Host/Content-Length/Content-Type; GET stays byte-identical.
+                if method != .GET {
+                    headers.add(name: "content-length", value: String(body?.count ?? 0))
+                    if body != nil { headers.add(name: "content-type", value: "application/json") }
+                }
                 for (name, value) in self.request.headers.sorted(by: { $0.key < $1.key }) {
+                    if body != nil, name == "content-type" { continue }
                     headers.add(name: name, value: value)
                 }
-                let head = HTTPRequestHead(version: .http1_1, method: .GET, uri: self.request.path, headers: headers)
+                let head = HTTPRequestHead(version: .http1_1, method: method, uri: self.request.path, headers: headers)
                 channel.write(HTTPClientRequestPart.head(head), promise: nil)
+                if let body { channel.write(HTTPClientRequestPart.body(.byteBuffer(ByteBuffer(bytes: body))), promise: nil) }
                 channel.writeAndFlush(HTTPClientRequestPart.end(nil)).whenFailure { _ in self.finish(.failed) }
             }
         }

@@ -1,0 +1,295 @@
+{
+  "cases": [
+    {
+      "name": "fixed-https-get",
+      "valid": true,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.example.com/profile",
+          "method": "GET",
+          "headers": [
+            "authorization",
+            "cookie"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ascii-letter-anywhere-in-final-label",
+      "valid": true,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.example.1a/%E6%97%A5%E6%9C%AC",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "percent-encoded-high-bytes",
+      "valid": true,
+      "outbound": {
+        "lookup": {
+          "url": "https://example.com/%80%ff",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "rfc-pchar-and-slashes",
+      "valid": true,
+      "outbound": {
+        "lookup": {
+          "url": "https://example.com/a-._~!$&'()*+,;=:@/b",
+          "method": "GET",
+          "headers": [
+            "!#$%&'*+-.^_`|~09az"
+          ]
+        }
+      }
+    },
+    {
+      "name": "empty-outbound",
+      "valid": true,
+      "outbound": {}
+    },
+    {
+      "name": "localhost-suffix",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.localhost/",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "local-suffix",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.local/",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "single-label",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://api/",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "ip-address",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://127.0.0.1/",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "numeric-final-label",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://example.123/",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "explicit-default-port",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://example.com:443/",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "uppercase-host",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://Example.com/",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "query",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://example.com/?q=1",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "fragment",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://example.com/#x",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "encoded-control",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://example.com/%00",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "encoded-del",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://example.com/%7f",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "encoded-backslash",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://example.com/%5c",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "malformed-escape",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://example.com/%G0",
+          "method": "GET",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "post-declaration",
+      "valid": true,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.example.com/profile",
+          "method": "POST",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "put-declaration",
+      "valid": true,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.example.com/profile",
+          "method": "PUT",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "delete-unsupported",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.example.com/profile",
+          "method": "DELETE",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "lowercase-post",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.example.com/profile",
+          "method": "post",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "lowercase-put",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.example.com/profile",
+          "method": "put",
+          "headers": []
+        }
+      }
+    },
+    {
+      "name": "uppercase-header-name",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.example.com/profile",
+          "method": "GET",
+          "headers": [
+            "Authorization"
+          ]
+        }
+      }
+    },
+    {
+      "name": "forbidden-set-cookie",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.example.com/profile",
+          "method": "GET",
+          "headers": [
+            "set-cookie"
+          ]
+        }
+      }
+    },
+    {
+      "name": "forbidden-proxy-header",
+      "valid": false,
+      "outbound": {
+        "lookup": {
+          "url": "https://api.example.com/profile",
+          "method": "GET",
+          "headers": [
+            "proxy-authorization"
+          ]
+        }
+      }
+    }
+  ]
+}

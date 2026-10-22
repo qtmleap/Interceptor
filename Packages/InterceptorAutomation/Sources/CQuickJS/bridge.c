@@ -81,10 +81,13 @@ typedef struct {
 #define MAX_INTENTS 16
 #define OUT_MAX_VALUE 4096u
 #define OUT_MAX_TOTAL 8192u
+#define OUT_MAX_JSON_BYTES 8192u
+#define OUT_MAX_JSON_DEPTH 16
 
-typedef struct { Str name; Str *headers; size_t nheaders; } OutDecl;
+typedef struct { Str name; Str *headers; size_t nheaders; int method; /* 0 GET, 1 POST, 2 PUT */ } OutDecl;
 // Snapshot copy of one validated Interceptor.send call; never references JS memory.
-typedef struct { Str binding; Str *names; Str *values; size_t n; } Intent;
+// `json` is the exact compact serialization taken at send time; has_json distinguishes absent from present.
+typedef struct { Str binding; Str *names; Str *values; size_t n; int has_json; Str json; } Intent;
 
 typedef struct RunState {
     QJSCancelToken *token;
@@ -1065,8 +1068,8 @@ static int str_eq(JSContext *ctx, JSValueConst s, const char *lit) {
 
 // Reads a plain object whose own property names are a subset of `keys` (all enumerable data), with
 // the `required` bit mask present. vals[i] is owned, JS_UNDEFINED when absent. All-or-nothing.
-static int read_obj(RunState *st, JSContext *ctx, JSValueConst obj, const char *const *keys, int n,
-                    unsigned required, JSValue *vals) {
+static int read_obj_fields(RunState *st, JSContext *ctx, JSValueConst obj, const char *const *keys, int n,
+                           unsigned required, JSValue *vals, unsigned *seen_out) {
     for (int i = 0; i < n; i++) vals[i] = JS_UNDEFINED;
     if (JS_GetClassID(obj) != st->cls_object) return 0;
     JSPropertyEnum *tab;
@@ -1092,7 +1095,13 @@ static int read_obj(RunState *st, JSContext *ctx, JSValueConst obj, const char *
     if (!ok) {
         for (int i = 0; i < n; i++) { JS_FreeValue(ctx, vals[i]); vals[i] = JS_UNDEFINED; }
     }
+    if (ok && seen_out) *seen_out = seen;
     return ok;
+}
+
+static int read_obj(RunState *st, JSContext *ctx, JSValueConst obj, const char *const *keys, int n,
+                    unsigned required, JSValue *vals) {
+    return read_obj_fields(st, ctx, obj, keys, n, required, vals, NULL);
 }
 
 static int get_str(JSContext *ctx, JSValueConst v, Str *out, size_t max) {
@@ -1271,8 +1280,11 @@ done:
     return JS_ThrowTypeError(ctx, "invalid Interceptor.attach");
 }
 
+static int serialize_value(RunState *st, JSContext *ctx, JSValueConst val, int depth, int max_depth, size_t cap, Buf *out);
+
 static void intent_free(Intent *it) {
     str_free(&it->binding);
+    str_free(&it->json);
     strs_free(it->names, it->n);
     strs_free(it->values, it->n);
     memset(it, 0, sizeof(*it));
@@ -1285,27 +1297,37 @@ static void intents_free(RunState *st) {
     st->nintents = 0;
 }
 
-// Interceptor.send(binding, {headers}): validates immediately and records a snapshot copy. Performs no I/O,
+// Interceptor.send(binding, {headers, json?}): validates immediately and records a snapshot copy. Performs no I/O,
 // returns undefined. Any violation (including a call outside a callback) is a sticky failure.
 static JSValue js_send(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-    static const char *const ok_keys[] = {"headers"};
+    static const char *const ok_keys[] = {"headers", "json"};
     (void)this_val;
     RunState *st = JS_GetContextOpaque(ctx);
-    JSValue opt[1], hv = JS_UNDEFINED;
+    JSValue opt[2], hv = JS_UNDEFINED;
     const OutDecl *decl = NULL;
     Intent it;
     JSPropertyEnum *tab = NULL;
     uint32_t cnt = 0;
     size_t total = 0;
     int ok = 0;
+    unsigned seen = 0;
     memset(&it, 0, sizeof(it));
-    opt[0] = JS_UNDEFINED;
+    opt[0] = opt[1] = JS_UNDEFINED;
     if (!st || !st->in_callback || argc != 2 || !st->intents || st->nintents >= st->max_intents) goto done;
     if (!get_str(ctx, argv[0], &it.binding, 32)) goto done;
 
     for (int i = 0; i < st->nout; i++) if (str_cmp(&st->out[i].name, &it.binding) == 0) decl = &st->out[i];
     if (!decl) goto done;
-    if (!read_obj(st, ctx, argv[1], ok_keys, 1, 1u, opt)) goto done;
+    if (!read_obj_fields(st, ctx, argv[1], ok_keys, 2, 1u, opt, &seen)) goto done;
+    // Presence is independent of the value: a present `json: undefined` is invalid, not absent.
+    if (seen & 2u) {
+        Buf jb;
+        if (decl->method == 0 || JS_IsUndefined(opt[1])) goto done;
+        if (!serialize_value(st, ctx, opt[1], 1, OUT_MAX_JSON_DEPTH, OUT_MAX_JSON_BYTES, &jb)) goto done;
+        it.json.s = (char *)jb.p;
+        it.json.n = jb.len;
+        it.has_json = 1;
+    }
     hv = opt[0];
     if (JS_GetClassID(hv) != st->cls_object) goto done;
     if (JS_GetOwnPropertyNames(ctx, &tab, &cnt, hv, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) { tab = NULL; goto done; }
@@ -1325,6 +1347,8 @@ static JSValue js_send(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
                 if (!(c == '\t' || (c >= 0x20 && c <= 0x7E))) good = 0;
             }
             if (total > OUT_MAX_TOTAL) good = 0;
+            if (good && it.has_json && it.names[i].n == 12 && !memcmp(it.names[i].s, "content-type", 12) &&
+                !(it.values[i].n == 16 && !memcmp(it.values[i].s, "application/json", 16))) good = 0;
         }
         JS_FreeValue(ctx, key);
         JS_FreeValue(ctx, val);
@@ -1342,6 +1366,7 @@ static JSValue js_send(JSContext *ctx, JSValueConst this_val, int argc, JSValueC
 done:
     if (tab) JS_FreePropertyEnum(ctx, tab, cnt);
     JS_FreeValue(ctx, opt[0]);
+    JS_FreeValue(ctx, opt[1]);
     intent_free(&it);
     if (ok) return JS_UNDEFINED;
     if (st) st->attach_failed = 1;
@@ -1366,7 +1391,18 @@ static void emit_intent(Buf *b, const Intent *it) {
         }
         b_ch(b, '"');
     }
-    b_str(b, "}}");
+    b_ch(b, '}');
+    if (it->has_json) {
+        b_str(b, ",\"jsonBody\":\"");
+        for (size_t k = 0; k < it->json.n; k++) {
+            unsigned char c = (unsigned char)it->json.s[k];
+            if (c == '"' || c == '\\') { b_ch(b, '\\'); b_ch(b, (char)c); }
+            else if (c < 0x20 || c == 0x7F) { char e[7]; snprintf(e, sizeof(e), "\\u%04x", c); b_str(b, e); }
+            else b_ch(b, (char)c);
+        }
+        b_ch(b, '"');
+    }
+    b_ch(b, '}');
 }
 
 static int install_interceptor(JSContext *ctx) {
@@ -1719,7 +1755,7 @@ static void out_free(OutDecl *d) {
     memset(d, 0, sizeof(*d));
 }
 
-// `v` -> optional strict {binding:{url,method:'GET',headers:[...]}} (<= 4 bindings). Takes copies into st->out.
+// `v` -> optional strict {binding:{url,method:GET|POST|PUT,headers:[...]}} (<= 4 bindings). Takes copies into st->out.
 static int parse_outbound(RunState *st, JSContext *ctx, JSValueConst v) {
     static const char *const ok_keys[] = {"url", "method", "headers"};
     if (JS_GetClassID(v) != st->cls_object) return 0;
@@ -1737,7 +1773,7 @@ static int parse_outbound(RunState *st, JSContext *ctx, JSValueConst v) {
         if (good) {
             good = read_obj(st, ctx, val, ok_keys, 3, 7u, f);
             if (good) {
-                good = str_eq(ctx, f[1], "GET") && get_str(ctx, f[0], &url, 2048) && out_url_ok(&url) &&
+                good = (str_eq(ctx, f[1], "GET") ? (d->method = 0, 1) : str_eq(ctx, f[1], "POST") ? (d->method = 1, 1) : str_eq(ctx, f[1], "PUT") ? (d->method = 2, 1) : 0) && get_str(ctx, f[0], &url, 2048) && out_url_ok(&url) &&
                        get_list(st, ctx, f[2], 0, 8, &d->headers, &d->nheaders);
                 for (size_t h = 0; good && h < d->nheaders; h++) good = out_header_ok(&d->headers[h]);
                 for (int k = 0; k < 3; k++) JS_FreeValue(ctx, f[k]);

@@ -4672,13 +4672,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Any readable data, including sign-in information, may be sent to these APIs."
+            "value" : "Any readable data, including sign-in information, and captured headers or JSON data may be sent to these fixed servers. POST and PUT requests may update data on the external server."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "読み取りを許可したデータは、認証情報も含めて外部APIへ送信される可能性があります。"
+            "value" : "読み取りを許可したデータは、認証情報も含め、取得したヘッダーやJSONデータとして固定の外部サーバーへ送信される可能性があります。POSTやPUTでは外部サーバー上のデータが更新される場合があります。"
           }
         }
       }
