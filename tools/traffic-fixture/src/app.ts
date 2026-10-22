@@ -2,6 +2,8 @@ import type { Context as HonoContext } from 'hono'
 import { Hono } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { z } from 'zod'
+import { installProbeRoutes, type ProbeRepository } from './probe-repositories'
+import { PROBE_REPOSITORIES } from './probe-repositories.generated'
 
 // Workers Web APIs only: no Node APIs, no bindings, no logging, no state kept between requests.
 type FixtureEnvironment = { Variables: { bodyBytes: Uint8Array<ArrayBuffer> } }
@@ -160,13 +162,26 @@ const methodNotAllowed = (c: Context, method: string) => {
   return sendJson(c, { error: 'method_not_allowed' }, 405)
 }
 
-export const app = new Hono<FixtureEnvironment>()
+// Shared pipeline (no-store, bounded bodies, 404/error handlers) plus the fixed probe allowlist.
+export const configureApp = (
+  target: Hono<FixtureEnvironment>,
+  probes: readonly ProbeRepository[],
+) => {
+  target.use('*', async (c, next) => {
+    c.header('Cache-Control', 'no-store')
+    c.set('bodyBytes', await readBounded(c.req.raw))
+    await next()
+  })
+  target.notFound((c) => sendJson(c, { error: 'not_found' }, 404))
+  target.onError((error, c) => {
+    if (error instanceof RejectedRequest) return sendJson(c, { error: error.code }, error.status)
+    return sendJson(c, { error: 'internal_error' }, 500)
+  })
+  installProbeRoutes(target, probes)
+  return target
+}
 
-app.use('*', async (c, next) => {
-  c.header('Cache-Control', 'no-store')
-  c.set('bodyBytes', await readBounded(c.req.raw))
-  await next()
-})
+export const app = configureApp(new Hono<FixtureEnvironment>(), PROBE_REPOSITORIES)
 
 // Registers one method per path; any other method on that path gets 405 with Allow.
 const route = (
@@ -177,13 +192,6 @@ const route = (
   app.on(method, path, handler)
   app.all(path, (c) => methodNotAllowed(c, method))
 }
-
-app.notFound((c) => sendJson(c, { error: 'not_found' }, 404))
-
-app.onError((error, c) => {
-  if (error instanceof RejectedRequest) return sendJson(c, { error: error.code }, error.status)
-  return sendJson(c, { error: 'internal_error' }, 500)
-})
 
 route('GET', '/', (c) => sendJson(c, { name: 'interceptor-traffic-fixture', endpoints: ENDPOINTS }))
 route('GET', '/health', (c) => sendJson(c, { status: 'ok' }))

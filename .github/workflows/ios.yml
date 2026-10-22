@@ -84,6 +84,20 @@ jobs:
           python3 scripts/verify-quickjs-vendor.py
           swift test --package-path Packages/InterceptorAutomation
 
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') }}
+        with:
+          bun-version: 1.4.2
+
+      - name: Verify native repository contract
+        if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') }}
+        run: |
+          bun install --frozen-lockfile --ignore-scripts --cwd tools/traffic-fixture
+          swift build --package-path Packages/InterceptorAutomation --product interceptor-repository
+          publisher="$(swift build --package-path Packages/InterceptorAutomation --show-bin-path)/interceptor-repository"
+          test -x "$publisher"
+          bun run --cwd tools/traffic-fixture test:native-contract --publisher "$publisher"
+
       - name: Select dedicated iPhone simulator
         if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') }}
         run: |

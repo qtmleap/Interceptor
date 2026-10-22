@@ -8,11 +8,14 @@ let usage = """
 usage: interceptor-repository --help
        interceptor-repository keygen EXTERNAL_KEY_PATH
        interceptor-repository publish DIRECTORY --id UUID --name NAME --sequence N [--key EXTERNAL_KEY_PATH]
+       interceptor-repository verify DIRECTORY --now EPOCH_SECONDS
 
 keygen   writes a raw 32-byte Ed25519 private key (mode 0600, never overwrites) outside any Git checkout or
          public directory, and prints only the public key's SHA-256 fingerprint.
 publish  reads DIRECTORY/plugins/*.json and atomically writes DIRECTORY/repository.json (30 day expiry).
          Without --key the repository is unsigned. Nothing is uploaded or executed.
+verify   read-only: checks DIRECTORY/repository.json and every referenced plugins/NAME.json exactly as a client would
+         at the given Unix time. Writes nothing; rejects symlinked repository.json, plugins/ and packages.
 
 """
 
@@ -51,6 +54,18 @@ func readRegular(_ path: String, limit: Int, mode: Bool = false) throws -> Data 
     let fd = open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
     guard fd >= 0 else { throw errno_("cannot open \(path)") }
     defer { close(fd) }
+    return try readOpened(fd, path, limit: limit, mode: mode)
+}
+
+/// Same checks as `readRegular` for a file opened relative to a directory descriptor (no pathname traversal).
+func readRegular(at dirFD: Int32, _ name: String, display: String, limit: Int) throws -> Data {
+    let fd = openat(dirFD, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+    guard fd >= 0 else { throw errno_("cannot open \(display)") }
+    defer { close(fd) }
+    return try readOpened(fd, display, limit: limit, mode: false)
+}
+
+func readOpened(_ fd: Int32, _ path: String, limit: Int, mode: Bool) throws -> Data {
     var st = stat()
     guard fstat(fd, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG else { throw Fail(message: "\(path): not a regular file") }
     guard st.st_size <= limit else { throw Fail(message: "\(path): larger than \(limit) bytes") }
@@ -136,6 +151,35 @@ func publish(directory: String, id: UUID, name: String, sequence: Int64, keyPath
     if let signer { print("fingerprint \(Digest.sha256Hex(signer.publicKey.rawRepresentation))") }
 }
 
+/// Opens a directory (relative to `dirFD` when given) without following a symlink at the final component.
+func openDirectory(_ name: String, at dirFD: Int32?, _ what: String) throws -> Int32 {
+    let flags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
+    let fd = dirFD.map { openat($0, name, flags) } ?? open(name, flags)
+    guard fd >= 0 else { throw Fail(message: "\(what) must be a real directory: \(String(cString: strerror(errno)))") }
+    return fd
+}
+
+/// Read-only: verifies the envelope at `now`, then every referenced package against its index entry.
+/// Every component is opened relative to the previous descriptor, so a concurrent directory swap cannot escape the root.
+func verify(directory: String, now: Date) throws {
+    let rootFD = try openDirectory(directory, at: nil, "repository directory")
+    defer { close(rootFD) }
+    let envelope = try readRegular(at: rootFD, "repository.json", display: directory + "/repository.json", limit: Limits.envelope)
+    let snapshot = try RepositoryEnvelope.verify(envelope: envelope, url: try RepositoryURL(parsing: "https://repository.example/repository.json"), now: now)
+    var pluginsFD: Int32 = -1
+    defer { if pluginsFD >= 0 { close(pluginsFD) } }
+    for entry in snapshot.index.plugins {
+        let parts = entry.packagePath.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 2, parts[0] == "plugins", isPackageFilename(String(parts[1])) else {
+            throw Fail(message: "packagePath must be plugins/NAME.json: \(entry.packagePath)")
+        }
+        if pluginsFD < 0 { pluginsFD = try openDirectory("plugins", at: rootFD, "plugins/") }
+        let bytes = try readRegular(at: pluginsFD, String(parts[1]), display: directory + "/" + entry.packagePath, limit: Limits.package)
+        _ = try PluginPackage.validate(bytes, against: entry)
+    }
+    print("verified \(snapshot.index.plugins.count) plugins (sequence \(snapshot.index.sequence), \(snapshot.signature == .unsigned ? "unsigned" : "signed"))")
+}
+
 func run(_ args: [String]) throws {
     switch args.first {
     case "--help", "-h": print(usage, terminator: "")
@@ -151,6 +195,9 @@ func run(_ args: [String]) throws {
             throw Fail(message: "publish needs --id UUID --name NAME --sequence 1...\(Limits.maxSequence)")
         }
         try publish(directory: args[1], id: id, name: name, sequence: seq, keyPath: opts["--key"])
+    case "verify" where args.count == 4 && args[2] == "--now":
+        guard let epoch = Int64(args[3]), epoch >= 0 else { throw Fail(message: "verify needs --now EPOCH_SECONDS (non-negative integer)") }
+        try verify(directory: args[1], now: Date(timeIntervalSince1970: TimeInterval(epoch)))
     default: throw Fail(message: "unknown or incomplete command (try --help)")
     }
 }

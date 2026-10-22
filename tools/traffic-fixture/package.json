@@ -7,6 +7,7 @@
     "dev": "wrangler dev",
     "test": "bun test",
     "test:runtime": "bun run scripts/runtime-smoke.ts",
+    "test:native-contract": "bun run scripts/native-contract.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "lint": "biome check",
     "bundle": "wrangler deploy --dry-run --env test --outdir .wrangler/dry-run"
