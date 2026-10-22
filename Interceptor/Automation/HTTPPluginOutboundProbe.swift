@@ -10,6 +10,12 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
     static let maxEvents = 8, maxBytes = 4096, maxOwnershipBytes = 512
     enum Failure: Error, Equatable { case invalidRun, ownership, mismatch, io }
 
+    /// Completion-only flush/close operations; defaults are the real Darwin calls. Tests inject failures per instance.
+    struct CompletionIO: Sendable {
+        var sync: @Sendable (Int32) -> Int32 = { fsync($0) }
+        var close: @Sendable (Int32) -> Int32 = { Darwin.close($0) }
+    }
+
     private struct FileID: Equatable { let dev: dev_t, ino: ino_t }
     private struct Event { let binding: String, outcome: String, status: Int? }
 
@@ -18,7 +24,9 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
     private let runID: String, nonce: String, packageSHA256: String
     private let autoFD: Int32, probeFD: Int32, runFD: Int32
     private let probeName = "OutboundProbe"
+    private static let stageName = ".completion.json.stage"
     private let ids: [FileID], ownershipID: FileID
+    private let completionIO: CompletionIO
     private var receiptFD: Int32, receiptID: FileID
     // Confined to `queue`.
     private var events: [Event] = [], overflow = false, failed = false, closed = false, completed: Bool?
@@ -31,7 +39,8 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
     }
 
     static func open(runID: String, snapshot: PluginActivationSnapshot, activationURL: URL,
-                     isCurrent: @escaping @Sendable () -> Bool) throws -> HTTPPluginOutboundProbe {
+                     isCurrent: @escaping @Sendable () -> Bool,
+                     completionIO: CompletionIO = CompletionIO()) throws -> HTTPPluginOutboundProbe {
         guard UUID(uuidString: runID)?.uuidString.lowercased() == runID else { throw Failure.invalidRun }
         guard snapshot.revisions.count == 1, let package = snapshot.revisions.first?.package else { throw Failure.mismatch }
         var fds: [Int32] = []
@@ -62,7 +71,7 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
             fds.append(receipt)
             let probeObject = HTTPPluginOutboundProbe(runID: runID, nonce: owner.nonce, sha: owner.sha, fds: fds, ids: ids,
                                                       ownershipID: ownID, receiptID: try identity(receipt, directory: false, maxSize: 0),
-                                                      isCurrent: isCurrent)
+                                                      isCurrent: isCurrent, completionIO: completionIO)
             // Ownership moved to the object; a failed initial write must not close
             // these descriptors again after its deinitializer has already closed them.
             fds.removeAll()
@@ -75,7 +84,7 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
     }
 
     private init(runID: String, nonce: String, sha: String, fds: [Int32], ids: [FileID], ownershipID: FileID,
-                 receiptID: FileID, isCurrent: @escaping @Sendable () -> Bool) {
+                 receiptID: FileID, isCurrent: @escaping @Sendable () -> Bool, completionIO: CompletionIO) {
         self.runID = runID
         self.nonce = nonce
         packageSHA256 = sha
@@ -84,6 +93,7 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
         self.ownershipID = ownershipID
         self.receiptID = receiptID
         self.isCurrent = isCurrent
+        self.completionIO = completionIO
     }
 
     deinit {
@@ -182,29 +192,56 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
         try Self.writeLocked(receiptFD, try payload())
     }
 
+    /// Publishes completion.json only after the staged payload is written, flushed and its one close succeeded.
+    /// The exclusive rename is the final failable step; a failure does not publish or replace a final proof.
     private func writeCompletion() throws {
         try verifyAnchors()
         let data = try payload()
-        let fd = openat(runFD, "completion.json", O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        var fd = openat(runFD, Self.stageName, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
         guard fd >= 0 else { throw Failure.io }
-        defer { close(fd) }
-        let id = try Self.identity(fd, directory: false, maxSize: 0)
-        try Self.writeLocked(fd, data)
+        var stageID: FileID?
+        do {
+            let id = try Self.identity(fd, directory: false, maxSize: 0)
+            stageID = id
+            try Self.writeLocked(fd, data, sync: completionIO.sync)
+            _ = try Self.identity(fd, directory: false, exactSize: data.count)
+            let closing = fd
+            fd = -1 // ownership is consumed by the single close attempt, whatever it returns
+            guard completionIO.close(closing) == 0 else { throw Failure.io }
+            try checkStage(id, size: data.count)
+            try verifyAnchors()
+            guard renameatx_np(runFD, Self.stageName, runFD, "completion.json", UInt32(RENAME_EXCL)) == 0 else { throw Failure.io }
+        } catch {
+            if fd >= 0 { _ = completionIO.close(fd) }
+            if let stageID { removeStage(matching: stageID) }
+            throw error
+        }
+    }
+
+    private func checkStage(_ id: FileID, size: Int) throws {
         var st = stat()
-        guard fstatat(runFD, "completion.json", &st, AT_SYMLINK_NOFOLLOW) == 0,
-              FileID(dev: st.st_dev, ino: st.st_ino) == id, st.st_nlink == 1 else { throw Failure.io }
-        try verifyAnchors()
+        guard fstatat(runFD, Self.stageName, &st, AT_SYMLINK_NOFOLLOW) == 0, FileID(dev: st.st_dev, ino: st.st_ino) == id,
+              (st.st_mode & S_IFMT) == S_IFREG, st.st_uid == getuid(), st.st_nlink == 1, Int(st.st_size) == size else { throw Failure.io }
+    }
+
+    /// Removes only the staging name this writer created, and only while it still names the same regular file.
+    private func removeStage(matching id: FileID) {
+        var st = stat()
+        guard fstatat(runFD, Self.stageName, &st, AT_SYMLINK_NOFOLLOW) == 0, FileID(dev: st.st_dev, ino: st.st_ino) == id,
+              (st.st_mode & S_IFMT) == S_IFREG, st.st_nlink == 1 else { return }
+        _ = unlinkat(runFD, Self.stageName, 0)
     }
 
     // MARK: Darwin helpers
 
-    private static func identity(_ fd: Int32, directory: Bool, maxSize: Int = .max) throws -> FileID {
+    private static func identity(_ fd: Int32, directory: Bool, maxSize: Int = .max, exactSize: Int? = nil) throws -> FileID {
         var st = stat()
         guard fstat(fd, &st) == 0, st.st_uid == getuid() else { throw Failure.io }
         if directory {
             guard (st.st_mode & S_IFMT) == S_IFDIR else { throw Failure.io }
         } else {
-            guard (st.st_mode & S_IFMT) == S_IFREG, st.st_nlink == 1, st.st_size <= maxSize else { throw Failure.ownership }
+            guard (st.st_mode & S_IFMT) == S_IFREG, st.st_nlink == 1, st.st_size <= maxSize,
+                  exactSize.map({ Int(st.st_size) == $0 }) ?? true else { throw Failure.ownership }
         }
         return FileID(dev: st.st_dev, ino: st.st_ino)
     }
@@ -222,7 +259,7 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
         return data
     }
 
-    private static func writeLocked(_ fd: Int32, _ data: Data) throws {
+    private static func writeLocked(_ fd: Int32, _ data: Data, sync: (Int32) -> Int32 = { fsync($0) }) throws {
         while flock(fd, LOCK_EX) != 0 { guard errno == EINTR else { throw Failure.io } }
         defer { flock(fd, LOCK_UN) }
         var offset = 0
@@ -234,7 +271,7 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
                 offset += n
             }
         }
-        guard ftruncate(fd, off_t(data.count)) == 0, fsync(fd) == 0 else { throw Failure.io }
+        guard ftruncate(fd, off_t(data.count)) == 0, sync(fd) == 0 else { throw Failure.io }
     }
 
     private static func parseOwnership(_ data: Data, runID: String) throws -> (nonce: String, sha: String) {

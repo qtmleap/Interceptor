@@ -11,6 +11,17 @@ private final class TicketFlag: @unchecked Sendable {
     var current: Bool { get { lock.withLock { value } } set { lock.withLock { value = newValue } } }
 }
 
+private final class CallCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+    var count: Int { lock.withLock { value } }
+    func increment() { lock.withLock { value += 1 } }
+}
+
+private final class CloseObservation: @unchecked Sendable {
+    var sawFinal = true, stagedBytes = Data()
+}
+
 final class HTTPPluginOutboundProbeTests: XCTestCase, @unchecked Sendable {
     private var root: URL!
     private var automation: URL { root.appendingPathComponent("Automation") }
@@ -64,6 +75,150 @@ final class HTTPPluginOutboundProbeTests: XCTestCase, @unchecked Sendable {
         try XCTUnwrap(JSONValue(parsing: HTTPPluginOutboundProbe.readPayload(at: run.appendingPathComponent(name))).objectValue)
     }
     private func flush(_ p: HTTPPluginOutboundProbe, drained: Bool = true) async -> Bool { await p.finish(drained: drained) }
+
+    private func readyInjecting(_ io: HTTPPluginOutboundProbe.CompletionIO) async throws -> HTTPPluginOutboundProbe {
+        let s = try await snapshot(nonce: nonce)
+        try writeOwnership(s)
+        return try HTTPPluginOutboundProbe.open(runID: runID, snapshot: s, activationURL: automation.appendingPathComponent("active.json"),
+                                                isCurrent: { true }, completionIO: io)
+    }
+
+    func testCompletionFsyncFailureLeavesNoFinalCompletion() async throws {
+        let syncs = CallCounter()
+        var io = HTTPPluginOutboundProbe.CompletionIO()
+        io.sync = { _ in syncs.increment(); errno = EIO; return -1 }
+        let p = try await readyInjecting(io)
+        p.observer("profile", .response(200))
+        let finished = await flush(p)
+        XCTAssertFalse(finished)
+        XCTAssertEqual(syncs.count, 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: run.appendingPathComponent("completion.json").path))
+        let before = try receipt()
+        XCTAssertEqual(before["events"]?.arrayValue?.count, 1)
+        let again = await flush(p)
+        XCTAssertFalse(again)
+        XCTAssertEqual(syncs.count, 1)
+        XCTAssertEqual(try receipt(), before)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: run.appendingPathComponent("completion.json").path))
+    }
+
+    func testCompletionCloseFailureAfterClosingLeavesNoFinalCompletionAndIsNotRetried() async throws {
+        let closes = CallCounter()
+        var io = HTTPPluginOutboundProbe.CompletionIO()
+        io.close = { fd in closes.increment(); _ = Darwin.close(fd); errno = EIO; return -1 }
+        let p = try await readyInjecting(io)
+        p.observer("profile", .response(200))
+        let finished = await flush(p)
+        XCTAssertFalse(finished)
+        XCTAssertEqual(closes.count, 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: run.appendingPathComponent("completion.json").path))
+        let before = try receipt()
+        XCTAssertEqual(before["events"]?.arrayValue?.count, 1)
+        let again = await flush(p)
+        XCTAssertFalse(again)
+        XCTAssertEqual(closes.count, 1)
+        XCTAssertEqual(try receipt(), before)
+    }
+
+    private var stage: URL { run.appendingPathComponent(".completion.json.stage") }
+    private var finalFile: URL { run.appendingPathComponent("completion.json") }
+    private func exists(_ url: URL) -> Bool { (try? FileManager.default.attributesOfItem(atPath: url.path)) != nil }
+
+    func testCompletionIsPublishedOnlyAfterCheckedCloseWithIdenticalBytesAndNoStageLeft() async throws {
+        let closes = CallCounter()
+        let seen = CloseObservation()
+        var io = HTTPPluginOutboundProbe.CompletionIO()
+        let stageURL = stage, finalURL = finalFile
+        io.close = { fd in
+            closes.increment()
+            seen.sawFinal = FileManager.default.fileExists(atPath: finalURL.path)
+            seen.stagedBytes = (try? Data(contentsOf: stageURL)) ?? Data()
+            return Darwin.close(fd)
+        }
+        let p = try await readyInjecting(io)
+        p.observer("profile", .response(200))
+        let finished = await flush(p)
+        XCTAssertTrue(finished)
+        XCTAssertEqual(closes.count, 1)
+        XCTAssertFalse(seen.sawFinal)
+        XCTAssertFalse(seen.stagedBytes.isEmpty)
+        XCTAssertEqual(try Data(contentsOf: finalFile), seen.stagedBytes)
+        XCTAssertFalse(exists(stage))
+    }
+
+    func testForeignStagingFileIsNeverModifiedAndBlocksCompletion() async throws {
+        let p = try await readyInjecting(HTTPPluginOutboundProbe.CompletionIO())
+        try Data("foreign".utf8).write(to: stage)
+        let first = await flush(p)
+        XCTAssertFalse(first)
+        XCTAssertEqual(try Data(contentsOf: stage), Data("foreign".utf8))
+        XCTAssertFalse(exists(finalFile))
+
+    }
+
+    func testStagingSymlinkIsNeverModifiedAndBlocksCompletion() async throws {
+        let q = try await readyInjecting(HTTPPluginOutboundProbe.CompletionIO())
+        let target = root.appendingPathComponent("target")
+        try Data("t".utf8).write(to: target)
+        try FileManager.default.createSymbolicLink(at: stage, withDestinationURL: target)
+        let second = await flush(q)
+        XCTAssertFalse(second)
+        XCTAssertEqual(try Data(contentsOf: target), Data("t".utf8))
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: stage.path), target.path)
+        XCTAssertFalse(exists(finalFile))
+    }
+
+    func testPreexistingFinalFailsExclusiveRenameAndOnlyOwnStageIsRemoved() async throws {
+        let p = try await readyInjecting(HTTPPluginOutboundProbe.CompletionIO())
+        try Data("foreign".utf8).write(to: finalFile)
+        let finished = await flush(p)
+        XCTAssertFalse(finished)
+        XCTAssertEqual(try Data(contentsOf: finalFile), Data("foreign".utf8))
+        XCTAssertFalse(exists(stage))
+    }
+
+    func testStageReplacedDuringSyncPreservesForeignFileAndPublishesNothing() async throws {
+        var io = HTTPPluginOutboundProbe.CompletionIO()
+        let stageURL = stage
+        io.sync = { fd in
+            _ = unlink(stageURL.path)
+            try? Data("foreign".utf8).write(to: stageURL)
+            return fsync(fd)
+        }
+        let p = try await readyInjecting(io)
+        let finished = await flush(p)
+        XCTAssertFalse(finished)
+        XCTAssertEqual(try Data(contentsOf: stage), Data("foreign".utf8))
+        XCTAssertFalse(exists(finalFile))
+    }
+
+    func testStageHardLinkedDuringCloseIsRejectedAndLinkPreserved() async throws {
+        var io = HTTPPluginOutboundProbe.CompletionIO()
+        let stageURL = stage, alias = root.appendingPathComponent("alias")
+        io.close = { fd in _ = link(stageURL.path, alias.path); return Darwin.close(fd) }
+        let p = try await readyInjecting(io)
+        let finished = await flush(p)
+        XCTAssertFalse(finished)
+        XCTAssertFalse(exists(finalFile))
+        XCTAssertTrue(exists(alias))
+        XCTAssertTrue(exists(stage))
+    }
+
+    func testAnchorReplacedDuringSyncPublishesNothingAndKeepsForeignReceipt() async throws {
+        var io = HTTPPluginOutboundProbe.CompletionIO()
+        let receiptURL = run.appendingPathComponent("receipt.json")
+        io.sync = { fd in
+            _ = unlink(receiptURL.path)
+            try? Data("foreign".utf8).write(to: receiptURL)
+            return fsync(fd)
+        }
+        let p = try await readyInjecting(io)
+        let finished = await flush(p)
+        XCTAssertFalse(finished)
+        XCTAssertEqual(try Data(contentsOf: receiptURL), Data("foreign".utf8))
+        XCTAssertFalse(exists(finalFile))
+        XCTAssertFalse(exists(stage))
+    }
 
     func testInitialReceiptHasExactSchemaAndEventsAreOrderedStatusOnly() async throws {
         let (s, p) = try await ready()
