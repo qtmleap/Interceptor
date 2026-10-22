@@ -16,6 +16,8 @@ const BASIC_CREDENTIALS = 'demo:demo-pass'
 const BEARER_TOKEN = 'interceptor-test-token'
 const DUMMY_COOKIE =
   'fixture_session=dummy-session-not-a-secret; Path=/; Secure; HttpOnly; SameSite=Lax'
+const COOKIE_PAIR = DUMMY_COOKIE.split(';')[0] ?? ''
+const COOKIE_NAME = COOKIE_PAIR.split('=')[0] ?? ''
 // 204 is handled separately because it cannot carry a body.
 const STATUSES: Array<ContentfulStatusCode | 204> = [
   200, 201, 202, 204, 400, 401, 403, 404, 409, 418, 422, 429, 500, 502, 503, 504,
@@ -43,6 +45,8 @@ const ENDPOINTS = [
   { method: 'GET', path: '/html' },
   { method: 'GET', path: '/auth/basic' },
   { method: 'GET', path: '/auth/bearer' },
+  { method: 'GET', path: '/auth/credentials' },
+  { method: 'GET', path: '/auth/cookie' },
   { method: 'GET', path: '/cookies' },
   { method: 'GET', path: '/status/:code' },
   { method: 'GET', path: '/redirect/:count' },
@@ -234,6 +238,23 @@ route('GET', '/auth/bearer', (c) => {
     return unauthorized(c, BEARER_REALM)
   }
   return sendJson(c, { authenticated: true, scheme: 'bearer' })
+})
+
+// Issues the same public dummy credentials as /auth/bearer and /cookies; never reflects input.
+route('GET', '/auth/credentials', (c) => {
+  c.header('Set-Cookie', DUMMY_COOKIE)
+  return sendJson(c, { accessToken: BEARER_TOKEN, tokenType: 'Bearer' })
+})
+
+// Exactly one fixture_session segment (case-sensitive name) with the exact expected pair.
+route('GET', '/auth/cookie', (c) => {
+  const cookie = c.req.header('cookie') ?? ''
+  const segments = cookie.split(';').map((segment) => segment.trim())
+  const sessions = segments.filter((segment) => segment.startsWith(`${COOKIE_NAME}=`))
+  if (cookie.includes(',') || sessions.length !== 1 || sessions[0] !== COOKIE_PAIR) {
+    return sendJson(c, { error: 'unauthorized' }, 401)
+  }
+  return sendJson(c, { authenticated: true, scheme: 'cookie' })
 })
 
 route('GET', '/cookies', (c) => {

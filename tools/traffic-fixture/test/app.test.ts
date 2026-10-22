@@ -419,3 +419,134 @@ describe('/json/large', () => {
     expect((await call(`/json/large?size=${size}`)).status).toBe(400)
   })
 })
+
+describe('GET credentials reuse', () => {
+  const PAIR = 'fixture_session=dummy-session-not-a-secret'
+
+  const issue = async () => {
+    const res = await call('/auth/credentials')
+    const body = await jsonOf(res)
+    const [setCookie = ''] = res.headers.getSetCookie()
+    return { res, body, token: String(body.accessToken), pair: setCookie.split(';')[0] ?? '' }
+  }
+
+  const cookieCall = (cookie?: string) =>
+    call('/auth/cookie', cookie === undefined ? {} : { headers: { cookie } })
+
+  test('issues the public dummy bearer token and session cookie', async () => {
+    const { res, body, token, pair } = await issue()
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(res.headers.get('content-type')).toContain('application/json')
+    expect(body).toEqual({ accessToken: 'interceptor-test-token', tokenType: 'Bearer' })
+    expect(res.headers.getSetCookie()).toHaveLength(1)
+    expect(pair).toBe(PAIR)
+    expect(token).toBe('interceptor-test-token')
+  })
+
+  test('does not reflect incoming Authorization or Cookie', async () => {
+    const res = await call('/auth/credentials', {
+      headers: { authorization: 'Bearer reflected-auth', cookie: 'sid=reflected-cookie' },
+    })
+    const text = await res.text()
+    expect(text).not.toContain('reflected')
+    expect(res.headers.getSetCookie().join('')).not.toContain('reflected')
+  })
+
+  test('credentials rejects other methods with 405 and Allow: GET', async () => {
+    const res = await call('/auth/credentials', { method: 'POST', body: 'x' })
+    expect(res.status).toBe(405)
+    expect(res.headers.get('allow')).toBe('GET')
+    expect(res.headers.get('cache-control')).toBe('no-store')
+  })
+
+  test('/auth/cookie rejects other methods with 405 and Allow: GET', async () => {
+    const res = await call('/auth/cookie', { method: 'DELETE' })
+    expect(res.status).toBe(405)
+    expect(res.headers.get('allow')).toBe('GET')
+    expect(res.headers.get('cache-control')).toBe('no-store')
+  })
+
+  test('inventory lists the new endpoints', async () => {
+    const body = await jsonOf(await call('/'))
+    expect(Array.isArray(body.endpoints)).toBe(true)
+    const endpoints = body.endpoints as Array<{ method: string; path: string }>
+    for (const path of ['/auth/credentials', '/auth/cookie']) {
+      expect(
+        endpoints.some((endpoint) => endpoint.method === 'GET' && endpoint.path === path),
+      ).toBe(true)
+    }
+  })
+
+  test('issued bearer token authorises /auth/bearer', async () => {
+    const { token } = await issue()
+    const res = await call('/auth/bearer', { headers: { authorization: `Bearer ${token}` } })
+    expect(res.status).toBe(200)
+    expect(await jsonOf(res)).toEqual({ authenticated: true, scheme: 'bearer' })
+  })
+
+  test('issued cookie authorises /auth/cookie', async () => {
+    const { pair } = await issue()
+    const res = await cookieCall(pair)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(await jsonOf(res)).toEqual({ authenticated: true, scheme: 'cookie' })
+  })
+
+  test('cookie accepts unrelated cookies around the pair', async () => {
+    for (const cookie of [`a=1; ${PAIR}; b=2`, `${PAIR};x=y`, `a=1;  ${PAIR}  `]) {
+      expect((await cookieCall(cookie)).status).toBe(200)
+    }
+  })
+
+  test('a differently cased cookie name is unrelated to the exact session name', async () => {
+    expect((await cookieCall(`${PAIR}; Fixture_Session=other`)).status).toBe(200)
+    expect((await cookieCall('Fixture_Session=dummy-session-not-a-secret')).status).toBe(401)
+  })
+
+  test('cookie rejects missing, wrong, empty, wrong-case, duplicate and comma-joined', async () => {
+    const cookies = [
+      undefined,
+      '',
+      'fixture_session=',
+      'fixture_session=wrong',
+      'Fixture_Session=dummy-session-not-a-secret',
+      'FIXTURE_SESSION=dummy-session-not-a-secret',
+      'fixture_session=DUMMY-SESSION-NOT-A-SECRET',
+      `${PAIR}; ${PAIR}`,
+      `${PAIR}; fixture_session=other`,
+      `fixture_session=other; ${PAIR}`,
+      `${PAIR}, fixture_session=other`,
+      `a=1, ${PAIR}`,
+      `a=1,b=2; ${PAIR}`,
+      `${PAIR}; a=1,b=2`,
+      `x${PAIR}`,
+      `${PAIR}x`,
+    ]
+    for (const cookie of cookies) {
+      const res = await cookieCall(cookie)
+      expect(res.status).toBe(401)
+      expect(res.headers.get('www-authenticate')).toBeNull()
+      expect(res.headers.get('cache-control')).toBe('no-store')
+      expect(await jsonOf(res)).toEqual({ error: 'unauthorized' })
+    }
+  })
+
+  test('Authorization alone cannot satisfy the cookie endpoint', async () => {
+    for (const authorization of [
+      'Bearer interceptor-test-token',
+      `Basic ${btoa('demo:demo-pass')}`,
+    ]) {
+      const res = await call('/auth/cookie', { headers: { authorization } })
+      expect(res.status).toBe(401)
+      expect(res.headers.get('www-authenticate')).toBeNull()
+    }
+  })
+
+  test('the cookie cannot satisfy the bearer endpoint', async () => {
+    const { pair } = await issue()
+    const res = await call('/auth/bearer', { headers: { cookie: pair } })
+    expect(res.status).toBe(401)
+    expect(res.headers.get('www-authenticate')).toContain('Bearer')
+  })
+})

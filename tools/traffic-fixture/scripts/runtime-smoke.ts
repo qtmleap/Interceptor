@@ -178,6 +178,26 @@ const run = async () => {
         true,
       )
     }
+    const issued = await call('/auth/credentials')
+    const accessToken = issued.json().accessToken
+    assert(typeof accessToken === 'string')
+    const cookiePair = issued.response.headers.getSetCookie()[0]?.split(';')[0]
+    assert(cookiePair)
+    assert.equal(
+      (
+        await call('/auth/bearer', 200, { headers: { authorization: `Bearer ${accessToken}` } })
+      ).json().authenticated,
+      true,
+    )
+    assert.deepEqual(
+      (await call('/auth/cookie', 200, { headers: { cookie: cookiePair } })).json(),
+      { authenticated: true, scheme: 'cookie' },
+    )
+    const invalidCookie = await call('/auth/cookie', 401, {
+      headers: { cookie: `other=a,b; ${cookiePair}` },
+    })
+    assert.equal(invalidCookie.response.headers.get('www-authenticate'), null)
+    await call('/auth/cookie', 401)
     await call('/search', 400, post('{'))
     await call('/search', 405)
     await call('/echo', 413, post('x'.repeat(65537)))

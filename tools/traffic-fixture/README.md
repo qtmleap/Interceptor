@@ -16,6 +16,8 @@ Interceptor のプラグイン／通信テスト用ダミーサーバー (Hono +
 | GET | `/xml` `/text` `/html` | 固定のレスポンス。JSON以外を書き換えずに通す場合の確認に使用 |
 | GET | `/auth/basic` | `demo:demo-pass`。不一致は 401 + `WWW-Authenticate` |
 | GET | `/auth/bearer` | `interceptor-test-token`。不一致は 401 |
+| GET | `/auth/credentials` | ダミーの`accessToken`と`tokenType`をJSONで返し、`Set-Cookie`も付ける |
+| GET | `/auth/cookie` | `fixture_session=dummy-session-not-a-secret`が1つあれば200。それ以外は401 |
 | GET | `/cookies` | ダミーの `fixture_session` Cookie (Secure; HttpOnly; SameSite=Lax) |
 | GET | `/status/:code` | 200,201,202,204,400,401,403,404,409,418,422,429,500,502,503,504 |
 | GET | `/redirect/:count` | 指定した回数（0〜5回）だけ同じホスト内でリダイレクト。0は直接JSONを返す |
@@ -28,6 +30,18 @@ Interceptor のプラグイン／通信テスト用ダミーサーバー (Hono +
 リクエスト・レスポンスとも最大64KiBです。リクエストが上限を超えると413を返します。
 `x-fixture-request-id`は英数字と`._~-`の1〜64文字を受け付け、`/search`のレスポンスに含めます。
 `requestByteLength`と`sha256`は、サーバーが実際に受け取ったバイト数とSHA-256です。
+
+### GETで取得した認証情報を別APIで使う
+
+`/auth/credentials`から取得したトークンは`/auth/bearer`で、Cookieは`/auth/cookie`で使えます。Cookieの属性は送らず、`fixture_session=...`の部分を送ります。
+`fixture_session`の重複、不正な値、カンマ区切りのCookieは401です。Cookie名は大文字小文字を区別するため、`Fixture_Session`だけでは認証されません。Cookie認証の401には`WWW-Authenticate`を付けません。
+ここで確認できるのはサーバー側の動作です。プラグインから別APIへ送信する機能は未実装です。
+
+```sh
+curl -si 127.0.0.1:8787/auth/credentials   # accessToken と Set-Cookie を取得
+curl -s -H 'Authorization: Bearer interceptor-test-token' 127.0.0.1:8787/auth/bearer
+curl -s -H 'Cookie: fixture_session=dummy-session-not-a-secret' 127.0.0.1:8787/auth/cookie
+```
 
 ## 実行
 
