@@ -409,5 +409,186 @@ final class HTTPPluginOutboundProbeTests: XCTestCase, @unchecked Sendable {
         XCTAssertNil(HTTPPluginOutboundProbe.make(options: [HTTPPluginOutboundProbe.optionKey: NSNumber(value: 1)], snapshot: s,
                                                   activationURL: automation.appendingPathComponent("active.json"), isCurrent: { true }))
     }
+
+    // MARK: Identity query
+
+    private func request(_ id: String? = nil, extra: String = "", schema: String = "1", op: String = "\"outboundProbeIdentity\"") -> Data {
+        Data("{\"schemaVersion\":\(schema),\"operation\":\(op),\"requestID\":\"\(id ?? UUID().uuidString.lowercased())\"\(extra)}".utf8)
+    }
+
+    private func identity(_ data: Data?) throws -> [String: JSONValue] {
+        try XCTUnwrap(JSONValue(parsing: XCTUnwrap(data)).objectValue)
+    }
+
+    private func readyProbe(current: @escaping @Sendable () -> Bool = { true }, markReady: Bool = true) async throws -> (PluginActivationSnapshot, HTTPPluginOutboundProbe) {
+        let s = try await snapshot(nonce: nonce)
+        try writeOwnership(s)
+        let p = try XCTUnwrap(make(s, current: current))
+        if markReady { p.markReady() }
+        return (s, p)
+    }
+
+    func testIdentityReplyHasExactKeysValuesAndCorrelatesRequest() async throws {
+        let (s, p) = try await readyProbe()
+        let id = UUID().uuidString.lowercased()
+        let data = HTTPPluginOutboundProbe.reply(request: request(id), probe: p)
+        XCTAssertLessThanOrEqual(try XCTUnwrap(data).count, 512)
+        let r = try identity(data)
+        XCTAssertEqual(Set(r.keys), ["schemaVersion", "requestID", "runID", "packageSHA256", "instanceID"])
+        XCTAssertEqual(r["schemaVersion"], .integer(1))
+        XCTAssertEqual(r["requestID"], .string(id))
+        XCTAssertEqual(r["runID"], .string(runID))
+        XCTAssertEqual(r["packageSHA256"], .string(s.revisions[0].package.revision))
+        let instance = try XCTUnwrap(r["instanceID"]?.stringValue)
+        XCTAssertEqual(UUID(uuidString: instance)?.uuidString.lowercased(), instance)
+        let text = String(decoding: try XCTUnwrap(data), as: UTF8.self)
+        XCTAssertFalse(text.contains(nonce))
+    }
+
+    func testInstanceIDIsStablePerProbeAndRequestIDFollowsEachRequest() async throws {
+        let (_, p) = try await readyProbe()
+        let a = try identity(HTTPPluginOutboundProbe.reply(request: request(), probe: p))
+        let b = try identity(HTTPPluginOutboundProbe.reply(request: request(), probe: p))
+        XCTAssertNotNil(a["instanceID"]?.stringValue)
+        XCTAssertEqual(a["instanceID"], b["instanceID"])
+        XCTAssertNotEqual(a["requestID"], b["requestID"])
+    }
+
+    func testDistinctProbesHaveDistinctInstanceIDs() async throws {
+        let (_, first) = try await readyProbe()
+        let a = try identity(HTTPPluginOutboundProbe.reply(request: request(), probe: first))
+        _ = await first.finish(drained: true)
+        // Same run reopening is refused by the exclusive receipt; use a fresh run directory for the second probe.
+        let secondRun = UUID().uuidString.lowercased()
+        let dir = automation.appendingPathComponent("OutboundProbe/\(secondRun)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let s = try await snapshot(nonce: nonce)
+        try JSONValue.object(["schemaVersion": .integer(1), "runID": .string(secondRun), "nonce": .string(nonce),
+                              "packageSHA256": .string(s.revisions[0].package.revision)]).data()
+            .write(to: dir.appendingPathComponent("ownership.json"))
+        let second = try XCTUnwrap(make(s, id: secondRun))
+        second.markReady()
+        let b = try identity(HTTPPluginOutboundProbe.reply(request: request(), probe: second))
+        XCTAssertNotNil(b["instanceID"]?.stringValue)
+        XCTAssertNotEqual(a["instanceID"], b["instanceID"])
+    }
+
+    func testIdentityUnavailableWithoutProbeBeforeReadyOrWhenTicketNotCurrent() async throws {
+        let (_, p) = try await readyProbe()
+        XCTAssertNotNil(HTTPPluginOutboundProbe.reply(request: request(), probe: p))
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: request(), probe: nil))
+        let flag = TicketFlag()
+        let s = try await snapshot(nonce: nonce)
+        let second = UUID().uuidString.lowercased()
+        let dir = automation.appendingPathComponent("OutboundProbe/\(second)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try JSONValue.object(["schemaVersion": .integer(1), "runID": .string(second), "nonce": .string(nonce),
+                              "packageSHA256": .string(s.revisions[0].package.revision)]).data()
+            .write(to: dir.appendingPathComponent("ownership.json"))
+        let notReady = try XCTUnwrap(make(s, id: second, current: { flag.current }))
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: request(), probe: notReady))
+        notReady.markReady()
+        XCTAssertNotNil(HTTPPluginOutboundProbe.reply(request: request(), probe: notReady))
+        flag.current = false
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: request(), probe: notReady))
+    }
+
+    func testIdentityRequestsWithWrongShapeAreRejected() async throws {
+        let (_, p) = try await readyProbe()
+        let id = UUID().uuidString.lowercased()
+        XCTAssertNotNil(HTTPPluginOutboundProbe.reply(request: request(id), probe: p))
+        let bad: [Data] = [
+            Data(), Data("{".utf8), Data("[]".utf8), Data("null".utf8),
+            request(id, extra: ",\"extra\":1"),
+            Data("{\"schemaVersion\":1,\"operation\":\"outboundProbeIdentity\"}".utf8),
+            Data("{\"schemaVersion\":1,\"requestID\":\"\(id)\"}".utf8),
+            Data("{\"operation\":\"outboundProbeIdentity\",\"requestID\":\"\(id)\"}".utf8),
+            request(id, schema: "2"), request(id, schema: "0"), request(id, schema: "1.5"), request(id, schema: "1.0"),
+            request(id, schema: "true"), request(id, schema: "\"1\""), request(id, schema: "null"),
+            request(id, op: "\"other\""), request(id, op: "1"), request(id, op: "null"),
+            Data("{\"schemaVersion\":1,\"operation\":\"outboundProbeIdentity\",\"requestID\":1}".utf8),
+            Data("{\"schemaVersion\":1,\"operation\":\"outboundProbeIdentity\",\"requestID\":null}".utf8),
+        ]
+        for (n, data) in bad.enumerated() { XCTAssertNil(HTTPPluginOutboundProbe.reply(request: data, probe: p), "case \(n)") }
+    }
+
+    func testIdentityRequestWithNonCanonicalRequestIDIsRejected() async throws {
+        let (_, p) = try await readyProbe()
+        let id = UUID().uuidString.lowercased()
+        for bad in [id.uppercased(), "{" + id + "}", id + " ", " " + id, String(id.dropLast()), id.replacingOccurrences(of: "-", with: ""),
+                    "", "../" + id, "not-a-uuid"] {
+            XCTAssertNil(HTTPPluginOutboundProbe.reply(request: request(bad), probe: p), bad)
+        }
+    }
+
+    func testOversizeIdentityRequestIsRejectedEvenWhenOtherwiseValid() async throws {
+        let (_, p) = try await readyProbe()
+        let exact = request()
+        XCTAssertLessThanOrEqual(exact.count, 192)
+        XCTAssertNotNil(HTTPPluginOutboundProbe.reply(request: exact, probe: p))
+        // Pad with insignificant whitespace to just over the bound: still a syntactically valid exact-key request.
+        let padded = exact + Data(repeating: 0x20, count: 193 - exact.count)
+        XCTAssertEqual(padded.count, 193)
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: padded, probe: p))
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: Data(repeating: 0x20, count: 1 << 16) + exact, probe: p))
+    }
+
+    func testIdentityDisappearsWhenRealLifecycleStopsInvalidatesOrIsReplaced() async throws {
+        let lifecycle = TunnelLifecycle()
+
+        // stop
+        let stopTicket = lifecycle.start { _ in }.ticket
+        let (_, stopped) = try await readyProbe(current: { lifecycle.isCurrent(stopTicket) })
+        XCTAssertNotNil(HTTPPluginOutboundProbe.reply(request: request(), probe: stopped))
+        let stop = lifecycle.stop { }
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: request(), probe: stopped))
+        await stop?.value
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: request(), probe: stopped))
+        _ = await stopped.finish(drained: true)
+        try FileManager.default.removeItem(at: run.appendingPathComponent("receipt.json"))
+        try FileManager.default.removeItem(at: run.appendingPathComponent("completion.json"))
+
+        // invalidate (failed-start cleanup)
+        let start = lifecycle.start { _ in }
+        let (_, invalidated) = try await readyProbe(current: { lifecycle.isCurrent(start.ticket) })
+        XCTAssertNotNil(HTTPPluginOutboundProbe.reply(request: request(), probe: invalidated))
+        lifecycle.invalidate(start.ticket)
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: request(), probe: invalidated))
+        _ = try? await start.task.value
+        _ = await invalidated.finish(drained: true)
+        try FileManager.default.removeItem(at: run.appendingPathComponent("receipt.json"))
+        try FileManager.default.removeItem(at: run.appendingPathComponent("completion.json"))
+
+        // replacement by a newer start
+        let old = lifecycle.start { _ in }
+        let (_, replaced) = try await readyProbe(current: { lifecycle.isCurrent(old.ticket) })
+        XCTAssertNotNil(HTTPPluginOutboundProbe.reply(request: request(), probe: replaced))
+        let newer = lifecycle.start { _ in }
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: request(), probe: replaced))
+        _ = try? await old.task.value
+        _ = try? await newer.task.value
+    }
+
+    func testFinishMakesIdentityUnavailableAndSameRunCannotReopen() async throws {
+        let (s, p) = try await readyProbe()
+        XCTAssertNotNil(HTTPPluginOutboundProbe.reply(request: request(), probe: p))
+        // A live probe holds the exclusive receipt: a second open for the same run fails.
+        XCTAssertNil(make(s))
+        let finished = await p.finish(drained: true)
+        XCTAssertTrue(finished)
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: request(), probe: p))
+        // The finished run's receipt still blocks a same-run reopen, so no second identity can exist for it.
+        XCTAssertNil(make(s))
+    }
+
+    func testMarkReadyAfterFinishCannotReviveAndDuplicateKeysAreRejected() async throws {
+        let (_, p) = try await readyProbe()
+        let id = UUID().uuidString.lowercased()
+        let dup = Data("{\"schemaVersion\":1,\"schemaVersion\":1,\"operation\":\"outboundProbeIdentity\",\"requestID\":\"\(id)\"}".utf8)
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: dup, probe: p))
+        _ = await p.finish(drained: true)
+        p.markReady()
+        XCTAssertNil(HTTPPluginOutboundProbe.reply(request: request(), probe: p))
+    }
 }
 #endif

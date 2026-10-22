@@ -110,7 +110,8 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
 
     /// Writes the completion proof once, only for a fully drained dispatcher and a flushed, error-free writer.
     func finish(drained: Bool) async -> Bool {
-        await withCheckedContinuation { continuation in
+        transition(to: .ended, from: [.starting, .ready])
+        return await withCheckedContinuation { continuation in
             queue.async { [self] in continuation.resume(returning: complete(drained: drained)) }
         }
     }
@@ -127,6 +128,48 @@ final class HTTPPluginOutboundProbe: @unchecked Sendable {
         var st = stat()
         guard lstat(url.path, &st) == 0, FileID(dev: st.st_dev, ino: st.st_ino) == id else { throw Failure.io }
         return data
+    }
+
+    // MARK: Identity query
+
+    static let maxIdentityRequestBytes = 192, maxIdentityReplyBytes = 512
+
+    private enum Readiness { case starting, ready, ended }
+    /// Independent of `queue` and of the lifecycle lock; transitions never call `isCurrent`.
+    private let readinessLock = NSLock()
+    private var readiness = Readiness.starting
+    /// Immutable per probe; minted once so a restart with the same run and package still differs.
+    private let instanceID = UUID().uuidString.lowercased()
+
+    private func transition(to next: Readiness, from allowed: [Readiness]) {
+        readinessLock.lock()
+        defer { readinessLock.unlock() }
+        if allowed.contains(readiness) { readiness = next }
+    }
+
+    private var isReady: Bool {
+        readinessLock.lock()
+        defer { readinessLock.unlock() }
+        return readiness == .ready
+    }
+
+    /// Marks full startup complete so the identity query may answer. Never revives an ended probe.
+    func markReady() { transition(to: .ready, from: [.starting]) }
+
+    /// Bounded read-only identity reply for the provider's DEBUG app-message handler. No I/O, queue or mutation.
+    static func reply(request: Data, probe: HTTPPluginOutboundProbe?) -> Data? {
+        guard let probe, request.count <= maxIdentityRequestBytes,
+              let object = (try? JSONValue(parsing: request))?.objectValue,
+              Set(object.keys) == ["schemaVersion", "operation", "requestID"],
+              object["schemaVersion"] == .integer(1), object["operation"] == .string("outboundProbeIdentity"),
+              let requestID = object["requestID"]?.stringValue,
+              UUID(uuidString: requestID)?.uuidString.lowercased() == requestID,
+              probe.isReady, probe.isCurrent() else { return nil }
+        let reply = try? JSONValue.object([
+            "schemaVersion": .integer(1), "requestID": .string(requestID), "runID": .string(probe.runID),
+            "packageSHA256": .string(probe.packageSHA256), "instanceID": .string(probe.instanceID),
+        ]).data()
+        return reply.flatMap { $0.count <= maxIdentityReplyBytes ? $0 : nil }
     }
 
     // MARK: Queue-confined

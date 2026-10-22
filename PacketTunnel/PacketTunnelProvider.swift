@@ -90,6 +90,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 }
             }
             guard monitored else { throw CancellationError() }
+            #if DEBUG
+            // Local readiness only (never lifecycle callbacks): startup fully succeeded; replies still check isCurrent.
+            startingProbe?.markReady()
+            #endif
         } catch {
             // Own failed startup is cleaned before the next serialized global operation runs.
             lifecycle.invalidate(ticket)
@@ -142,6 +146,15 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         }) else { return }
         await stop.value
     }
+
+    #if DEBUG
+    /// Read-only identity query for the physical harness: answers only a fully started, still-current probe.
+    override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)? = nil) {
+        Task { @MainActor [weak self] in
+            completionHandler?(HTTPPluginOutboundProbe.reply(request: messageData, probe: self?.outboundProbe))
+        }
+    }
+    #endif
 
     override func stopTunnel(with reason: NEProviderStopReason) async {
         let stop = lifecycle.stop { [self] in await teardown(monitorID: nil) }
