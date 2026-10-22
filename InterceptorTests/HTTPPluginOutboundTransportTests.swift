@@ -313,16 +313,21 @@ private final class OutboundLocked<Value>: @unchecked Sendable {
 private final class OutboundOrigin: @unchecked Sendable {
     let transport: HTTPPluginDirectTransport
     let requests: OutboundLocked<[OutboundObservedRequest]>
+    let decryptedBytes: OutboundLocked<Int>
+    let clientChannels: OutboundLocked<[Channel]>
     private let channels: OutboundLocked<[Channel]>
     private let group: MultiThreadedEventLoopGroup
 
     private init(
         transport: HTTPPluginDirectTransport,
         requests: OutboundLocked<[OutboundObservedRequest]>,
+        decryptedBytes: OutboundLocked<Int>,
+        clientChannels: OutboundLocked<[Channel]>,
         channels: OutboundLocked<[Channel]>,
         group: MultiThreadedEventLoopGroup,
     ) {
         self.transport = transport; self.requests = requests; self.channels = channels; self.group = group
+        self.decryptedBytes = decryptedBytes; self.clientChannels = clientChannels
     }
 
     static func clientContext() throws -> NIOSSLContext {
@@ -336,6 +341,8 @@ private final class OutboundOrigin: @unchecked Sendable {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let channels = OutboundLocked<[Channel]>([])
         let requests = OutboundLocked<[OutboundObservedRequest]>([])
+        let decryptedBytes = OutboundLocked(0)
+        let clientChannels = OutboundLocked<[Channel]>([])
         do {
             let certificates = try NIOSSLCertificate.fromPEMBytes(Array(OutboundTestTLS.certificate.utf8))
             let key = try NIOSSLPrivateKey(bytes: Array(OutboundTestTLS.privateKey.utf8), format: .pem)
@@ -344,9 +351,11 @@ private final class OutboundOrigin: @unchecked Sendable {
             let serverTLS = try NIOSSLContext(configuration: configuration)
             let listener = try await ServerBootstrap(group: group).childChannelInitializer { channel in
                 channels.change { $0.append(channel) }
+                clientChannels.change { $0.append(channel) }
                 do {
                     let pipeline = channel.pipeline.syncOperations
                     try pipeline.addHandler(NIOSSLServerHandler(context: serverTLS))
+                    try pipeline.addHandler(OutboundDecryptedByteObserver(bytes: decryptedBytes))
                     try pipeline.configureHTTPServerPipeline()
                     try pipeline.addHandler(OutboundOriginHandler(requests: requests))
                     return channel.eventLoop.makeSucceededVoidFuture()
@@ -358,7 +367,8 @@ private final class OutboundOrigin: @unchecked Sendable {
                 testingResolver: { _ in try SocketAddress(ipAddress: "127.0.0.1", port: port) },
                 testingTLSContext: clientContext(),
             )
-            return OutboundOrigin(transport: transport, requests: requests, channels: channels, group: group)
+            return OutboundOrigin(transport: transport, requests: requests, decryptedBytes: decryptedBytes,
+                                  clientChannels: clientChannels, channels: channels, group: group)
         } catch {
             for channel in channels.value {
                 try? await channel.close().get()
@@ -373,6 +383,19 @@ private final class OutboundOrigin: @unchecked Sendable {
             try? await channel.close().get()
         }
         try? await group.shutdownGracefully()
+    }
+}
+
+/// Observe every decrypted application byte, including incomplete HTTP heads or bodies.
+private final class OutboundDecryptedByteObserver: ChannelInboundHandler, @unchecked Sendable {
+    typealias InboundIn = ByteBuffer
+    private let bytes: OutboundLocked<Int>
+
+    init(bytes: OutboundLocked<Int>) { self.bytes = bytes }
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        bytes.change { $0 += unwrapInboundIn(data).readableBytes }
+        context.fireChannelRead(data)
     }
 }
 
@@ -527,6 +550,7 @@ extension HTTPPluginOutboundTransportTests {
                     XCTAssertEqual(observed.body, Data(body.utf8), "body must be the exact caller-serialized bytes")
                     XCTAssertEqual(observed.contentLengthValues, [String(body.utf8.count)])
                     XCTAssertEqual(observed.bodyBytes, body.utf8.count)
+                    XCTAssertGreaterThan(origin.decryptedBytes.value, body.utf8.count, "the pre-decoder probe observes HTTP headers and body")
                     XCTAssertEqual(observed.contentTypeValues, ["application/json"])
                     XCTAssertEqual(observed.headerNames, ["host", "connection", "content-length", "content-type"])
                     XCTAssertEqual(observed.host, "api.example.com")
@@ -656,7 +680,14 @@ extension HTTPPluginOutboundTransportTests {
                 checks.change { $0 += 1; return $0 < 3 }
             })
             XCTAssertEqual(result, .rejected)
-            XCTAssertTrue(origin.requests.value.isEmpty, "no head or body is written before post-TLS authorization succeeds")
+            XCTAssertEqual(checks.value, 3, "authorization must reach the post-TLS check")
+            let client = try XCTUnwrap(origin.clientChannels.value.first)
+            XCTAssertEqual(origin.clientChannels.value.count, 1)
+            let closed = expectation(description: "revoked TLS connection closes")
+            client.closeFuture.whenComplete { _ in closed.fulfill() }
+            await fulfillment(of: [closed], timeout: 2)
+            XCTAssertEqual(origin.decryptedBytes.value, 0, "even partial HTTP headers or body must stay off the wire")
+            XCTAssertTrue(origin.requests.value.isEmpty)
         }
     }
 
