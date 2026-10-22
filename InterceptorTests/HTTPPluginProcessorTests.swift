@@ -681,6 +681,150 @@ final class HTTPPluginProcessorTests: XCTestCase, @unchecked Sendable {
     }
 }
 
+extension HTTPPluginProcessorTests {
+    /// Padding lives inside the parsed tree; size admission is measured in UTF-8 bytes.
+    private func sizedJSON(_ size: Int, count: Int64 = 20, array: Bool = false) throws -> Data {
+        func tree(padding: String) -> JSONValue {
+            let object = JSONValue.object([
+                "count": .integer(count), "label": .string("日本語😀é"),
+                "items": .array([.object(["name": .string("配列🙂"), "values": .array([.bool(true), .null, .integer(7)])])]),
+                "padding": .string(padding),
+            ])
+            return array ? .array([object, .array([.bool(false), .string("終")])]) : object
+        }
+        let overhead = try tree(padding: "").data().count
+        let padding = try XCTUnwrap(size >= overhead ? String(repeating: "x", count: size - overhead) : nil)
+        let bytes = try tree(padding: padding).data()
+        XCTAssertEqual(bytes.count, size)
+        return bytes
+    }
+
+    func testModeratelyLargeJSONTraversesFourPhases() async throws {
+        let package = try package(request: """
+        onEnter(r){
+          const b=Array.isArray(r.body)?r.body[0]:r.body;
+          if(b.label!=='日本語😀é'||b.items[0].name!=='配列🙂'||b.items[0].values[2]!==7)throw new Error('request tree missing');
+          b.count=21;
+        },
+        onLeave(r){
+          const b=Array.isArray(r.body)?r.body[0]:r.body;
+          if(b.count!==21)throw new Error('forwarded request missing');
+          const rejected=(()=>{try{b.items[0].values.push(9);return false;}catch{return true;}})();
+          if(!rejected||b.items[0].values.length!==3)throw new Error('request leave mutable');
+        }
+        """, response: """
+        onEnter(r){
+          const b=Array.isArray(r.body)?r.body[0]:r.body;
+          const q=Array.isArray(r.request.body)?r.request.body[0]:r.request.body;
+          if(q.count!==21||q.label!=='日本語😀é'||b.items[0].name!=='配列🙂')throw new Error('both bodies missing');
+          b.count=21;
+        },
+        onLeave(r){
+          const b=Array.isArray(r.body)?r.body[0]:r.body;
+          const q=Array.isArray(r.request.body)?r.request.body[0]:r.request.body;
+          if(b.count!==21||q.count!==21)throw new Error('forwarded bodies missing');
+          const rejected=(()=>{try{b.count=99;return false;}catch{return true;}})();
+          const requestRejected=(()=>{try{q.count=99;return false;}catch{return true;}})();
+          if(!rejected||!requestRejected||b.count!==21||q.count!==21)throw new Error('response leave mutable');
+        }
+        """)
+        let processor = try await approved([package]).processor
+        for size in [8 * 1024, 16 * 1024, 24 * 1024] {
+            for array in [false, true] {
+                let original = try sizedJSON(size, array: array)
+                let expected = try json(sizedJSON(size, count: 21, array: array))
+                var req = request(body: original)
+                let requestOutput = try await processor.process(.requestEnter, request: req, response: nil)
+                XCTAssertEqual(try json(requestOutput), expected)
+                req.body = try XCTUnwrap(requestOutput)
+                XCTAssertEqual(req.body.count, size)
+                let requestLeave = try await processor.process(.requestLeave, request: req, response: nil)
+                XCTAssertNil(requestLeave)
+                var res = response(body: original)
+                let event = try JSONValue.object([
+                    "id": .string(req.id.uuidString), "phase": .string(HTTPPluginPhase.responseEnter.rawValue),
+                    "request": .object(["method": .string(req.method), "host": .string(req.host), "path": .string(req.path),
+                                        "headers": .object([:]), "query": .object([:]), "body": json(req.body)]),
+                    "response": .object(["status": .integer(200), "headers": .object([:]), "body": json(original)]),
+                ])
+                let eventBytes = try event.data().count
+                XCTAssertLessThanOrEqual(eventBytes, JavaScriptLimits.maxEventBytes)
+                print("JSONBoundary bodyBytes=\(size) array=\(array) responseEventBytes=\(eventBytes)")
+                let responseOutput = try await processor.process(.responseEnter, request: req, response: res)
+                XCTAssertEqual(try json(responseOutput), expected)
+                res.body = try XCTUnwrap(responseOutput)
+                XCTAssertEqual(res.body.count, size)
+                let responseLeave = try await processor.process(.responseLeave, request: req, response: res)
+                XCTAssertNil(responseLeave)
+            }
+        }
+    }
+
+    func testLargeUnchangedJSONReturnsNoReplacement() async throws {
+        let package = try package(request: "onEnter(r){r.body.count=20;},onLeave(){}",
+                                  response: "onEnter(r){r.body.count=20;},onLeave(){}")
+        let processor = try await approved([package]).processor
+        for size in [8 * 1024, 16 * 1024, 24 * 1024] {
+            let compact = try sizedJSON(size - 3)
+            let wire = Data("{ \n\t".utf8) + compact.dropFirst()
+            XCTAssertEqual(wire.count, size)
+            for phase in HTTPPluginPhase.allCases {
+                let output = try await processor.process(phase, request: request(body: wire), response: response(body: wire))
+                XCTAssertNil(output, "the adapter must leave original wire bytes available to transport: \(phase), \(size)")
+            }
+        }
+    }
+
+    func testValidJSONOneByteOverLimitBypassesEveryPhase() async throws {
+        let package = try package(request: "onEnter(){throw new Error('oversize request entered');},onLeave(){throw new Error('oversize request left');}",
+                                  response: "onEnter(){throw new Error('oversize response entered');},onLeave(){throw new Error('oversize response left');}")
+        let processor = try await approved([package]).processor
+        let wire = try sizedJSON(24 * 1024 + 1)
+        _ = try json(wire)
+        for phase in HTTPPluginPhase.allCases {
+            let isResponse = phase == .responseEnter || phase == .responseLeave
+            let output = try await processor.process(phase, request: request(body: isResponse ? Data(#"{"count":20}"#.utf8) : wire),
+                                                     response: isResponse ? response(body: wire) : nil)
+            XCTAssertNil(output, "valid JSON must bypass before any callback: \(phase)")
+        }
+    }
+
+    func testMutationOutputHonorsExactBodyByteBoundary() async throws {
+        let original = try sizedJSON(24 * 1024 - 1)
+        for growth in [1, 2] {
+            let callback = "onEnter(r){r.body.padding+='\(String(repeating: "x", count: growth))';}"
+            let package = try package(request: callback, response: callback)
+            let (store, revisions) = try await AutomationFixtures.activationContext(packages: [package], activationURL: directory.appendingPathComponent("growth-\(growth).json"))
+            let empty = try await store.snapshot()
+            let snapshot = try await store.activate(package, revisionID: XCTUnwrap(revisions.first).id, expectedGeneration: empty.generation)
+            let processor = HTTPPluginProcessor(store: store, snapshot: snapshot, hasCaptureConsent: { true })
+            for phase in [HTTPPluginPhase.requestEnter, .responseEnter] {
+                do {
+                    let output = try await processor.process(phase, request: request(body: original), response: response(body: original))
+                    XCTAssertEqual(growth, 1, "24577-byte mutation must fail")
+                    XCTAssertEqual(try XCTUnwrap(output).count, 24 * 1024)
+                    XCTAssertEqual(try json(output), try json(sizedJSON(24 * 1024)))
+                } catch {
+                    XCTAssertEqual(growth, 2, "24576-byte mutation must be accepted")
+                    XCTAssertEqual(error as? HTTPPluginProcessor.Failure, .invalidResult)
+                }
+            }
+        }
+    }
+
+    func testLargeLeaveMutationAttemptsAreRejected() async throws {
+        let processor = try await approved([package(request: "onLeave(r){r.body.items[0].values.push(9);}",
+                                                    response: "onLeave(r){r.body.items[0].values.push(9);}")]).processor
+        let body = try sizedJSON(24 * 1024)
+        for phase in [HTTPPluginPhase.requestLeave, .responseLeave] {
+            do {
+                _ = try await processor.process(phase, request: request(body: body), response: response(body: body))
+                XCTFail("a large leave callback must remain read-only")
+            } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .scriptError) }
+        }
+    }
+}
+
 /// A deterministic consent seam pauses only a test thread at the third authorization check: after
 /// the real VM returned, immediately before the adapter rereads the activation generation.
 private final class PostVMGate: @unchecked Sendable {

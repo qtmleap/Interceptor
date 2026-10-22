@@ -60,6 +60,37 @@ final class HTTPPluginLiveIntegrationTests: XCTestCase, @unchecked Sendable {
         }
     }
 
+    func testOversizeJSONPassesThroughRealTLSInBothDirections() async throws {
+        let routes = [Route(path: "/large-json", source: Self.fourPhaseSource), Route(path: "/search", source: Self.fourPhaseSource)]
+        try await withNetwork(routes: routes) { network in
+            var expectedBodies: [Data] = []
+            for size in [24 * 1024 + 1, 64 * 1024, 1024 * 1024] {
+                let prefix = "{\"limit\":20,\"label\":\"日本語😀\",\"padding\":\""
+                let suffix = "\"}"
+                let body = Data((prefix + String(repeating: "x", count: size - prefix.utf8.count - suffix.utf8.count) + suffix).utf8)
+                XCTAssertEqual(body.count, size)
+                _ = try Self.json(body)
+                for chunked in [false, true] {
+                    expectedBodies.append(body)
+                    let response = try await network.roundTrip(path: "/large-json", body: body, chunked: chunked)
+                    XCTAssertEqual(response.status, 200)
+                    XCTAssertEqual(response.body, body, "the actual client must receive every original response byte")
+                    XCTAssertTrue(network.processor.records.value.isEmpty, "oversized request and response must bypass all four callbacks")
+                }
+            }
+            XCTAssertEqual(network.originRequests.value.map(\.body), expectedBodies, "the actual origin must receive every original request byte")
+            let control = try await network.roundTrip(path: "/search")
+            XCTAssertEqual(try Self.json(control.body), .object([
+                "maintenance": .bool(true), "originLimit": .integer(5), "requestLimit": .integer(5),
+            ]))
+            let complete = await network.waitForSuccessfulPhases(4)
+            XCTAssertTrue(complete, "the same real adapter must still invoke all callbacks for eligible traffic")
+            let records = network.processor.records.value
+            XCTAssertEqual(records.count, 4)
+            XCTAssertTrue(records.allSatisfy { $0.error == nil && $0.request.path == "/search" })
+        }
+    }
+
     func testConcurrentTLSConnectionsKeepBothMutationsAndEveryPhaseWithoutBusy() async throws {
         try await withNetwork(routes: [Route(path: "/search", source: Self.fourPhaseSource)]) { network in
             async let first = network.roundTrip(path: "/search")
@@ -629,9 +660,11 @@ private final class Network: @unchecked Sendable {
         return client
     }
 
-    func roundTrip(path: String, hostHeader: String = "api.example.com") async throws -> WireResponse {
+    func roundTrip(path: String, hostHeader: String = "api.example.com", body: Data = Data(#"{"limit":20}"#.utf8),
+                   chunked: Bool = false) async throws -> WireResponse
+    {
         let client = try await tlsClient()
-        return try await request(path: path, hostHeader: hostHeader, client: client)
+        return try await request(path: path, hostHeader: hostHeader, client: client, body: body, chunked: chunked)
     }
 
     func expectContinueThenEligible(path: String) async throws -> [WireResponse] {
@@ -669,6 +702,7 @@ private final class Network: @unchecked Sendable {
 
     private func request(
         path: String, hostHeader: String = "api.example.com", client: Channel, expectsContinue: Bool = false,
+        body: Data = Data(#"{"limit":20}"#.utf8), chunked: Bool = false,
     ) async throws -> WireResponse {
         let response = ResponseCollector(loop: client.eventLoop, expectsContinue: expectsContinue)
         try await client.pipeline.addHandler(response).get()
@@ -678,10 +712,8 @@ private final class Network: @unchecked Sendable {
             client.close(promise: nil)
         }
         defer { responseTimeout.cancel() }
-        let body = Data(#"{"limit":20}"#.utf8)
-        var headers = HTTPHeaders([
-            ("Host", hostHeader), ("Content-Type", "application/json"), ("Content-Length", String(body.count)),
-        ])
+        var headers = HTTPHeaders([("Host", hostHeader), ("Content-Type", "application/json")])
+        headers.add(name: chunked ? "Transfer-Encoding" : "Content-Length", value: chunked ? "chunked" : String(body.count))
         if expectsContinue {
             headers.add(name: "Expect", value: "100-continue")
         }
@@ -693,9 +725,12 @@ private final class Network: @unchecked Sendable {
         } else {
             client.write(HTTPClientRequestPart.head(head), promise: nil)
         }
-        var buffer = client.allocator.buffer(capacity: body.count)
-        buffer.writeBytes(body)
-        client.write(HTTPClientRequestPart.body(.byteBuffer(buffer)), promise: nil)
+        let parts = chunked ? [body.prefix(body.count / 2), body.dropFirst(body.count / 2)] : [body]
+        for part in parts {
+            var buffer = client.allocator.buffer(capacity: part.count)
+            buffer.writeBytes(part)
+            client.write(HTTPClientRequestPart.body(.byteBuffer(buffer)), promise: nil)
+        }
         try await client.writeAndFlush(HTTPClientRequestPart.end(nil)).get()
         let result = try await completed.get()
         try await client.pipeline.removeHandler(response).get()
@@ -891,15 +926,24 @@ private final class OriginHandler: ChannelInboundHandler, @unchecked Sendable {
                     if head?.headers.first(name: "expect") == "100-continue" {
                         context.write(wrapOutboundOut(.head(HTTPResponseHead(version: .http1_1, status: .init(statusCode: 103)))), promise: nil)
                     }
-                    let parsedRequest = try JSONValue(parsing: body)
-                    let response = try JSONValue.object(["maintenance": .bool(false), "originLimit": parsedRequest.objectValue?["limit"] ?? .null]).data()
-                    let head = HTTPResponseHead(version: .http1_1, status: .ok, headers: HTTPHeaders([
-                        ("Content-Type", "application/json"), ("Content-Length", String(response.count)),
-                    ]))
+                    let response: Data
+                    if head?.uri == "/large-json" {
+                        response = body
+                    } else {
+                        let parsedRequest = try JSONValue(parsing: body)
+                        response = try JSONValue.object(["maintenance": .bool(false), "originLimit": parsedRequest.objectValue?["limit"] ?? .null]).data()
+                    }
+                    let chunked = head?.uri == "/large-json" && head?.headers.first(name: "transfer-encoding") == "chunked"
+                    var headers = HTTPHeaders([("Content-Type", "application/json")])
+                    headers.add(name: chunked ? "Transfer-Encoding" : "Content-Length", value: chunked ? "chunked" : String(response.count))
+                    let head = HTTPResponseHead(version: .http1_1, status: .ok, headers: headers)
                     context.write(wrapOutboundOut(.head(head)), promise: nil)
-                    var buffer = context.channel.allocator.buffer(capacity: response.count)
-                    buffer.writeBytes(response)
-                    context.write(wrapOutboundOut(.body(.byteBuffer(buffer))), promise: nil)
+                    let parts = chunked ? [response.prefix(response.count / 2), response.dropFirst(response.count / 2)] : [response]
+                    for part in parts {
+                        var buffer = context.channel.allocator.buffer(capacity: part.count)
+                        buffer.writeBytes(part)
+                        context.write(wrapOutboundOut(.body(.byteBuffer(buffer))), promise: nil)
+                    }
                     context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
                 } catch { context.close(promise: nil) }
         }
