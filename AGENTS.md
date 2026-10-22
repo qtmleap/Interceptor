@@ -209,3 +209,37 @@ existing review policy always still apply.
   manual, scheduled, release, and deployment gates intact.
 - See `docs/development/ci-change-scope.md` for the common classifier contract.
 <!-- /non-code-verification -->
+
+<!-- screenshot-webp -->
+## Screenshot compression (mandatory)
+
+- Apply this rule to every project and execution host, including native,
+  simulator/device, browser and mock captures, exports, and delegated work.
+- Immediately after each capture/export, convert its transient original to a
+  lossless WebP as the next processing step, before publishing or handing it to
+  a reviewer. Preserve native pixel dimensions, alpha (including RGB under fully
+  transparent pixels; enable the encoder's exact mode) and the color profile.
+  Record Retina scale in the manifest; do not resize or use lossy compression
+  for comparison evidence.
+- Verify the WebP decodes at the original dimensions with identical RGBA pixels
+  using the same recorded color profile/space for both decodes. Record the tool,
+  source/output hashes, dimensions, scale, byte sizes and verification result.
+  If an input cannot be represented losslessly, retain it and report the blocker;
+  do not silently reduce bit depth, gamut, dimensions or frames.
+- Treat PNG/JPEG/TIFF originals as temporary. After verifying the WebP and updating
+  its consumers, remove only this run's redundant originals. If a tool requires
+  the original format (for example XCTest result bundles, an approved baseline,
+  or store submission), still create the WebP and retain only the required
+  original for that named consumer, recording its purpose and retention. Create
+  the WebP derivative before uploading the required original. Do not rewrite approved
+  baselines or test bundles merely to change their image format.
+- Use the real .webp extension and image/webp media type; update viewer links,
+  manifests and hashes without breaking existing consumers. Missing encoders,
+  failed conversions or failed pixel checks are unfinished work; report them
+  instead of silently keeping only an uncompressed screenshot or deleting it.
+- Include this requirement explicitly in every delegated task that may capture
+  screenshots, even if the worker cannot read these instructions. Workers must
+  pass it to their own delegates. Require WebP paths, verification and any retained
+  originals; the coordinator independently verifies this evidence before claiming
+  completion.
+<!-- /screenshot-webp -->

@@ -58,6 +58,16 @@ gate completes, locally or through actual CI coverage on matching inputs.
   required unrun cell is **unverified**, not a pass. Missing harnesses are reported
   as integration work; this instruction-only template installs none.
 
+## Mandatory WebP compression
+
+Follow root `AGENTS.md`, “Screenshot compression (mandatory)”, for every capture.
+Create and verify a lossless WebP immediately after capture/export, preserving
+native dimensions, Retina scale and decoded pixels. Use the WebP for retained
+exports, viewers and reviews. Keep an original only for a documented consumer
+that requires its format; preserve required XCTest attachments and approved
+baselines. Record hashes, sizes, verification and any retained originals. Include
+this requirement explicitly in delegated capture tasks.
+
 ## Sharing remote screenshots
 
 For remote screen captures, including ad-hoc UI inspection and test comparisons,

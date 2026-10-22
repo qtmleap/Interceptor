@@ -105,6 +105,11 @@ typedef struct RunState {
     size_t n_rd_query;
     int read_body_json;
     int body_writable;   // enter phase with the manifest write grant for the invoked leg
+    // Opt-in diagnostics only; NULL for every ordinary call.
+    QJSDiagnostics *diag;
+    int cur_phase;
+    uint64_t start_ns;   // the original deadline start (single clock read at C entry)
+    uint64_t cpu0_ns;
 } RunState;
 
 static uint64_t now_ns(void) {
@@ -113,22 +118,101 @@ static uint64_t now_ns(void) {
     return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
 }
 
-static int budget_exceeded(RunState *st) {
+// MARK: opt-in diagnostics (scalar only; every entry point is a no-op when `st->diag` is NULL)
+
+static uint64_t thread_cpu_ns(int *ok) {
+#if defined(CLOCK_THREAD_CPUTIME_ID)
+    struct timespec ts;
+    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
+        *ok = 1;
+        return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+    }
+#endif
+    *ok = 0;
+    return 0;
+}
+
+static void diag_clocks(const RunState *st, uint64_t *wall, uint64_t *cpu) {
+    uint64_t now = now_ns();
+    *wall = now >= st->start_ns ? now - st->start_ns : 0;
+    int ok;
+    uint64_t c = thread_cpu_ns(&ok);
+    *cpu = ok && c >= st->cpu0_ns ? c - st->cpu0_ns : 0;
+}
+
+// Records that `phase` was entered. Bounded by the fixed record capacity; never allocates.
+static void diag_phase(RunState *st, int phase) {
+    QJSDiagnostics *d = st->diag;
+    if (!d) return;
+    st->cur_phase = phase;
+    if (d->count >= d->capacity) return;
+    QJSDiagnosticRecord *r = &d->records[d->count++];
+    r->phase = phase;
+    diag_clocks(st, &r->wall_ns, &r->thread_cpu_ns);
+}
+
+static void diag_begin(RunState *st, QJSDiagnostics *d, uint64_t start_ns) {
+    memset(d, 0, sizeof(*d));
+    d->capacity = QJS_DIAG_CAPACITY;
+    d->selected_route = -1;
+    d->selected_source = -1;
+    d->supported_flags = QJS_DIAG_WALL_SUPPORTED;
+    int ok;
+    st->cpu0_ns = thread_cpu_ns(&ok);
+    if (ok) d->supported_flags |= QJS_DIAG_THREAD_CPU_SUPPORTED;
+    st->start_ns = start_ns;
+    st->diag = d;
+}
+
+static void diag_poll(QJSDiagnostics *d, int origin) {
+    uint32_t *n = origin == QJS_DIAG_ORIGIN_INTERRUPT ? &d->interrupt_polls : &d->inline_polls;
+    if (*n != UINT32_MAX) (*n)++;
+}
+
+// Called exactly once, at the first sticky stop.
+static void diag_stop(RunState *st, int origin) {
+    QJSDiagnostics *d = st->diag;
+    d->stop_status = st->stop;
+    d->stop_origin = origin;
+    d->stop_phase = st->cur_phase;
+    diag_clocks(st, &d->stop_wall_ns, &d->stop_thread_cpu_ns);
+}
+
+static void diag_finish(RunState *st, int status, size_t result_len) {
+    QJSDiagnostics *d = st->diag;
+    if (!d) return;
+    diag_phase(st, QJS_DIAG_PHASE_EXIT);
+    d->status = status;
+    d->result_len = result_len;
+    d->route_count = (uint32_t)st->ndecl;
+    d->file_count = (uint32_t)st->nfiles;
+    d->registration_count = (uint32_t)st->nregs;
+}
+
+// `origin` says where the stop was detected; the check order and result never depend on it.
+static int budget_check(RunState *st, int origin) {
+    if (st->diag) diag_poll(st->diag, origin);
     if (st->stop) return 1;
     if (st->token && atomic_load_explicit(&st->token->cancelled, memory_order_acquire)) {
         st->stop = QJS_CANCELLED;
+        if (st->diag) diag_stop(st, origin);
         return 1;
     }
     if (now_ns() >= st->deadline_ns) {
         st->stop = QJS_TIMEOUT;
+        if (st->diag) diag_stop(st, origin);
         return 1;
     }
     return 0;
 }
 
+static int budget_exceeded(RunState *st) {
+    return budget_check(st, QJS_DIAG_ORIGIN_INLINE_POLL);
+}
+
 static int interrupt_cb(JSRuntime *rt, void *opaque) {
     (void)rt;
-    return budget_exceeded((RunState *)opaque);
+    return budget_check((RunState *)opaque, QJS_DIAG_ORIGIN_INTERRUPT);
 }
 
 // MARK: limited allocator (mirrors the engine's default one, plus an OOM flag)
@@ -1956,11 +2040,11 @@ static int v2_setup_failure(const RunState *st) {
     return st->stop ? st->stop : st->oom ? QJS_MEMORY_OR_STACK : QJS_INVALID_INPUT;
 }
 
-QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
+static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
                      const uint8_t *package_json, size_t package_len,
                      const char *hook,
                      const uint8_t *event_json, size_t event_len,
-                     const uint8_t *config_json, size_t config_len) {
+                     const uint8_t *config_json, size_t config_len, QJSDiagnostics *diagnostics) {
     QJSResult res = {QJS_INTERNAL, NULL, 0};
     uint8_t *src = NULL, *ev = NULL, *cfg = NULL, *package = NULL;
     size_t source_len = 0;
@@ -1977,13 +2061,27 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
     memset(&id, 0, sizeof(id));
     for (int i = 0; i < MAX_REGS; i++) st.regs[i].cb = JS_UNDEFINED;
     st.token = token;
-    st.deadline_ns = now_ns() + (uint64_t)(limits ? limits->deadline_ms : 0) * 1000000ull;
+    uint64_t start_ns = now_ns();   // the original deadline start, read exactly where it always was
+    st.deadline_ns = start_ns + (uint64_t)(limits ? limits->deadline_ms : 0) * 1000000ull;
+    if (diagnostics) {
+        diag_begin(&st, diagnostics, start_ns);
+        diag_phase(&st, QJS_DIAG_PHASE_PREFLIGHT);
+        diagnostics->package_len = package_len;
+        diagnostics->event_len = event_len;
+        diagnostics->config_len = config_len;
+        if (limits) {
+            diagnostics->limits = *limits;
+            diagnostics->limits_valid = 1;
+            diagnostics->deadline_relative_ns = (uint64_t)limits->deadline_ms * 1000000ull;
+        }
+    }
 
     if (!limits || limits->deadline_ms == 0 || limits->heap_bytes == 0 || limits->stack_bytes == 0 ||
         limits->max_result_bytes == 0 || limits->max_result_depth == 0) {
+        diag_finish(&st, res.status, 0);
         return res;
     }
-    if (!parse_phase(hook, &leg, &kind)) { res.status = QJS_INVALID_INPUT; return res; }
+    if (!parse_phase(hook, &leg, &kind)) { res.status = QJS_INVALID_INPUT; diag_finish(&st, res.status, 0); return res; }
     st.phase_leg = leg;
     st.phase_kind = kind;
 
@@ -1991,13 +2089,16 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
         !event_json || event_len == 0 || event_len > limits->max_event_bytes ||
         !config_json || config_len == 0 || config_len > limits->max_config_bytes) {
         res.status = QJS_INVALID_INPUT;
+        diag_finish(&st, res.status, 0);
         return res;
     }
-    if (budget_exceeded(&st)) { res.status = st.stop; return res; }
+    if (budget_exceeded(&st)) { res.status = st.stop; diag_finish(&st, res.status, 0); return res; }
+    diag_phase(&st, QJS_DIAG_PHASE_INPUT_COPY);
     ev = copy_z(event_json, event_len);
     cfg = copy_z(config_json, config_len);
     package = copy_z(package_json, package_len);
     if (!ev || !cfg || !package) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
+    diag_phase(&st, QJS_DIAG_PHASE_INPUT_SCAN);
     if (!json_check(ev, event_len, 64) || !json_check(cfg, config_len, 64) || !json_check(package, package_len, 64) ||
         !v2_safe_integer_tokens(ev, event_len) || !v2_safe_integer_tokens(cfg, config_len) ||
         !v2_safe_integer_tokens(package, package_len)) {
@@ -2005,6 +2106,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
         goto cleanup;
     }
 
+    diag_phase(&st, QJS_DIAG_PHASE_RUNTIME);
     rt = JS_NewRuntime2(&limited_funcs, &st);
     if (!rt) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
     JS_SetMemoryLimit(rt, limits->heap_bytes);
@@ -2013,6 +2115,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
     JS_SetCanBlock(rt, 0);
     JS_SetInterruptHandler(rt, interrupt_cb, &st);
 
+    diag_phase(&st, QJS_DIAG_PHASE_CONTEXT);
     ctx = JS_NewContextRaw(rt);
     if (!ctx) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
     if (JS_AddIntrinsicBaseObjects(ctx) || JS_AddIntrinsicDate(ctx) || JS_AddIntrinsicEval(ctx) ||
@@ -2032,6 +2135,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
     JS_SetContextOpaque(ctx, &st);
 
     // Manifest, event and config are parsed and validated natively before user code exists.
+    diag_phase(&st, QJS_DIAG_PHASE_JSON_PARSE);
     manv = JS_ParseJSON(ctx, (const char *)package, package_len, "<package>");
     if (JS_IsException(manv)) { status = classify_exception(ctx, &st, QJS_INVALID_INPUT); goto cleanup; }
     evv = JS_ParseJSON(ctx, (const char *)ev, event_len, "<event>");
@@ -2039,13 +2143,16 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
     cfgv = JS_ParseJSON(ctx, (const char *)cfg, config_len, "<config>");
     if (JS_IsException(cfgv)) { status = classify_exception(ctx, &st, QJS_INVALID_INPUT); goto cleanup; }
 
+    diag_phase(&st, QJS_DIAG_PHASE_PACKAGE);
     if (!load_package(&st, ctx, manv, &write_request, &write_response)) { status = v2_setup_failure(&st); goto cleanup; }
     st.body_writable = kind == 0 && (leg == 0 ? write_request : write_response);
+    diag_phase(&st, QJS_DIAG_PHASE_CONFIG_EVENT);
     if (!freeze_tree(&st, ctx, cfgv, 1, 0)) { status = v2_setup_failure(&st); goto cleanup; }
     have_id = 1;   // ident_free tolerates a partially filled identity
     if (!load_event(&st, ctx, evv, hook, leg == 1, &id, &legv)) { status = v2_setup_failure(&st); goto cleanup; }
 
     // Select from the raw identity and requested phase before evaluating any source.
+    diag_phase(&st, QJS_DIAG_PHASE_SELECTION);
     int candidates = 0, phase = leg * 2 + kind, selected_file = -1;
     for (int i = 0; i < st.ndecl; i++) {
         if (st.decl[i].hooks[phase].s && match_accepts(&st.decl[i], &id, leg == 1)) {
@@ -2054,7 +2161,8 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
     }
     if (candidates > 1) { status = QJS_INVALID_INPUT; goto cleanup; }
     if (!candidates) {
-        if (budget_exceeded(&st)) { status = st.stop; goto cleanup; }
+        diag_phase(&st, QJS_DIAG_PHASE_FINAL_ACCEPTANCE);
+        if (budget_check(&st, QJS_DIAG_ORIGIN_FINAL_CHECK)) { status = st.stop; goto cleanup; }
         const char *empty = "{\"actions\":[]}";
         size_t len = strlen(empty);
         if (len > limits->max_result_bytes) { status = QJS_INVALID_RESULT; goto cleanup; }
@@ -2065,13 +2173,16 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
     Str *selected = &st.decl[st.selected_route].hooks[phase];
     for (int i = 0; i < st.nfiles; i++) if (str_cmp(selected, &st.files[i].name) == 0) selected_file = i;
     if (selected_file < 0) { status = QJS_INVALID_INPUT; goto cleanup; }
+    if (diagnostics) { diagnostics->selected_route = st.selected_route; diagnostics->selected_source = selected_file; }
     for (int i = 0; i < st.ndecl; i++) for (int p = 0; p < 4; p++)
         if (st.decl[i].hooks[p].s && str_cmp(selected, &st.decl[i].hooks[p]) == 0) st.expected_phases |= 1u << p;
     source_len = st.files[selected_file].code.n;
     if (source_len > limits->max_source_bytes) { status = QJS_INVALID_INPUT; goto cleanup; }
+    if (diagnostics) diagnostics->source_len = source_len;
     src = copy_z((const uint8_t *)st.files[selected_file].code.s, source_len);
     if (!src) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
 
+    diag_phase(&st, QJS_DIAG_PHASE_ORIGINAL_BODY);
     // Canonical form of the original body of the invoked leg (the only thing a callback may change).
     if (kind == 0 && (leg == 0 ? write_request : write_response)) {
         JSAtom ba = JS_NewAtom(ctx, "body");
@@ -2086,9 +2197,11 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
         }
     }
 
+    diag_phase(&st, QJS_DIAG_PHASE_API_INSTALL);
     if (!install_interceptor(ctx)) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
 
     {
+        diag_phase(&st, QJS_DIAG_PHASE_EVAL);
         JSValue completion = JS_Eval(ctx, (const char *)src, source_len, "<plugin>", JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_STRICT);
         if (JS_IsException(completion)) { status = classify_exception(ctx, &st, QJS_SCRIPT_ERROR); goto cleanup; }
         JS_FreeValue(ctx, completion);
@@ -2107,6 +2220,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
         v.out.cap = limits->max_result_bytes;
         v.out.p = malloc(v.out.cap + 1);
         if (!v.out.p) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
+        diag_phase(&st, QJS_DIAG_PHASE_CALLBACKS);
         b_str(&v.out, "{\"actions\":[");
         for (int i = 0; i < st.nregs && ok; i++) {
             if (!JS_IsFunction(ctx, st.regs[i].cb)) continue;
@@ -2123,6 +2237,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
             if (!JS_IsUndefined(ret)) ok = emit_actions(&v, ret);
             JS_FreeValue(ctx, ret);
         }
+        diag_phase(&st, QJS_DIAG_PHASE_RESULT);
         if (ok) b_ch(&v.out, ']');
         if (ok && kind == 0 && (leg == 0 ? write_request : write_response)) {
             JSAtom ba = JS_NewAtom(ctx, "body");
@@ -2159,7 +2274,8 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
         if (ok && v.out.overflow) ok = 0;
         if (ok) v.out.p[v.out.len] = 0;
         if (ok && !json_check(v.out.p, v.out.len, (int)limits->max_result_depth)) ok = 0;
-        if (budget_exceeded(&st)) {
+        diag_phase(&st, QJS_DIAG_PHASE_FINAL_ACCEPTANCE);
+        if (budget_check(&st, QJS_DIAG_ORIGIN_FINAL_CHECK)) {
             status = st.stop;
         } else if (ok) {
             res.data = v.out.p;
@@ -2175,6 +2291,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
     }
 
 cleanup:
+    diag_phase(&st, QJS_DIAG_PHASE_TEARDOWN);
     if (ctx) {
         for (int i = 0; i < st.nregs; i++) JS_FreeValue(ctx, st.regs[i].cb);
         JS_FreeValue(ctx, legv);
@@ -2195,5 +2312,26 @@ cleanup:
     free(package);
     for (int i = 0; i < st.nfiles; i++) { str_free(&st.files[i].name); str_free(&st.files[i].code); }
     res.status = status;
+    diag_finish(&st, status, res.length);
     return res;
+}
+
+QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
+                     const uint8_t *package_json, size_t package_len,
+                     const char *hook,
+                     const uint8_t *event_json, size_t event_len,
+                     const uint8_t *config_json, size_t config_len) {
+    return run_v2_impl(token, limits, package_json, package_len, hook, event_json, event_len,
+                       config_json, config_len, NULL);
+}
+
+// Same body as qjs_run_v2; only the diagnostics pointer differs (NULL is the ordinary path).
+QJSResult qjs_run_v2_diagnostic(QJSCancelToken *token, const QJSLimits *limits,
+                                const uint8_t *package_json, size_t package_len,
+                                const char *hook,
+                                const uint8_t *event_json, size_t event_len,
+                                const uint8_t *config_json, size_t config_len,
+                                QJSDiagnostics *diagnostics) {
+    return run_v2_impl(token, limits, package_json, package_len, hook, event_json, event_len,
+                       config_json, config_len, diagnostics);
 }

@@ -109,21 +109,25 @@ public final class JavaScriptExecutor: @unchecked Sendable {
         return try await admitAndRun(input: Data(source.utf8), hookName: hook.functionName, event: eventJSON, config: configJSON, isV2: false)
     }
 
-    private func admitAndRun(input: Data, hookName: String, event: Data, config: Data, isV2: Bool) async throws -> Data {
+    private func admitAndRun(input: Data, hookName: String, event: Data, config: Data, isV2: Bool,
+                             collector: JavaScriptDiagnosticCollector? = nil) async throws -> Data {
         if Task.isCancelled { throw JavaScriptExecutionError.cancelled }
         guard let job = Job() else { throw JavaScriptExecutionError.internalFailure }
         guard admit(job) else {
             job.finish()
             throw JavaScriptExecutionError.busy
         }
+        collector?.mark(.admitted)
         let sourceBytes = Array(input)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
                 queue.async {
+                    collector?.mark(.workerStarted)
                     let outcome = Result { try Self.execute(job: job, source: sourceBytes, hook: hookName,
-                                                           event: event, config: config, isV2: isV2) }
+                                                           event: event, config: config, isV2: isV2, collector: collector) }
                     // Release admission before resuming so the caller can immediately run again.
                     self.release(job)
+                    collector?.mark(.released)
                     continuation.resume(with: outcome)
                 }
             }
@@ -136,13 +140,20 @@ public final class JavaScriptExecutor: @unchecked Sendable {
     /// Evaluates only the source selected by the full strict schema 2 package and raw event.
     /// The native C boundary independently validates every file, route, reference and grant.
     public func runV2(packageJSON: Data, hook: JavaScriptHook, eventJSON: Data, configJSON: Data) async throws -> Data {
+        try await runV2(packageJSON: packageJSON, hook: hook, eventJSON: eventJSON, configJSON: configJSON, collector: nil)
+    }
+
+    /// Single shared v2 path; `collector` is nil for the public API (no clocks, no diagnostic objects).
+    func runV2(packageJSON: Data, hook: JavaScriptHook, eventJSON: Data, configJSON: Data,
+               collector: JavaScriptDiagnosticCollector?) async throws -> Data {
+        collector?.mark(.called)
         guard hook.isLifecyclePhase, !packageJSON.isEmpty,
               packageJSON.count <= JavaScriptLimits.maxPackageBytes,
               eventJSON.count <= JavaScriptLimits.maxEventBytes,
               configJSON.count <= JavaScriptLimits.maxConfigBytes else {
             throw JavaScriptExecutionError.invalidInput
         }
-        return try await admitAndRun(input: packageJSON, hookName: hook.functionName, event: eventJSON, config: configJSON, isV2: true)
+        return try await admitAndRun(input: packageJSON, hookName: hook.functionName, event: eventJSON, config: configJSON, isV2: true, collector: collector)
     }
 
     /// Cancels the currently admitted invocation, if any. Idle calls must not affect later runs.
@@ -168,7 +179,9 @@ public final class JavaScriptExecutor: @unchecked Sendable {
         lock.unlock()
     }
 
-    private static func execute(job: Job, source: [UInt8], hook: String, event: Data, config: Data, isV2: Bool) throws -> Data {
+    private static func execute(job: Job, source: [UInt8], hook: String, event: Data, config: Data, isV2: Bool,
+                                 collector: JavaScriptDiagnosticCollector?) throws -> Data {
+        collector?.mark(.preflightStarted)
         // Run strict parsing on the worker queue, before JS can discard duplicate keys.
         do {
             guard case .object = try JSONValue(parsing: event),
@@ -176,6 +189,7 @@ public final class JavaScriptExecutor: @unchecked Sendable {
                 throw JavaScriptExecutionError.invalidInput
             }
         } catch { throw JavaScriptExecutionError.invalidInput }
+        collector?.mark(.preflightFinished)
         var limits = QJSLimits(
             deadline_ms: JavaScriptLimits.deadlineMilliseconds,
             heap_bytes: JavaScriptLimits.heapBytes,
@@ -187,12 +201,20 @@ public final class JavaScriptExecutor: @unchecked Sendable {
             max_result_depth: JavaScriptLimits.maxResultDepth,
             max_actions: JavaScriptLimits.maxActions)
         let token = job.nativeToken
+        // Only an opt-in diagnosed run allocates the native record block; the public API passes nil.
+        let nativeDiagnostics: UnsafeMutablePointer<QJSDiagnostics>? = collector == nil ? nil : .allocate(capacity: 1)
+        if let nativeDiagnostics { nativeDiagnostics.initialize(to: QJSDiagnostics()) }
+        defer { nativeDiagnostics?.deallocate() }
         var result = source.withUnsafeBufferPointer { src in
             event.withUnsafeBytes { ev in
                 config.withUnsafeBytes { cfg in
                     let evp = ev.baseAddress?.assumingMemoryBound(to: UInt8.self)
                     let cfgp = cfg.baseAddress?.assumingMemoryBound(to: UInt8.self)
                     if isV2 {
+                        // One C body: the diagnostic entry differs from qjs_run_v2 only by this pointer.
+                        if let nativeDiagnostics {
+                            return qjs_run_v2_diagnostic(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count, nativeDiagnostics)
+                        }
                         return qjs_run_v2(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count)
                     }
                     return qjs_run(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count)
@@ -200,6 +222,11 @@ public final class JavaScriptExecutor: @unchecked Sendable {
             }
         }
         defer { qjs_result_free(&result) }
+        if let collector, let nativeDiagnostics {
+            collector.mark(.nativeFinished)
+            collector.setNative(JavaScriptDiagnosticTrace(native: nativeDiagnostics.pointee))
+        }
+        defer { collector?.mark(.resultHandlingFinished) }
         switch result.status {
         case Int32(QJS_OK):
             guard let bytes = result.data, result.length <= JavaScriptLimits.maxResultBytes else {
