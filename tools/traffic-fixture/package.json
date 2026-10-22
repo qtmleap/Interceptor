@@ -1,0 +1,25 @@
+{
+  "name": "interceptor-traffic-fixture",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "bun test",
+    "test:runtime": "bun run scripts/runtime-smoke.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "lint": "biome check",
+    "bundle": "wrangler deploy --dry-run --env test --outdir .wrangler/dry-run"
+  },
+  "dependencies": {
+    "hono": "4.13.13",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.2",
+    "@cloudflare/workers-types": "5.20261022.1",
+    "@types/bun": "1.4.3",
+    "typescript": "7.0.2",
+    "wrangler": "4.147.0"
+  }
+}

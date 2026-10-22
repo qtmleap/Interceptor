@@ -1,0 +1,12 @@
+{
+  "name": "Interceptor Traffic Fixture",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/shyim/devcontainers-features/bun:0": {},
+    "ghcr.io/devcontainers/features/node:1": { "version": "24" }
+  },
+  "postCreateCommand": "bun install --frozen-lockfile --ignore-scripts",
+  "customizations": {
+    "vscode": { "extensions": ["biomejs.biome", "tamasfe.even-better-toml"] }
+  }
+}
