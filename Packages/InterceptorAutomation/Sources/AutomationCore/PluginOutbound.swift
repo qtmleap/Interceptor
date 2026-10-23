@@ -10,6 +10,27 @@ public enum PluginOutboundPolicy {
     public static let maxHeaderNameBytes = 128
     public static let maxHeaderValueBytes = 4096
     public static let maxTotalHeaderValueBytes = 8192
+    /// Compact UTF-8 bytes and container depth of an outbound JSON body (mirrors the bridge serializer caps).
+    public static let maxJSONBodyBytes = 8192
+    public static let maxJSONBodyDepth = 16
+
+    enum JSONBodyCheck { case valid, overLimit, invalid }
+
+    /// Strict JSON, at most `maxJSONBodyBytes` bytes and `maxJSONBodyDepth` nested containers. The bytes are not re-encoded.
+    static func checkJSONBody(_ data: Data) -> JSONBodyCheck {
+        guard data.count <= maxJSONBodyBytes else { return .overLimit }
+        do {
+            return try StrictJSON.parse(data).nesting <= maxJSONBodyDepth ? .valid : .overLimit
+        } catch AutomationError.limitExceeded {
+            return .overLimit
+        } catch {
+            return .invalid
+        }
+    }
+
+    public static func isAllowedJSONBody(_ data: Data) -> Bool {
+        checkJSONBody(data) == .valid
+    }
 
     private static let denied: Set<String> = [
         "host", "content-length", "transfer-encoding", "connection", "upgrade", "te", "trailer", "expect", "keep-alive", "set-cookie",
@@ -61,14 +82,20 @@ public enum PluginOutboundPolicy {
     private static func isSafePath(_ p: String) -> Bool {
         guard PluginManifest.isEncodedPath(p) else { return false }
         let u = Array(p.utf8)
-        func hex(_ c: UInt8) -> UInt8 { c <= 0x39 ? c - 0x30 : (c | 0x20) - 0x61 + 10 }
+        func hex(_ c: UInt8) -> UInt8 {
+            c <= 0x39 ? c - 0x30 : (c | 0x20) - 0x61 + 10
+        }
         var i = 0
         while i < u.count {
             if u[i] == 0x25 {
                 let v = hex(u[i + 1]) << 4 | hex(u[i + 2])
-                if v < 0x20 || v == 0x7F || v == 0x5C { return false }
+                if v < 0x20 || v == 0x7F || v == 0x5C {
+                    return false
+                }
                 i += 3
-            } else { i += 1 }
+            } else {
+                i += 1
+            }
         }
         return true
     }

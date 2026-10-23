@@ -115,7 +115,14 @@ typedef struct RunState {
     int read_body_json;
     int body_writable;   // enter phase with the manifest write grant for the invoked leg
     // v2 only: declared outbound bindings and the HTTP intents recorded by Interceptor.send.
-    int in_callback;     // set only while the host invokes a registered callback
+    int in_callback;     // set only while the host invokes a registered callback (and drains its promise jobs)
+    int requires_async;  // read-only probe attempted a fetch; no network has occurred
+    // fetch mode only (qjs_run_v2_fetch): trusted blocking host callback plus aggregate caps.
+    QJSFetchCallback fetch_cb;
+    void *fetch_opaque;
+    uint64_t wall_deadline_ns;   // 0 when not in fetch mode
+    unsigned nrequests;
+    size_t response_total;
     int nout;
     OutDecl out[MAX_OUT];
     Intent *intents;
@@ -134,7 +141,8 @@ static int budget_exceeded(RunState *st) {
         st->stop = QJS_CANCELLED;
         return 1;
     }
-    if (now_ns() >= st->deadline_ns) {
+    uint64_t now = now_ns();
+    if (now >= st->deadline_ns || (st->wall_deadline_ns && now >= st->wall_deadline_ns)) {
         st->stop = QJS_TIMEOUT;
         return 1;
     }
@@ -1065,8 +1073,8 @@ static int str_eq(JSContext *ctx, JSValueConst s, const char *lit) {
 
 // Reads a plain object whose own property names are a subset of `keys` (all enumerable data), with
 // the `required` bit mask present. vals[i] is owned, JS_UNDEFINED when absent. All-or-nothing.
-static int read_obj(RunState *st, JSContext *ctx, JSValueConst obj, const char *const *keys, int n,
-                    unsigned required, JSValue *vals) {
+static int read_obj_fields(RunState *st, JSContext *ctx, JSValueConst obj, const char *const *keys, int n,
+                           unsigned required, JSValue *vals, unsigned *seen_out) {
     for (int i = 0; i < n; i++) vals[i] = JS_UNDEFINED;
     if (JS_GetClassID(obj) != st->cls_object) return 0;
     JSPropertyEnum *tab;
@@ -1092,7 +1100,13 @@ static int read_obj(RunState *st, JSContext *ctx, JSValueConst obj, const char *
     if (!ok) {
         for (int i = 0; i < n; i++) { JS_FreeValue(ctx, vals[i]); vals[i] = JS_UNDEFINED; }
     }
+    if (ok && seen_out) *seen_out = seen;
     return ok;
+}
+
+static int read_obj(RunState *st, JSContext *ctx, JSValueConst obj, const char *const *keys, int n,
+                    unsigned required, JSValue *vals) {
+    return read_obj_fields(st, ctx, obj, keys, n, required, vals, NULL);
 }
 
 static int get_str(JSContext *ctx, JSValueConst v, Str *out, size_t max) {
@@ -2151,15 +2165,407 @@ static int v2_safe_integer_tokens(const uint8_t *text, size_t len) {
     return 1;
 }
 
+// MARK: standard global fetch (fetch mode only)
+//
+// One synchronous trusted host callback per request. fetch() validates natively, blocks in the callback
+// (the wait extends the CPU deadline but never the wall deadline) and returns an already-settled
+// Promise. Promise jobs are drained only while a registered callback is active.
+
+#define FETCH_CPU_MS 250u
+#define FETCH_WALL_MS 120000ull
+#define FETCH_MAX_REQUESTS 64u
+#define FETCH_MAX_JSON_BYTES 8192u
+#define FETCH_MAX_JSON_DEPTH 16
+#define FETCH_REQUEST_MS 5000u
+#define FETCH_MAX_BODY (1024u * 1024u)
+#define FETCH_MAX_TOTAL (16u * 1024u * 1024u)
+#define FETCH_REQ_BODY_MAX 8192u
+#define FETCH_REQ_JSON_CAP (128u * 1024u)
+
+struct QJSFetchReply {
+    int32_t status;
+    uint8_t *body;
+    size_t len;
+    int has;
+    int overflow;
+};
+
+int32_t qjs_fetch_reply_set(QJSFetchReply *reply, int32_t status, const uint8_t *body, size_t len) {
+    if (!reply) return 1;
+    if (status < 100 || status > 599 || len > FETCH_MAX_BODY || (len && !body)) {
+        reply->overflow = 1;
+        return 1;
+    }
+    uint8_t *copy = copy_z(body, len);
+    if (!copy) { reply->overflow = 1; return 1; }
+    free(reply->body);
+    reply->body = copy;
+    reply->len = len;
+    reply->status = status;
+    reply->has = 1;
+    return 0;
+}
+
+// Consumes `v`. Returns a Promise already fulfilled (reject == 0) or rejected (reject == 1) with it.
+static JSValue settled_promise(JSContext *ctx, JSValue v, int reject) {
+    JSValue f[2];
+    JSValue p = JS_NewPromiseCapability(ctx, f);
+    if (JS_IsException(p)) { JS_FreeValue(ctx, v); return p; }
+    JSValue r = JS_Call(ctx, f[reject], JS_UNDEFINED, 1, (JSValueConst *)&v);
+    int failed = JS_IsException(r);
+    JS_FreeValue(ctx, r);
+    JS_FreeValue(ctx, v);
+    JS_FreeValue(ctx, f[0]);
+    JS_FreeValue(ctx, f[1]);
+    if (failed) { JS_FreeValue(ctx, p); return JS_EXCEPTION; }
+    return p;
+}
+
+static JSValue reject_error(JSContext *ctx, int syntax, const char *msg) {
+    if (syntax) JS_ThrowSyntaxError(ctx, "%s", msg);
+    else JS_ThrowTypeError(ctx, "%s", msg);
+    return settled_promise(ctx, JS_GetException(ctx), 1);
+}
+
+// Private shared state for the two body readers; neither JS nor the Response exposes this object.
+static int consume_response_body(JSContext *ctx, JSValueConst state) {
+    JSValue used = JS_GetPropertyStr(ctx, state, "used");
+    if (JS_IsException(used)) return -1;
+    int consumed = JS_ToBool(ctx, used);
+    JS_FreeValue(ctx, used);
+    if (consumed < 0) return -1;
+    if (consumed) return 0;
+    return JS_SetPropertyStr(ctx, state, "used", JS_TRUE) < 0 ? -1 : 1;
+}
+
+static JSValue js_resp_used(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *data) {
+    (void)this_val; (void)argc; (void)argv; (void)magic;
+    return JS_GetPropertyStr(ctx, data[0], "used");
+}
+
+static JSValue js_resp_text(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *data) {
+    (void)this_val; (void)argc; (void)argv; (void)magic;
+    int consumed = consume_response_body(ctx, data[1]);
+    if (consumed < 0) return JS_EXCEPTION;
+    if (!consumed) return reject_error(ctx, 0, "response body already consumed");
+    return settled_promise(ctx, JS_DupValue(ctx, data[0]), 0);
+}
+
+static JSValue js_resp_json(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *data) {
+    (void)this_val; (void)argc; (void)argv; (void)magic;
+    int consumed = consume_response_body(ctx, data[1]);
+    if (consumed < 0) return JS_EXCEPTION;
+    if (!consumed) return reject_error(ctx, 0, "response body already consumed");
+    RunState *st = JS_GetContextOpaque(ctx);
+    size_t n;
+    const char *c = JS_ToCStringLen2(ctx, &n, data[0], 0);
+    if (!c) return JS_EXCEPTION;
+    int ok = json_check((const uint8_t *)c, n, 64) && v2_safe_integer_tokens((const uint8_t *)c, n);
+    JSValue parsed = JS_UNDEFINED;
+    if (ok) parsed = JS_ParseJSON(ctx, c, n, "<response>");
+    JS_FreeCString(ctx, c);
+    if (!ok) return reject_error(ctx, 1, "invalid JSON");
+    if (JS_IsException(parsed)) {
+        if (!st || st->stop || st->oom) return JS_EXCEPTION;
+        return settled_promise(ctx, JS_GetException(ctx), 1);
+    }
+    return settled_promise(ctx, parsed, 0);
+}
+
+static JSValue make_response(JSContext *ctx, int32_t status, const uint8_t *body, size_t len) {
+    JSValue obj = JS_NewObject(ctx);
+    JSValue bodyv = JS_NewStringLen(ctx, (const char *)body, len);
+    JSValue state = JS_NewObjectProto(ctx, JS_NULL);
+    JSValue text = JS_UNDEFINED, json = JS_UNDEFINED, used = JS_UNDEFINED;
+    if (JS_IsException(obj) || JS_IsException(bodyv) || JS_IsException(state)) goto fail;
+    if (JS_SetPropertyStr(ctx, state, "used", JS_FALSE) < 0) goto fail;
+    JSValueConst data[2] = {bodyv, state};
+    text = JS_NewCFunctionData(ctx, js_resp_text, 0, 0, 2, data);
+    json = JS_NewCFunctionData(ctx, js_resp_json, 0, 0, 2, data);
+    used = JS_NewCFunctionData(ctx, js_resp_used, 0, 0, 1, (JSValueConst *)&state);
+    if (JS_IsException(text) || JS_IsException(json) || JS_IsException(used)) goto fail;
+    if (JS_DefinePropertyValueStr(ctx, obj, "status", JS_NewInt32(ctx, status), JS_PROP_ENUMERABLE) < 0) goto fail;
+    if (JS_DefinePropertyValueStr(ctx, obj, "ok", JS_NewBool(ctx, status >= 200 && status <= 299), JS_PROP_ENUMERABLE) < 0) goto fail;
+    JSAtom atom = JS_NewAtom(ctx, "bodyUsed");
+    if (atom == JS_ATOM_NULL) goto fail;
+    int ok = JS_DefinePropertyGetSet(ctx, obj, atom, used, JS_UNDEFINED, JS_PROP_ENUMERABLE);
+    used = JS_UNDEFINED;
+    JS_FreeAtom(ctx, atom);
+    if (ok < 0) goto fail;
+    if (JS_SetPropertyStr(ctx, obj, "text", text) < 0) { text = JS_UNDEFINED; goto fail; }
+    text = JS_UNDEFINED;
+    if (JS_SetPropertyStr(ctx, obj, "json", json) < 0) { json = JS_UNDEFINED; goto fail; }
+    JS_FreeValue(ctx, bodyv);
+    JS_FreeValue(ctx, state);
+    return obj;
+fail:
+    JS_FreeValue(ctx, obj);
+    JS_FreeValue(ctx, bodyv);
+    JS_FreeValue(ctx, text);
+    JS_FreeValue(ctx, json);
+    JS_FreeValue(ctx, state);
+    JS_FreeValue(ctx, used);
+    return JS_EXCEPTION;
+}
+
+typedef struct {
+    Str url, method;
+    Str *names, *values;
+    size_t n;
+    Str body;
+    int has_body;
+} FetchReq;
+
+static void fetch_req_free(FetchReq *r) {
+    str_free(&r->url);
+    str_free(&r->method);
+    strs_free(r->names, r->n);
+    strs_free(r->values, r->n);
+    str_free(&r->body);
+    memset(r, 0, sizeof(*r));
+}
+
+static int fetch_header_value_ok(const Str *v) {
+    for (size_t k = 0; k < v->n; k++) {
+        unsigned char c = (unsigned char)v->s[k];
+        if (!(c == '\t' || (c >= 0x20 && c <= 0x7E))) return 0;
+    }
+    return 1;
+}
+
+// Fills `r` from fetch(url[, init]). 1 = valid, 0 = invalid, -1 = allocation failure.
+static int parse_fetch_args(RunState *st, JSContext *ctx, int argc, JSValueConst *argv, FetchReq *r) {
+    static const char *const keys[] = {"method", "headers", "body"};
+    JSValue f[3] = {JS_UNDEFINED, JS_UNDEFINED, JS_UNDEFINED};
+    JSPropertyEnum *tab = NULL;
+    uint32_t cnt = 0;
+    unsigned seen = 0;
+    size_t total = 0;
+    int ok = 0, is_write = 0;
+    memset(r, 0, sizeof(*r));
+    if (argc < 1 || argc > 2 || !get_str(ctx, argv[0], &r->url, 2048) || !out_url_ok(&r->url)) goto done;
+    if (argc == 2 && !JS_IsUndefined(argv[1]) && !read_obj_fields(st, ctx, argv[1], keys, 3, 0u, f, &seen)) goto done;
+
+    if (!JS_IsUndefined(f[0])) {
+        if (!get_str(ctx, f[0], &r->method, 16)) goto done;
+        for (size_t i = 0; i < r->method.n; i++) if (r->method.s[i] >= 'a' && r->method.s[i] <= 'z') r->method.s[i] -= 32;
+    } else {
+        r->method.s = strdup("GET");
+        if (!r->method.s) { st->oom = 1; goto done; }
+        r->method.n = 3;
+    }
+    if (!((r->method.n == 3 && (!memcmp(r->method.s, "GET", 3) || !memcmp(r->method.s, "PUT", 3))) ||
+          (r->method.n == 4 && !memcmp(r->method.s, "POST", 4)))) goto done;
+    is_write = r->method.s[0] != 'G';
+
+    if (!JS_IsUndefined(f[2])) {
+        if (!is_write || !get_str(ctx, f[2], &r->body, FETCH_REQ_BODY_MAX) ||
+            !json_check((const uint8_t *)r->body.s, r->body.n, FETCH_MAX_JSON_DEPTH)) goto done;
+        r->has_body = 1;
+    }
+    if (!JS_IsUndefined(f[1])) {
+        if (JS_GetClassID(f[1]) != st->cls_object) goto done;
+        if (JS_GetOwnPropertyNames(ctx, &tab, &cnt, f[1], JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) { tab = NULL; goto done; }
+        if (cnt > 8) goto done;
+    }
+    r->names = calloc(cnt + 1, sizeof(Str));
+    r->values = calloc(cnt + 1, sizeof(Str));
+    if (!r->names || !r->values) { st->oom = 1; goto done; }
+    for (uint32_t i = 0; i < cnt; i++) {
+        JSValue key = JS_AtomToValue(ctx, tab[i].atom), val = JS_UNDEFINED;
+        int good = JS_IsString(key) && get_str(ctx, key, &r->names[i], 128);
+        r->n = i + 1;
+        if (good) {
+            for (size_t k = 0; k < r->names[i].n; k++) {
+                char *c = &r->names[i].s[k];
+                if (*c >= 'A' && *c <= 'Z') *c += 32;
+            }
+            good = out_header_ok(&r->names[i]) && !(r->names[i].n == 15 && !memcmp(r->names[i].s, "accept-encoding", 15)) &&
+                   own_data(ctx, f[1], tab[i].atom, &val) && get_str(ctx, val, &r->values[i], OUT_MAX_VALUE) &&
+                   fetch_header_value_ok(&r->values[i]);
+        }
+        if (good) {
+            total += r->values[i].n;
+            if (total > OUT_MAX_TOTAL) good = 0;
+            for (uint32_t j = 0; good && j < i; j++) if (str_cmp(&r->names[j], &r->names[i]) == 0) good = 0;
+            if (good && r->has_body && r->names[i].n == 12 && !memcmp(r->names[i].s, "content-type", 12) &&
+                !(r->values[i].n == 16 && !memcmp(r->values[i].s, "application/json", 16))) good = 0;
+        }
+        JS_FreeValue(ctx, key);
+        JS_FreeValue(ctx, val);
+        if (!good) goto done;
+    }
+    for (size_t i = 1; i < r->n; i++)
+        for (size_t j = i; j > 0 && str_cmp(&r->names[j - 1], &r->names[j]) > 0; j--) {
+            Str t = r->names[j]; r->names[j] = r->names[j - 1]; r->names[j - 1] = t;
+            t = r->values[j]; r->values[j] = r->values[j - 1]; r->values[j - 1] = t;
+        }
+    ok = 1;
+done:
+    if (tab) JS_FreePropertyEnum(ctx, tab, cnt);
+    for (int i = 0; i < 3; i++) JS_FreeValue(ctx, f[i]);
+    if (!ok) { int oom = st->oom; fetch_req_free(r); return oom ? -1 : 0; }
+    return 1;
+}
+
+static void put_json_string(Buf *b, const Str *s) {
+    b_ch(b, '"');
+    for (size_t k = 0; k < s->n; k++) {
+        unsigned char c = (unsigned char)s->s[k];
+        if (c == '"' || c == '\\') { b_ch(b, '\\'); b_ch(b, (char)c); }
+        else if (c < 0x20 || c == 0x7F) { char e[7]; snprintf(e, sizeof(e), "\\u%04x", c); b_str(b, e); }
+        else b_ch(b, (char)c);
+    }
+    b_ch(b, '"');
+}
+
+// {"url","method","headers":{lowercase,sorted},"body"?:"<json text>"}. A body without content-type gets application/json.
+static int build_fetch_json(const FetchReq *r, Buf *b) {
+    int has_ct = 0;
+    for (size_t i = 0; i < r->n; i++) if (r->names[i].n == 12 && !memcmp(r->names[i].s, "content-type", 12)) has_ct = 1;
+    b->p = malloc(FETCH_REQ_JSON_CAP + 1);
+    b->len = 0;
+    b->cap = FETCH_REQ_JSON_CAP;
+    b->overflow = 0;
+    if (!b->p) return 0;
+    b_str(b, "{\"url\":");
+    put_json_string(b, &r->url);
+    b_str(b, ",\"method\":");
+    put_json_string(b, &r->method);
+    b_str(b, ",\"headers\":{");
+    int first = 1, ct_done = !(r->has_body && !has_ct);
+    for (size_t i = 0; i <= r->n; i++) {
+        if (!ct_done && (i == r->n || str_cmp(&(Str){"content-type", 12}, &r->names[i]) < 0)) {
+            if (!first) b_ch(b, ',');
+            b_str(b, "\"content-type\":\"application/json\"");
+            first = 0;
+            ct_done = 1;
+        }
+        if (i == r->n) break;
+        if (!first) b_ch(b, ',');
+        first = 0;
+        put_json_string(b, &r->names[i]);
+        b_ch(b, ':');
+        put_json_string(b, &r->values[i]);
+    }
+    b_ch(b, '}');
+    if (r->has_body) {
+        b_str(b, ",\"body\":");
+        put_json_string(b, &r->body);
+    }
+    b_ch(b, '}');
+    if (b->overflow) { free(b->p); b->p = NULL; return 0; }
+    b->p[b->len] = 0;
+    return 1;
+}
+
+static JSValue js_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    RunState *st = JS_GetContextOpaque(ctx);
+    FetchReq req;
+    Buf json = {NULL, 0, 0, 0};
+    // Outside an active registered callback (including its promise-job drain) the whole run is invalid.
+    if (!st || !st->fetch_cb || !st->in_callback) {
+        if (st) st->attach_failed = 1;
+        return JS_ThrowTypeError(ctx, "invalid fetch");
+    }
+    if (budget_exceeded(st)) return JS_ThrowTypeError(ctx, "fetch stopped");
+    int parsed = parse_fetch_args(st, ctx, argc, argv, &req);
+    if (parsed < 0) return JS_ThrowTypeError(ctx, "out of memory");
+    if (!parsed) return reject_error(ctx, 0, "invalid fetch request");
+    if (st->nrequests >= FETCH_MAX_REQUESTS) { fetch_req_free(&req); return reject_error(ctx, 0, "fetch request limit"); }
+    int built = build_fetch_json(&req, &json);
+    fetch_req_free(&req);
+    if (!built) return reject_error(ctx, 0, "invalid fetch request");
+    st->nrequests++;
+
+    uint64_t t0 = now_ns();
+    uint64_t left_ms = st->wall_deadline_ns > t0 ? (st->wall_deadline_ns - t0) / 1000000ull : 0;
+    if (left_ms == 0) {
+        free(json.p);
+        st->stop = QJS_TIMEOUT;
+        return JS_ThrowTypeError(ctx, "fetch stopped");
+    }
+    uint32_t timeout_ms = left_ms < FETCH_REQUEST_MS ? (uint32_t)left_ms : FETCH_REQUEST_MS;
+    QJSFetchReply reply;
+    memset(&reply, 0, sizeof(reply));
+    int32_t rc = st->fetch_cb(st->fetch_opaque, json.p, json.len, timeout_ms, &reply);
+    free(json.p);
+    // Host wait is excluded from the cumulative CPU budget only; the wall deadline keeps running.
+    st->deadline_ns += now_ns() - t0;
+    JSValue out;
+    if (rc == 2) {
+        st->stop = QJS_CANCELLED;
+        out = JS_ThrowTypeError(ctx, "fetch aborted");
+    } else if (budget_exceeded(st)) {
+        out = JS_ThrowTypeError(ctx, "fetch stopped");
+    } else if (reply.overflow || (rc == 0 && reply.has && st->response_total + reply.len > FETCH_MAX_TOTAL)) {
+        st->stop = QJS_MEMORY_OR_STACK;
+        out = JS_ThrowTypeError(ctx, "fetch response too large");
+    } else if (rc != 0 || !reply.has || !utf8_valid(reply.body, reply.len)) {
+        out = reject_error(ctx, 0, "network error");
+    } else {
+        st->response_total += reply.len;
+        JSValue resp = make_response(ctx, reply.status, reply.body, reply.len);
+        out = JS_IsException(resp) ? resp : settled_promise(ctx, resp, 0);
+    }
+    free(reply.body);
+    return out;
+}
+
+// Read-only scheduling probe: no transport, no committed intents, and a fresh VM for the later run.
+static JSValue js_probe_fetch(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    RunState *st = JS_GetContextOpaque(ctx);
+    if (!st || !st->in_callback) {
+        if (st) st->attach_failed = 1;
+        return JS_ThrowTypeError(ctx, "fetch outside callback");
+    }
+    st->requires_async = 1;
+    return JS_ThrowTypeError(ctx, "asynchronous hook required");
+}
+
+static int install_fetch(JSContext *ctx, int probe) {
+    JSValue global = JS_GetGlobalObject(ctx);
+    JSValue fn = JS_NewCFunction(ctx, probe ? js_probe_fetch : js_fetch, "fetch", 1);
+    int ok = !JS_IsException(fn) && JS_DefinePropertyValueStr(ctx, global, "fetch", fn, 0) > 0;
+    if (JS_IsException(fn)) JS_FreeValue(ctx, fn);
+    JS_FreeValue(ctx, global);
+    return ok;
+}
+
+// Drains promise jobs until none remain, then resolves a returned Promise in place (*ret is replaced by its
+// fulfilment value). Pending after the drain means no job can ever settle it: a script error.
+static int settle_callback(RunState *st, JSContext *ctx, JSRuntime *rt, JSValue *ret) {
+    for (;;) {
+        if (budget_exceeded(st)) return st->stop;
+        JSContext *jctx = NULL;
+        int r = JS_ExecutePendingJob(rt, &jctx);
+        if (r == 0) break;
+        if (r < 0) return classify_exception(ctx, st, QJS_SCRIPT_ERROR);
+    }
+    if (budget_exceeded(st)) return st->stop;
+    int state = (int)JS_PromiseState(ctx, *ret);
+    if (state < 0) return 0;   // not a Promise
+    if (state == JS_PROMISE_FULFILLED) {
+        JSValue v = JS_PromiseResult(ctx, *ret);
+        JS_FreeValue(ctx, *ret);
+        *ret = v;
+        return 0;
+    }
+    return st->oom ? QJS_MEMORY_OR_STACK : QJS_SCRIPT_ERROR;
+}
+
 static int v2_setup_failure(const RunState *st) {
     return st->stop ? st->stop : st->oom ? QJS_MEMORY_OR_STACK : QJS_INVALID_INPUT;
 }
 
-QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
-                     const uint8_t *package_json, size_t package_len,
-                     const char *hook,
-                     const uint8_t *event_json, size_t event_len,
-                     const uint8_t *config_json, size_t config_len) {
+static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
+                            QJSFetchCallback fetch_cb, void *fetch_opaque, int probe_fetch,
+                            const uint8_t *package_json, size_t package_len,
+                            const char *hook,
+                            const uint8_t *event_json, size_t event_len,
+                            const uint8_t *config_json, size_t config_len) {
     QJSResult res = {QJS_INTERNAL, NULL, 0};
     uint8_t *src = NULL, *ev = NULL, *cfg = NULL, *package = NULL;
     size_t source_len = 0;
@@ -2176,13 +2582,24 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
     memset(&id, 0, sizeof(id));
     for (int i = 0; i < MAX_REGS; i++) st.regs[i].cb = JS_UNDEFINED;
     st.token = token;
-    st.deadline_ns = now_ns() + (uint64_t)(limits ? limits->deadline_ms : 0) * 1000000ull;
+    {
+        size_t cpu_ms = limits ? limits->deadline_ms : 0;
+        if (fetch_cb && cpu_ms > FETCH_CPU_MS) cpu_ms = FETCH_CPU_MS;
+        st.deadline_ns = now_ns() + (uint64_t)cpu_ms * 1000000ull;
+    }
+    if (fetch_cb) {
+        st.fetch_cb = fetch_cb;
+        st.fetch_opaque = fetch_opaque;
+        st.wall_deadline_ns = now_ns() + FETCH_WALL_MS * 1000000ull;
+    }
 
     if (!limits || limits->deadline_ms == 0 || limits->heap_bytes == 0 || limits->stack_bytes == 0 ||
         limits->max_result_bytes == 0 || limits->max_result_depth == 0) {
         return res;
     }
     if (!parse_phase(hook, &leg, &kind)) { res.status = QJS_INVALID_INPUT; return res; }
+    // Fetch mode exists only for response.onLeave; every other phase keeps the synchronous contract.
+    if ((fetch_cb || probe_fetch) && !(leg == 1 && kind == 1)) { res.status = QJS_INVALID_INPUT; return res; }
     st.phase_leg = leg;
     st.phase_kind = kind;
 
@@ -2285,7 +2702,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
         }
     }
 
-    if (!install_interceptor(ctx)) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
+    if (!install_interceptor(ctx) || ((fetch_cb || probe_fetch) && !install_fetch(ctx, probe_fetch))) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
 
     {
         JSValue completion = JS_Eval(ctx, (const char *)src, source_len, "<plugin>", JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_STRICT);
@@ -2318,6 +2735,18 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
             size_t first_intent = st.nintents;
             st.in_callback = 1;
             JSValue ret = JS_Call(ctx, st.regs[i].cb, JS_UNDEFINED, 2, argv);
+            if (probe_fetch && !budget_exceeded(&st) &&
+                (st.requires_async || (!JS_IsException(ret) && (int)JS_PromiseState(ctx, ret) >= 0))) {
+                st.in_callback = 0;
+                JS_FreeValue(ctx, ret);
+                free(v.out.p);
+                status = QJS_ASYNC_REQUIRED;
+                goto cleanup;
+            }
+            if (fetch_cb && !JS_IsException(ret)) {
+                int fs = settle_callback(&st, ctx, rt, &ret);
+                if (fs) { st.in_callback = 0; JS_FreeValue(ctx, ret); free(v.out.p); status = fs; goto cleanup; }
+            }
             st.in_callback = 0;
             if (JS_IsException(ret)) {
                 status = classify_exception(ctx, &st, QJS_SCRIPT_ERROR);
@@ -2411,4 +2840,39 @@ cleanup:
     for (int i = 0; i < st.nfiles; i++) { str_free(&st.files[i].name); str_free(&st.files[i].code); }
     res.status = status;
     return res;
+}
+
+QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
+                     const uint8_t *package_json, size_t package_len,
+                     const char *hook,
+                     const uint8_t *event_json, size_t event_len,
+                     const uint8_t *config_json, size_t config_len) {
+    return run_v2_impl(token, limits, NULL, NULL, 0, package_json, package_len, hook, event_json, event_len,
+                       config_json, config_len);
+}
+
+QJSResult qjs_run_v2_fetch(QJSCancelToken *token, const QJSLimits *limits,
+                           QJSFetchCallback callback, void *opaque,
+                           const uint8_t *package_json, size_t package_len,
+                           const char *hook,
+                           const uint8_t *event_json, size_t event_len,
+                           const uint8_t *config_json, size_t config_len) {
+    if (!callback) {
+        QJSResult res = {QJS_INVALID_INPUT, NULL, 0};
+        return res;
+    }
+    return run_v2_impl(token, limits, callback, opaque, 0, package_json, package_len, hook, event_json, event_len,
+                       config_json, config_len);
+}
+
+QJSResult qjs_run_v2_probe(QJSCancelToken *token, const QJSLimits *limits,
+                          const uint8_t *package_json, size_t package_len, const char *hook,
+                          const uint8_t *event_json, size_t event_len,
+                          const uint8_t *config_json, size_t config_len) {
+    if (!hook || strcmp(hook, "response.onLeave")) {
+        QJSResult res = {QJS_INVALID_INPUT, NULL, 0};
+        return res;
+    }
+    return run_v2_impl(token, limits, NULL, NULL, 1, package_json, package_len, hook,
+                       event_json, event_len, config_json, config_len);
 }

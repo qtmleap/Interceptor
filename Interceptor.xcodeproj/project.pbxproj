@@ -105,6 +105,7 @@
 				Automation/AutomationSharedConfiguration.swift,
 				Automation/HTTPPluginProcessor.swift,
 				Automation/HTTPPluginOutboundDispatcher.swift,
+				Automation/HTTPPluginFetchDispatcher.swift,
 				Automation/HTTPPluginOutboundTransport.swift,
 				Automation/HTTPPluginOutboundProbe.swift,
 				Automation/TunnelAuthorizationMonitor.swift,

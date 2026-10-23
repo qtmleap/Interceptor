@@ -1,5 +1,5 @@
-import CQuickJS
 import AutomationCore
+import CQuickJS
 import Foundation
 
 /// Which declarative hook of a plugin source is invoked.
@@ -14,17 +14,17 @@ public enum JavaScriptHook: String, Sendable, CaseIterable {
     /// Global function name the script must define for this hook (legacy v1 hooks only).
     public var functionName: String {
         switch self {
-        case .request: return "onRequest"
-        case .response: return "onResponse"
-        case .requestEnter, .requestLeave, .responseEnter, .responseLeave: return rawValue
+            case .request: "onRequest"
+            case .response: "onResponse"
+            case .requestEnter, .requestLeave, .responseEnter, .responseLeave: rawValue
         }
     }
 
     /// The four dotted lifecycle phases run through `JavaScriptExecutor.runV2` only.
     public var isLifecyclePhase: Bool {
         switch self {
-        case .request, .response: return false
-        case .requestEnter, .requestLeave, .responseEnter, .responseLeave: return true
+            case .request, .response: false
+            case .requestEnter, .requestLeave, .responseEnter, .responseLeave: true
         }
     }
 }
@@ -42,6 +42,9 @@ public enum JavaScriptExecutionError: Error, Equatable, Sendable {
     /// Unexpected engine/bridge failure (allocation of the host objects, internal engine state).
     case internalFailure
 }
+
+/// Internal scheduling signal for a read-only hook; never a script-visible API.
+public struct JavaScriptAsyncRequired: Error, Sendable {}
 
 public enum JavaScriptLimits {
     public static let deadlineMilliseconds = 50
@@ -76,14 +79,18 @@ private final class Job: @unchecked Sendable {
 
     func cancel() {
         lock.lock()
-        if let token { qjs_cancel_token_cancel(token) }
+        if let token {
+            qjs_cancel_token_cancel(token)
+        }
         lock.unlock()
     }
 
     /// Must be called after `qjs_run` has returned.
     func finish() {
         lock.lock()
-        if let token { qjs_cancel_token_free(token) }
+        if let token {
+            qjs_cancel_token_free(token)
+        }
         token = nil
         lock.unlock()
     }
@@ -103,14 +110,17 @@ public final class JavaScriptExecutor: @unchecked Sendable {
         guard !hook.isLifecyclePhase,
               source.utf8.count <= JavaScriptLimits.maxSourceBytes,
               eventJSON.count <= JavaScriptLimits.maxEventBytes,
-              configJSON.count <= JavaScriptLimits.maxConfigBytes else {
+              configJSON.count <= JavaScriptLimits.maxConfigBytes
+        else {
             throw JavaScriptExecutionError.invalidInput
         }
         return try await admitAndRun(input: Data(source.utf8), hookName: hook.functionName, event: eventJSON, config: configJSON, isV2: false)
     }
 
-    private func admitAndRun(input: Data, hookName: String, event: Data, config: Data, isV2: Bool) async throws -> Data {
-        if Task.isCancelled { throw JavaScriptExecutionError.cancelled }
+    private func admitAndRun(input: Data, hookName: String, event: Data, config: Data, isV2: Bool, detectAsync: Bool = false) async throws -> Data {
+        if Task.isCancelled {
+            throw JavaScriptExecutionError.cancelled
+        }
         guard let job = Job() else { throw JavaScriptExecutionError.internalFailure }
         guard admit(job) else {
             job.finish()
@@ -121,7 +131,7 @@ public final class JavaScriptExecutor: @unchecked Sendable {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
                 queue.async {
                     let outcome = Result { try Self.execute(job: job, source: sourceBytes, hook: hookName,
-                                                           event: event, config: config, isV2: isV2) }
+                                                            event: event, config: config, isV2: isV2, detectAsync: detectAsync) }
                     // Release admission before resuming so the caller can immediately run again.
                     self.release(job)
                     continuation.resume(with: outcome)
@@ -132,17 +142,21 @@ public final class JavaScriptExecutor: @unchecked Sendable {
         }
     }
 
-
     /// Evaluates only the source selected by the full strict schema 2 package and raw event.
     /// The native C boundary independently validates every file, route, reference and grant.
     public func runV2(packageJSON: Data, hook: JavaScriptHook, eventJSON: Data, configJSON: Data) async throws -> Data {
-        guard hook.isLifecyclePhase, !packageJSON.isEmpty,
+        try await runV2(packageJSON: packageJSON, hook: hook, eventJSON: eventJSON, configJSON: configJSON, detectAsync: false)
+    }
+
+    public func runV2(packageJSON: Data, hook: JavaScriptHook, eventJSON: Data, configJSON: Data, detectAsync: Bool) async throws -> Data {
+        guard !detectAsync || hook == .responseLeave, hook.isLifecyclePhase, !packageJSON.isEmpty,
               packageJSON.count <= JavaScriptLimits.maxPackageBytes,
               eventJSON.count <= JavaScriptLimits.maxEventBytes,
-              configJSON.count <= JavaScriptLimits.maxConfigBytes else {
+              configJSON.count <= JavaScriptLimits.maxConfigBytes
+        else {
             throw JavaScriptExecutionError.invalidInput
         }
-        return try await admitAndRun(input: packageJSON, hookName: hook.functionName, event: eventJSON, config: configJSON, isV2: true)
+        return try await admitAndRun(input: packageJSON, hookName: hook.functionName, event: eventJSON, config: configJSON, isV2: true, detectAsync: detectAsync)
     }
 
     /// Cancels the currently admitted invocation, if any. Idle calls must not affect later runs.
@@ -156,7 +170,9 @@ public final class JavaScriptExecutor: @unchecked Sendable {
     private func admit(_ job: Job) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        if current != nil { return false }
+        if current != nil {
+            return false
+        }
         current = job
         return true
     }
@@ -164,15 +180,18 @@ public final class JavaScriptExecutor: @unchecked Sendable {
     private func release(_ job: Job) {
         job.finish()
         lock.lock()
-        if current === job { current = nil }
+        if current === job {
+            current = nil
+        }
         lock.unlock()
     }
 
-    private static func execute(job: Job, source: [UInt8], hook: String, event: Data, config: Data, isV2: Bool) throws -> Data {
+    private static func execute(job: Job, source: [UInt8], hook: String, event: Data, config: Data, isV2: Bool, detectAsync: Bool) throws -> Data {
         // Run strict parsing on the worker queue, before JS can discard duplicate keys.
         do {
             guard case .object = try JSONValue(parsing: event),
-                  case .object = try JSONValue(parsing: config) else {
+                  case .object = try JSONValue(parsing: config)
+            else {
                 throw JavaScriptExecutionError.invalidInput
             }
         } catch { throw JavaScriptExecutionError.invalidInput }
@@ -185,13 +204,17 @@ public final class JavaScriptExecutor: @unchecked Sendable {
             max_config_bytes: JavaScriptLimits.maxConfigBytes,
             max_result_bytes: JavaScriptLimits.maxResultBytes,
             max_result_depth: JavaScriptLimits.maxResultDepth,
-            max_actions: JavaScriptLimits.maxActions)
+            max_actions: JavaScriptLimits.maxActions,
+        )
         let token = job.nativeToken
         var result = source.withUnsafeBufferPointer { src in
             event.withUnsafeBytes { ev in
                 config.withUnsafeBytes { cfg in
                     let evp = ev.baseAddress?.assumingMemoryBound(to: UInt8.self)
                     let cfgp = cfg.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                    if isV2 && detectAsync {
+                        return qjs_run_v2_probe(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count)
+                    }
                     if isV2 {
                         return qjs_run_v2(token, &limits, src.baseAddress, src.count, hook, evp, ev.count, cfgp, cfg.count)
                     }
@@ -201,21 +224,22 @@ public final class JavaScriptExecutor: @unchecked Sendable {
         }
         defer { qjs_result_free(&result) }
         switch result.status {
-        case Int32(QJS_OK):
-            guard let bytes = result.data, result.length <= JavaScriptLimits.maxResultBytes else {
-                throw JavaScriptExecutionError.invalidResult
-            }
-            let data = Data(bytes: bytes, count: result.length)
-            do { _ = try JSONValue(parsing: data) }
-            catch { throw JavaScriptExecutionError.invalidResult }
-            return data
-        case Int32(QJS_TIMEOUT): throw JavaScriptExecutionError.timeout
-        case Int32(QJS_CANCELLED): throw JavaScriptExecutionError.cancelled
-        case Int32(QJS_MEMORY_OR_STACK): throw JavaScriptExecutionError.memoryOrStack
-        case Int32(QJS_INVALID_INPUT): throw JavaScriptExecutionError.invalidInput
-        case Int32(QJS_INVALID_RESULT): throw JavaScriptExecutionError.invalidResult
-        case Int32(QJS_SCRIPT_ERROR): throw JavaScriptExecutionError.scriptError
-        default: throw JavaScriptExecutionError.internalFailure
+            case Int32(QJS_OK):
+                guard let bytes = result.data, result.length <= JavaScriptLimits.maxResultBytes else {
+                    throw JavaScriptExecutionError.invalidResult
+                }
+                let data = Data(bytes: bytes, count: result.length)
+                do { _ = try JSONValue(parsing: data) }
+                catch { throw JavaScriptExecutionError.invalidResult }
+                return data
+            case Int32(QJS_ASYNC_REQUIRED): throw JavaScriptAsyncRequired()
+            case Int32(QJS_TIMEOUT): throw JavaScriptExecutionError.timeout
+            case Int32(QJS_CANCELLED): throw JavaScriptExecutionError.cancelled
+            case Int32(QJS_MEMORY_OR_STACK): throw JavaScriptExecutionError.memoryOrStack
+            case Int32(QJS_INVALID_INPUT): throw JavaScriptExecutionError.invalidInput
+            case Int32(QJS_INVALID_RESULT): throw JavaScriptExecutionError.invalidResult
+            case Int32(QJS_SCRIPT_ERROR): throw JavaScriptExecutionError.scriptError
+            default: throw JavaScriptExecutionError.internalFailure
         }
     }
 }
