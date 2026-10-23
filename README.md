@@ -108,20 +108,6 @@ fresh iPhone simulator for each run. Test results and logs are uploaded to the
 `simulator-results` artifact only when the simulator job fails, and are kept
 for one day.
 
-After the tests, `scripts/export-ui-evidence.py` (run from a hash-pinned Pillow
-12.3.0 virtual environment under `RUNNER_TEMP`) exports the XCTest screenshot
-attachments from the result bundle and publishes them in the one-day
-`ui-evidence` artifact on both success and failure. The artifact holds only
-verified lossless WebP files (exact RGBA, ICC profile and dimensions, with
-source hashes) and `manifest.json`; no raw diagnostics are included, and the
-original PNGs remain only in the `xcresult`. The eight required screenshots
-(`Outbound GET/POST/PUT/footer` in `en` and `ja`) must each have a paired
-`.geometry` JSON whose display scale is observed from the device, not assumed.
-Evidence is valid only when `manifest.json` has `"status": "complete"`; a
-`failure.json` (missing or incomplete result bundle, corrupt, unsupported or
-out-of-bounds images, build failure or cancellation) means unverified and is
-never a pass.
-
 CI requires the repository secret `QUANTUMLEAP_READ_TOKEN`, a GitHub token with
 read access to `qtmleap/QuantumLeap`. For a dedicated CI credential, prefer a
 fine-grained token limited to that repository with **Contents: read-only**.

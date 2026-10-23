@@ -1,5 +1,0 @@
-# Hash-pinned for `pip install --require-hashes --only-binary=:all: --no-deps`.
-# Hashes are the official PyPI macOS cp313 wheels (x86_64 and arm64) for 12.3.0.
-Pillow==12.3.0 \
-    --hash=sha256:7a743ff716f746fc19a9557f60dab1600d4613255f8a7aeb3cdde4db7eb15a66 \
-    --hash=sha256:d69141514cc30b774ceea5e3ed3a6635c8d8a96edf664689b890f4089111fb35

@@ -59,7 +59,7 @@ struct PluginPackageApprovalView: View {
                             if let endpoint = package.manifest.outbound[binding] {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(verbatim: binding).font(.headline)
-                                    Text(verbatim: endpoint.method + " " + endpoint.url).font(.footnote).textSelection(.enabled)
+                                    Text(verbatim: "GET " + endpoint.url).font(.footnote).textSelection(.enabled)
                                     LabeledContent("AUTO_APPROVAL_OUTBOUND_HEADERS") {
                                         if endpoint.headers.isEmpty {
                                             Text("AUTO_READ_NONE")
