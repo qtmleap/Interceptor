@@ -294,12 +294,71 @@ class PluginRepositoryFixtureTests(unittest.TestCase):
             self.assertTrue({file for phases in rule['hooks'].values() for file in phases.values()}
                             <= set(package['sourceFiles']))
 
+    BASE_HASHES = {
+        '/request-summary.json': 'f7985fe4eb7a5d60bcc69fc682b0f853e0c22a7a2a52bab84b1e1bccebe2ed12',
+        '/response-details.json': '841f9582b395c81964f1a875980f102aa3c2942079f8e42c32571725e8761210',
+        '/multi-file-hooks.json': '6f007a8e930949b7e0094b59b17cbfb82128eaf196156edd9901495f543440fa',
+        '/approval-limits.json': '80b1908a2ddeef087e5b419bc07dae8ac2c61279f10eed40b934e814ae9b50af',
+        '/repository.json': '8b73cee200453d88937e75252721418d4ce63784a2d2222f61f6564764cb8eae',
+        '/browser/target-hosts.json': '30fd5c5184f04d685115d3fee7c4c0c330c77fb09ba4eb964d9bb6c859bb59ae',
+        '/browser/repository.json': '9e262cd56b3ff8e41afd8675d70e156e872fe1c2b471af41c801d4cfbd8a67f4',
+    }
+
+    def test_original_served_bytes_match_hardcoded_pre_outbound_hashes(self):
+        files, _ = fixture.repository_files('this-run', DEVICE)
+        for path, expected in self.BASE_HASHES.items():
+            self.assertEqual(fixture.digest(files[path]), expected, path)
+
+    def test_outbound_variant_is_explicitly_derived_with_three_deterministic_bindings(self):
+        files, _ = fixture.repository_files('this-run', DEVICE)
+        index = json.loads(base64.b64decode(json.loads(files['/outbound/repository.json'])['payload'], validate=True))
+        self.assertEqual(index['name'], 'Outbound catalog fixture')
+        self.assertEqual(len(index['plugins']), 1)
+        entry = index['plugins'][0]
+        self.assertEqual(entry['packagePath'], 'approval.json')
+        raw = files['/outbound/' + entry['packagePath']]
+        package = json.loads(raw)
+        manifest = package['manifest']
+        self.assertEqual(manifest['name'], 'Outbound approval example')
+        self.assertEqual(entry['sha256'], fixture.digest(raw))
+        self.assertEqual(entry['size'], len(raw))
+        for key in ('id', 'name', 'version', 'author', 'summary', 'category'):
+            self.assertEqual(entry[key], manifest[key])
+        self.assertEqual(manifest['outbound'], {
+            'lookup': {'url': 'https://api.example.com/v1/profile', 'method': 'GET', 'headers': []},
+            'post': {'url': 'https://api.example.com/v1/records', 'method': 'POST', 'headers': ['authorization', 'content-type']},
+            'put': {'url': 'https://api.example.com/v1/records/latest', 'method': 'PUT', 'headers': ['content-type']},
+        })
+        sdk = json.loads(files['/multi-file-hooks.json'])
+        self.assertNotIn(manifest['id'], {sdk['manifest']['id'], 'E9472B70-2DB2-4F4C-A291-33F5FEF88519'})
+        self.assertEqual(package['sourceFiles'], sdk['sourceFiles'])
+        self.assertNotIn('outbound', sdk['manifest'])
+        self.assertNotEqual(index['id'], '57414817-0F72-40BA-A27C-535B784BEE00')
+        self.assertNotEqual(index['id'], '532AEB4B-8744-44DA-86CB-DC46E3831F23')
+
+    def test_native_outbound_expectations_match_served_package(self):
+        import re
+        files, _ = fixture.repository_files('this-run', DEVICE)
+        native = (ROOT / 'InterceptorUITests/AutomationUITests.swift').read_text()
+        revision = re.search(r'outboundRevision = "([a-f0-9]{64})"', native)
+        identifier = re.search(r'outboundID = "([0-9A-F-]{36})"', native)
+        self.assertIsNotNone(revision)
+        self.assertEqual(revision.group(1), fixture.digest(files['/outbound/approval.json']))
+        self.assertEqual(identifier.group(1), json.loads(files['/outbound/approval.json'])['manifest']['id'])
+        for binding in json.loads(files['/outbound/approval.json'])['manifest']['outbound'].values():
+            self.assertIn('"%s %s"' % (binding['method'], binding['url']), native)
+
     def test_readiness_digest_binds_every_allowlisted_catalog_and_package(self):
         files, bound_digest = fixture.repository_files('this-run', DEVICE)
         payload_files = {path: fixture.digest(raw) for path, raw in files.items() if path != '/__interceptor_fixture'}
         self.assertEqual(bound_digest, fixture.digest(fixture.encoded(payload_files)))
         changed = dict(payload_files)
         changed['/browser/target-hosts.json'] = '0' * 64
+        self.assertNotEqual(bound_digest, fixture.digest(fixture.encoded(changed)))
+        self.assertIn('/outbound/repository.json', payload_files)
+        self.assertIn('/outbound/approval.json', payload_files)
+        changed = dict(payload_files)
+        changed['/outbound/approval.json'] = '0' * 64
         self.assertNotEqual(bound_digest, fixture.digest(fixture.encoded(changed)))
 
     def test_browser_derivation_targets_the_exact_file_independent_of_rule_order(self):
@@ -327,11 +386,16 @@ class PluginRepositoryFixtureTests(unittest.TestCase):
             record = json.loads((work / 'fixture-run.json').read_text())
             self.assertIn('/browser/repository.json', record['publicFiles'])
             self.assertIn('/browser/target-hosts.json', record['publicFiles'])
-            self.assertEqual(record['derivedPackages'], {'/browser/target-hosts.json': 'multi-file-hooks.json'})
+            self.assertEqual(record['derivedPackages'], {'/browser/target-hosts.json': 'multi-file-hooks.json',
+                                                         '/outbound/approval.json': 'multi-file-hooks.json'})
+            self.assertIn('/outbound/repository.json', record['publicFiles'])
+            self.assertIn('/outbound/approval.json', record['publicFiles'])
             self.assertTrue((work / 'public/browser/repository.json').is_file())
             served = {(entry['path'], entry['status']) for entry in record['requests']['entries']}
             self.assertIn(('/browser/repository.json', 200), served)
             self.assertIn(('/browser/target-hosts.json', 200), served)
+            self.assertIn(('/outbound/repository.json', 200), served)
+            self.assertIn(('/outbound/approval.json', 200), served)
             self.assertTrue(record['serverStopped'])
             self.assertTrue(record['privateKeysRemoved'])
 

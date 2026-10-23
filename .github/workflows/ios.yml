@@ -89,6 +89,20 @@ jobs:
         with:
           bun-version: 1.4.2
 
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') }}
+        with:
+          python-version: '3.13.9'
+
+      - name: Install visual test tools
+        if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') }}
+        run: |
+          # Owned venv: only hash-pinned wheels, no dependency resolution, no system site-packages.
+          rm -rf "$RUNNER_TEMP/visual-tools"
+          python -m venv "$RUNNER_TEMP/visual-tools"
+          "$RUNNER_TEMP/visual-tools/bin/python" -m pip install --require-hashes --only-binary=:all: --no-deps -r scripts/requirements-visual.txt
+          "$RUNNER_TEMP/visual-tools/bin/python" -c 'import pathlib; p = pathlib.Path("scripts/export-ui-evidence.py"); compile(p.read_text(), str(p), "exec")'
+
       - name: Verify native repository contract
         if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') }}
         run: |
@@ -153,10 +167,13 @@ jobs:
           operation: cleanup
 
       - name: Build and run unit and UI tests
+        id: ui_tests
         if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') }}
         run: |
           set -o pipefail
           python3 -m unittest discover -s scripts/tests -p test_plugin_repository_fixture.py -v
+          "$RUNNER_TEMP/visual-tools/bin/python" -m unittest discover -s scripts/tests -p test_native_visual_regression.py -v
+          "$RUNNER_TEMP/visual-tools/bin/python" -m unittest discover -s scripts/tests -p test_ui_evidence.py -v
           NSUnbufferedIO=YES python3 scripts/ci-simulator-start-worker.py python3 scripts/ci-plugin-repository-fixture.py \
             --work-dir "$RUNNER_TEMP/plugin-repository-fixture" -- xcodebuild test \
             -project Interceptor.xcodeproj -scheme Interceptor \
@@ -204,6 +221,48 @@ jobs:
           trap 'exit 143' TERM
           wait "$build_pid"
 
+      - name: Collect UI evidence environment
+        # Must run before simulator cleanup: the device disappears afterwards.
+        id: ui_environment
+        if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') && (always()) }}
+        env:
+          TEST_OUTCOME: ${{ steps.ui_tests.outcome }}
+        run: |
+          "$RUNNER_TEMP/visual-tools/bin/python" - <<'PY' || echo '{"environment_unavailable": true}' > "$RUNNER_TEMP/ui-evidence-environment.json"
+          import json, os, subprocess
+          temp = os.environ["RUNNER_TEMP"]
+          env = {"test_outcome": os.environ.get("TEST_OUTCOME", "unknown")}
+          udid = os.environ.get("SIMULATOR_UUID", "")
+          try:
+              devices = json.loads(subprocess.run(["xcrun", "simctl", "--set", os.environ["CI_SIMULATOR_DEVICE_SET"], "list", "devices", "--json"],
+                                                  check=True, capture_output=True, text=True, timeout=60).stdout)["devices"]
+              for runtime, items in devices.items():
+                  for item in items:
+                      if item.get("udid") == udid:
+                          env.update(simulator_runtime=runtime, simulator_name=item.get("name", ""),
+                                     simulator_state=item.get("state", ""), simulator_device_type=item.get("deviceTypeIdentifier", ""))
+          except Exception as error:
+              env["simulator_lookup_error"] = type(error).__name__
+          try:
+              env["xcode"] = subprocess.run(["xcodebuild", "-version"], check=True, capture_output=True, text=True, timeout=60).stdout.replace("\n", " ").strip()
+          except Exception as error:
+              env["xcode_error"] = type(error).__name__
+          json.dump(env, open(os.path.join(temp, "ui-evidence-environment.json"), "w"))
+          PY
+
+      - name: Export verified UI evidence
+        # Immediately after XCTest and before any publishing. A missing or incomplete
+        # result bundle (build failure, cancellation) yields a failure manifest, never evidence.
+        id: ui_evidence
+        if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') && (always()) }}
+        run: |
+          rm -rf "$RUNNER_TEMP/ui-evidence"
+          "$RUNNER_TEMP/visual-tools/bin/python" scripts/export-ui-evidence.py \
+            --result-bundle "$RUNNER_TEMP/Interceptor.xcresult" \
+            --output "$RUNNER_TEMP/ui-evidence" \
+            --source "$GITHUB_SHA" \
+            --environment "$RUNNER_TEMP/ui-evidence-environment.json"
+
       - name: Clean up dedicated iPhone simulator
         if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') && (always()) }}
         run: |
@@ -228,6 +287,18 @@ jobs:
             ${{ runner.temp }}/plugin-repository-fixture/fixture-run.json
             ${{ runner.temp }}/plugin-repository-fixture/public/
           if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Save verified UI evidence
+        # Compact lossless WebP and manifest only; raw diagnostics are never exported here.
+        # The source originals remain solely in the xcresult. Evidence is valid only with
+        # manifest.json status "complete"; failure.json means unverified.
+        if: ${{ (needs['ci-change-scope'].result != 'success' || needs['ci-change-scope'].outputs.docs_only != 'true') && (always()) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-evidence
+          path: ${{ runner.temp }}/ui-evidence/
+          if-no-files-found: warn
           retention-days: 1
 
       - name: Docs-only exemption

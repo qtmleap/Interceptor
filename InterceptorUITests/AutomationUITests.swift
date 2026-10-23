@@ -1294,3 +1294,163 @@ extension AutomationUITests {
         return String(identifier[identifier.index(identifier.startIndex, offsetBy: Self.searchRowPrefix.count) ..< bar])
     }
 }
+
+// MARK: - Outbound approval methods and consent
+
+extension AutomationUITests {
+    /// Identities and bytes of the derived `outbound/approval.json` served by scripts/ci-plugin-repository-fixture.py
+    /// (derived from multi-file-hooks.json; `outboundRevision` is the SHA-256 of the exact served package bytes).
+    private static let outboundID = "3C0B5B0E-6D1F-4E57-9A52-7E1D4B8F2A61"
+    private static let outboundRevision = "af80907085f19584e78617f982be2e57ec6994e1373541ef2b7fa80b77d5e802"
+    private static let outboundBindings: [(binding: String, method: String, request: String, headers: String?)] = [
+        ("lookup", "GET", "GET https://api.example.com/v1/profile", nil),
+        ("post", "POST", "POST https://api.example.com/v1/records", "authorization, content-type"),
+        ("put", "PUT", "PUT https://api.example.com/v1/records/latest", "content-type"),
+    ]
+    private static let outboundFooters = [
+        "en": "Any readable data, including sign-in information, and captured headers or JSON data may be sent to these fixed servers. POST and PUT requests may update data on the external server.",
+        "ja": "読み取りを許可したデータは、認証情報も含め、取得したヘッダーやJSONデータとして固定の外部サーバーへ送信される可能性があります。POSTやPUTでは外部サーバー上のデータが更新される場合があります。",
+    ]
+    private static let outboundNoHeaders = ["en": "No traffic data", "ja": "通信データなし"]
+
+    @MainActor
+    func testOutboundApprovalMethodsAndConsentInEnglishAndJapanese() async {
+        guard let repositoryURL = await requiredRepositoryURL() else { return }
+        // Same fixed same-origin derivation as the browser catalog; the ownership guard above ran on /repository.json.
+        let outboundURL = repositoryURL.deletingLastPathComponent().appendingPathComponent("outbound/repository.json")
+        let device = XCUIDevice.shared
+        let owned: UIDeviceOrientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
+        let previous = device.orientation
+        device.orientation = owned
+        defer { device.orientation = previous.isValidInterfaceOrientation ? previous : .portrait }
+        for japanese in [false, true] {
+            let tag = japanese ? "ja" : "en"
+            let app = launch(japanese: japanese, suite: "Interceptor.UITests.\(UUID().uuidString)")
+            defer { app.terminate() }
+            openPlugins(app, japanese: japanese)
+            addRepository(outboundURL, app: app)
+            openCategory(app, id: "category:Requests")
+            openCatalogPackage(Self.outboundID, app: app)
+            enqueueGet(app)
+            openQueue(app)
+            confirmQueue(app)
+            assertEnabled(false, app: app)
+
+            tapEnabled(app)
+            let form = scrollContainer(app, "plugins.approval.form")
+            XCTAssertTrue(form.waitForExistence(timeout: 5))
+            for entry in Self.outboundBindings {
+                let identifier = "plugins.approval.outbound." + entry.binding
+                let elements = { self.outboundElements(identifier, in: form) }
+                XCTAssertTrue(revealFully(elements, in: form), "\(entry.binding) must be fully visible")
+                let texts = outboundTexts(elements())
+                XCTAssertTrue(texts.contains(entry.request), "\(entry.binding) shows exactly \(entry.request); saw \(texts)")
+                XCTAssertTrue(texts.contains(entry.binding))
+                for other in ["GET", "POST", "PUT"] where other != entry.method {
+                    XCTAssertFalse(texts.contains { $0.hasPrefix(other + " https://") }, "\(entry.binding) has one method")
+                }
+                if let headers = entry.headers {
+                    XCTAssertTrue(texts.contains { $0.contains(headers) }, "\(entry.binding) declares \(headers); saw \(texts)")
+                    XCTAssertFalse(texts.contains { $0.contains(Self.outboundNoHeaders[tag]!) })
+                } else {
+                    XCTAssertTrue(texts.contains { $0.contains(Self.outboundNoHeaders[tag]!) }, "\(entry.binding) declares no headers; saw \(texts)")
+                }
+                attachScreen("Outbound \(entry.method) \(tag)", japanese: japanese, app: app)
+            }
+            let footerText = Self.outboundFooters[tag]!
+            let footer = form.staticTexts.matching(NSPredicate(format: "label == %@", footerText)).firstMatch
+            XCTAssertTrue(revealFully({ footer.exists ? [footer] : [] }, in: form), "the complete localized footer must be fully visible")
+            XCTAssertEqual(footer.label, footerText)
+            attachScreen("Outbound footer \(tag)", japanese: japanese, app: app)
+
+            let revision = reach(app.textViews["plugins.approval.revision"], in: form, attempts: 30)
+            XCTAssertEqual(revision.value as? String, Self.outboundRevision, "approval binds the exact served bytes")
+
+            app.buttons.matching(identifier: "plugins.approval.cancel").firstMatch.tap()
+            XCTAssertTrue(form.waitForNonExistence(timeout: 5))
+            assertEnabled(false, app: app)
+            tapEnabled(app)
+            XCTAssertTrue(form.waitForExistence(timeout: 5))
+            app.buttons.matching(identifier: "plugins.approval.confirm").firstMatch.tap()
+            XCTAssertTrue(form.waitForNonExistence(timeout: 5))
+            assertEnabled(true, app: app)
+        }
+    }
+
+    /// The identifier on the binding's VStack may propagate to its leaves, or the VStack may be one element.
+    @MainActor
+    func outboundElements(_ identifier: String, in form: XCUIElement) -> [XCUIElement] {
+        form.descendants(matching: .any).matching(identifier: identifier).allElementsBoundByIndex.filter(\.exists)
+    }
+
+    /// Every label/value of the elements and their static-text and text-view descendants (selectable text may be a text view).
+    @MainActor
+    func outboundTexts(_ elements: [XCUIElement]) -> [String] {
+        var texts: [String] = []
+        for element in elements {
+            texts += [element.label, element.value as? String ?? ""]
+            for child in element.staticTexts.allElementsBoundByIndex + element.textViews.allElementsBoundByIndex {
+                texts += [child.label, child.value as? String ?? ""]
+            }
+        }
+        return texts.filter { !$0.isEmpty }
+    }
+
+    /// Scrolls the real form until all of the elements are inside the unobscured viewport.
+    @MainActor
+    func revealFully(_ elements: () -> [XCUIElement], in form: XCUIElement, attempts: Int = 40) -> Bool {
+        for _ in 0 ..< attempts {
+            let visible = viewport(form)
+            let current = elements()
+            if !current.isEmpty && current.allSatisfy({ !$0.frame.isEmpty && visible.contains($0.frame) }) { return true }
+            if let first = current.first, first.frame.midY < visible.minY {
+                form.swipeDown(velocity: .slow)
+            } else {
+                form.swipeUp(velocity: .slow)
+            }
+        }
+        return false
+    }
+
+    /// One full-screen screenshot plus JSON geometry metadata taken from that same image (no extra capture).
+    @MainActor
+    func attachScreen(_ name: String, japanese: Bool, app: XCUIApplication) {
+        let screenshot = XCUIScreen.main.screenshot()
+        let image = XCTAttachment(screenshot: screenshot)
+        image.name = name
+        image.lifetime = .keepAlways
+        add(image)
+
+        let screen = UIScreen.main
+        // UIScreen.bounds belongs to the runner, which may use compatibility sizing.
+        let appFrame = app.frame
+        let pixels = screenshot.image.cgImage.map { (width: $0.width, height: $0.height) } ?? (width: 0, height: 0)
+        let orientation = XCUIDevice.shared.orientation
+        let metadata: [String: Any] = [
+            "schemaVersion": 1,
+            "kind": "interceptor-ui-screen",
+            "scale": Double(screen.scale),
+            "screenPointWidth": Double(appFrame.width),
+            "screenPointHeight": Double(appFrame.height),
+            "imagePixelWidth": pixels.width,
+            "imagePixelHeight": pixels.height,
+            "osVersion": UIDevice.current.systemVersion,
+            "deviceModel": ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] ?? UIDevice.current.model,
+            "orientation": orientation.isLandscape ? "landscape" : "portrait",
+            "locale": japanese ? "ja_JP" : "en_US",
+        ]
+        XCTAssertGreaterThan(pixels.width, 0, "screenshot must expose a CGImage")
+        let expected = [Double(appFrame.width * screen.scale), Double(appFrame.height * screen.scale)].sorted()
+        for (actualEdge, expectedEdge) in zip([Double(pixels.width), Double(pixels.height)].sorted(), expected) {
+            XCTAssertEqual(actualEdge, expectedEdge, accuracy: 1, "\(name) geometry must match the image")
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys]) else {
+            XCTFail("geometry metadata for \(name) is not serializable")
+            return
+        }
+        let geometry = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        geometry.name = name + ".geometry"
+        geometry.lifetime = .keepAlways
+        add(geometry)
+    }
+}

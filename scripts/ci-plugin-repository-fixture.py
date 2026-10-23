@@ -33,6 +33,17 @@ REPOSITORY_ISSUED_AT = '2026-10-01T00:00:00Z'
 REPOSITORY_EXPIRES_AT = '2026-12-30T00:00:00Z'
 DERIVED_BROWSER_PACKAGE = '/browser/target-hosts.json'
 DERIVED_BROWSER_REPOSITORY = '/browser/repository.json'
+DERIVED_OUTBOUND_PACKAGE = '/outbound/approval.json'
+DERIVED_OUTBOUND_REPOSITORY = '/outbound/repository.json'
+OUTBOUND_PACKAGE_ID = '3C0B5B0E-6D1F-4E57-9A52-7E1D4B8F2A61'
+OUTBOUND_CATALOG_ID = 'A8F2C6D4-19B3-4C7E-8E05-5D2B9C41F7A3'
+OUTBOUND_HOST = 'https://api.example.com'
+# Deterministic binding order and declarations shown by the approval UI test.
+OUTBOUND_BINDINGS = {
+    'lookup': {'url': OUTBOUND_HOST + '/v1/profile', 'method': 'GET', 'headers': []},
+    'post': {'url': OUTBOUND_HOST + '/v1/records', 'method': 'POST', 'headers': ['authorization', 'content-type']},
+    'put': {'url': OUTBOUND_HOST + '/v1/records/latest', 'method': 'PUT', 'headers': ['content-type']},
+}
 
 
 def encoded(value):
@@ -122,8 +133,21 @@ def repository_files(token, device):
     derived_payload = payload | {'id': '532AEB4B-8744-44DA-86CB-DC46E3831F23',
                                  'name': 'Browser catalog fixture', 'plugins': [derived_entry]}
     files[DERIVED_BROWSER_REPOSITORY] = encoded({'schemaVersion': 1, 'payload': base64.b64encode(encoded(derived_payload)).decode()})
-    # The readiness nonce binds the exact complete allowlist, including the
-    # derived catalog, rather than only entries in the original catalog.
+    # A second explicitly synthetic catalog, derived from multi-file-hooks.json, carries schema-2
+    # outbound declarations. The original packages and the browser catalog stay byte-identical.
+    outbound = json.loads(packages['multi-file-hooks.json'][0])
+    outbound['manifest'].update(id=OUTBOUND_PACKAGE_ID, name='Outbound approval example',
+                                author='Outbound fixture author', category='Requests',
+                                summary='Derived fixture for outbound method and consent views.',
+                                outbound=json.loads(json.dumps(OUTBOUND_BINDINGS)))
+    outbound_raw = encoded(outbound)
+    files[DERIVED_OUTBOUND_PACKAGE] = outbound_raw
+    outbound_meta = outbound['manifest']
+    outbound_entry = {key: outbound_meta[key] for key in ('id', 'name', 'version', 'author', 'summary', 'category')} | {
+        'packagePath': 'approval.json', 'sha256': digest(outbound_raw), 'size': len(outbound_raw)}
+    outbound_payload = payload | {'id': OUTBOUND_CATALOG_ID, 'name': 'Outbound catalog fixture', 'plugins': [outbound_entry]}
+    files[DERIVED_OUTBOUND_REPOSITORY] = encoded({'schemaVersion': 1, 'payload': base64.b64encode(encoded(outbound_payload)).decode()})
+    # Bind readiness only after every derived catalog and package has been added.
     package_digest = digest(encoded({path: digest(raw) for path, raw in files.items()}))
     files['/__interceptor_fixture'] = encoded({'fixture': MARKER, 'version': 1, 'runToken': token,
                                               'device': device, 'packageDigest': package_digest})
@@ -438,10 +462,12 @@ def main():
         server = FixtureServer(files, tls, options.port)
         record.update({'repositoryURL': server.base_url + '/repository.json', 'runToken': token,
                        'packageDigest': package_digest, 'publicFiles': {name: digest(raw) for name, raw in files.items()},
-                       'derivedPackages': {DERIVED_BROWSER_PACKAGE: 'multi-file-hooks.json'}})
+                       'derivedPackages': {DERIVED_BROWSER_PACKAGE: 'multi-file-hooks.json',
+                                           DERIVED_OUTBOUND_PACKAGE: 'multi-file-hooks.json'}})
         context = check_ready(server, tls, files['/__interceptor_fixture'])
         if options.self_test:
-            for path in (DERIVED_BROWSER_REPOSITORY, DERIVED_BROWSER_PACKAGE):
+            for path in (DERIVED_BROWSER_REPOSITORY, DERIVED_BROWSER_PACKAGE,
+                         DERIVED_OUTBOUND_REPOSITORY, DERIVED_OUTBOUND_PACKAGE):
                 with urllib.request.urlopen(server.base_url + path, context=context, timeout=2) as response:
                     if response.status != 200 or response.read() != files[path]:
                         raise RuntimeError('Derived browser fixture was not served exactly: ' + path)
