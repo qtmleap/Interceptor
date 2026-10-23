@@ -1339,6 +1339,7 @@ extension AutomationUITests {
             tapEnabled(app)
             let form = scrollContainer(app, "plugins.approval.form")
             XCTAssertTrue(form.waitForExistence(timeout: 5))
+            attachScreen("Outbound overview \(tag)", japanese: japanese, app: app)
             for entry in Self.outboundBindings {
                 let identifier = "plugins.approval.outbound." + entry.binding
                 let elements = { self.outboundElements(identifier, in: form) }
