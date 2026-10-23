@@ -33,6 +33,13 @@ struct ContentView: View {
                 mainTabs
             }
         }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            while !Task.isCancelled {
+                await PluginFilesExporter.shared.synchronize()
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+            }
+        }
         .onAppear { stopCaptureIfUnauthorized() }
         .onChange(of: consentVersion) { stopCaptureIfUnauthorized() }
         .onChange(of: scenePhase) {

@@ -377,6 +377,164 @@ final class JavaScriptSaveJSONTests: XCTestCase, @unchecked Sendable {
         _ = try await run("() => {}", executor: executor)
     }
 
+    // MARK: scanner budget and late host completion (real C bridge)
+
+    /// ~1 MiB object whose 16384 distinct keys all share one FNV-1a 32-bit hash (Joux multicollision), so the native
+    /// duplicate-key scan degrades to quadratic probing: valid JSON within every size/depth cap, yet far slower than
+    /// the 250 ms CPU budget. Built from the public FNV-1a definition, independent of the C implementation.
+    private static let collidingKeysDocument: String = {
+        func step(_ h: UInt32, _ bytes: [UInt8]) -> UInt32 {
+            bytes.reduce(h) { ($0 ^ UInt32($1)) &* 16777619 }
+        }
+        let alphabet = Array("abcdefghijklmnopqrstuvwxyz0123456789".utf8)
+        var state: UInt32 = 2166136261
+        var pairs: [([UInt8], [UInt8])] = []
+        for _ in 0 ..< 14 {
+            var seen: [UInt32: [UInt8]] = [:]
+            var found: ([UInt8], [UInt8])?
+            search: for a in alphabet { for b in alphabet { for c in alphabet { for d in alphabet {
+                let block = [a, b, c, d]
+                let h = step(state, block)
+                if let other = seen[h] { found = (other, block); state = h; break search }
+                seen[h] = block
+            } } } }
+            guard let f = found else { fatalError("no FNV collision block found") }
+            pairs.append(f)
+        }
+        var keys: [[UInt8]] = [[]]
+        for (x, y) in pairs { keys = keys.flatMap { [$0 + x, $0 + y] } }
+        var json = "{"
+        for (i, key) in keys.enumerated() {
+            if i > 0 { json += "," }
+            json += "\"" + String(decoding: key, as: UTF8.self) + "\":0"
+        }
+        return json + "}"
+    }()
+
+    func testCollidingKeysDocumentFixtureIsValidWithinLimits() {
+        let doc = Self.collidingKeysDocument
+        XCTAssertLessThanOrEqual(doc.utf8.count, Self.oneMiB)
+        XCTAssertGreaterThan(doc.utf8.count, 900_000)
+        XCTAssertNotNil(try? JSONValue(parsing: Data(doc.utf8)))
+    }
+
+    private func slowScanTransport() -> JavaScriptFetchExecutor.Transport {
+        let bytes = Data(Self.collidingKeysDocument.utf8)
+        return { _ in JavaScriptFetchResponse(status: 200, body: bytes) }
+    }
+
+    func testScannerPollsCpuBudgetAndNeverCallsHostAfterDeadline() async {
+        let clock = ContinuousClock()
+        let real = Saves()
+        let begin = clock.now
+        do {
+            _ = try await run("async () => { const t = await (await fetch('\(url)')).text(); await Interceptor.saveJSON('big', t); }",
+                              saves: real, transport: slowScanTransport())
+            XCTFail("expected timeout")
+        } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .timeout) }
+        let elapsed = begin.duration(to: clock.now)
+        let n = await real.items.count
+        XCTAssertEqual(n, 0, "host callback must not run after the scanner exhausted the CPU budget")
+        XCTAssertLessThan(elapsed, .milliseconds(900), "scanner must stop at the deadline instead of finishing the quadratic scan")
+    }
+
+    func testScannerStopsPromptlyOnCancelAndNeverCallsHost() async throws {
+        let executor = JavaScriptFetchExecutor()
+        let saves = Saves()
+        let clock = ContinuousClock()
+        let fetched = expectation(description: "fetched")
+        let transport = slowScanTransport()
+        let task = Task { () -> Error? in
+            do {
+                _ = try await self.run("async () => { const t = await (await fetch('\(self.url)')).text(); await Interceptor.saveJSON('big', t); }",
+                                       executor: executor, saves: saves, transport: { req in
+                    fetched.fulfill()
+                    return try await transport(req)
+                })
+                return nil
+            } catch { return error }
+        }
+        await fulfillment(of: [fetched], timeout: 5)
+        try await Task.sleep(nanoseconds: 60_000_000) // let the scan start
+        let cancelAt = clock.now
+        executor.cancel()
+        let error = await task.value
+        let after = cancelAt.duration(to: clock.now)
+        XCTAssertEqual(error as? JavaScriptExecutionError, .cancelled)
+        let n = await saves.items.count
+        XCTAssertEqual(n, 0)
+        XCTAssertLessThan(after, .milliseconds(400), "cancel must interrupt the validation scan")
+    }
+
+    func testResponseJSONScannerStopsPromptlyOnCancel() async throws {
+        let executor = JavaScriptFetchExecutor()
+        let saves = Saves()
+        let clock = ContinuousClock()
+        let fetched = expectation(description: "fetched")
+        let transport = slowScanTransport()
+        let task = Task { () -> Error? in
+            do {
+                _ = try await self.run("async () => { await (await fetch('\(self.url)')).json(); }",
+                                       executor: executor, saves: saves, transport: { req in
+                    fetched.fulfill()
+                    return try await transport(req)
+                })
+                return nil
+            } catch { return error }
+        }
+        await fulfillment(of: [fetched], timeout: 5)
+        try await Task.sleep(nanoseconds: 60_000_000) // let the scan start
+        let cancelAt = clock.now
+        executor.cancel()
+        let error = await task.value
+        let after = cancelAt.duration(to: clock.now)
+        XCTAssertEqual(error as? JavaScriptExecutionError, .cancelled)
+        let n = await saves.items.count
+        XCTAssertEqual(n, 0)
+        XCTAssertLessThan(after, .milliseconds(400), "cancel must interrupt the validation scan")
+    }
+
+    func testGrantAndCountAreCheckedBeforeExpensiveValidation() async throws {
+        let clock = ContinuousClock()
+        let denied = Saves()
+        var begin = clock.now
+        _ = try await run("async () => { const t = await (await fetch('\(url)')).text(); try { await Interceptor.saveJSON('big', t); } catch (e) { return; } throw new Error('accepted'); }",
+                          files: false, saves: denied, transport: slowScanTransport())
+        var elapsed = begin.duration(to: clock.now)
+        XCTAssertLessThan(elapsed, .milliseconds(400), "files not granted: reject before scanning")
+        var n = await denied.items.count
+        XCTAssertEqual(n, 0)
+
+        let capped = Saves()
+        begin = clock.now
+        _ = try await run("async () => { const t = await (await fetch('\(url)')).text(); for (let i = 0; i < 64; i++) await Interceptor.saveJSON('k' + i, '{}'); try { await Interceptor.saveJSON('big', t); } catch (e) { return; } throw new Error('accepted'); }",
+                          saves: capped, transport: slowScanTransport())
+        elapsed = begin.duration(to: clock.now)
+        XCTAssertLessThan(elapsed, .milliseconds(400), "save count exhausted: reject before scanning")
+        n = await capped.items.count
+        XCTAssertEqual(n, 64)
+    }
+
+    func testLateSuccessfulHostSaveAfterCallbackTimeoutRejectsAfterDrain() async throws {
+        // The callback timeout is a stable 10 s (+250 ms grace). The host ignores cancellation and commits at ~10.4 s.
+        let saves = Saves()
+        let clock = ContinuousClock()
+        let begin = clock.now
+        let actions = try await run("async () => { try { await Interceptor.saveJSON('late', '{\"a\":1}'); } catch (e) { return; } throw new Error('late success reported as success'); }",
+                                    saves: saves, save: { k, t in
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                DispatchQueue.global().asyncAfter(deadline: .now() + 10.4) { c.resume() }
+            }
+            await saves.add(k, t)
+        })
+        let elapsed = begin.duration(to: clock.now)
+        XCTAssertEqual(actions.count, 0)
+        let items = await saves.items
+        XCTAssertEqual(items.map(\.key), ["late"], "committed write is retained and was drained before runV2 returned")
+        XCTAssertEqual(items.first?.text, "{\"a\":1}")
+        XCTAssertGreaterThanOrEqual(elapsed, .milliseconds(10_400))
+    }
+
     // MARK: phase, probe and global shape
 
     func testOnlyResponseLeaveAcceptsSaveMode() async throws {

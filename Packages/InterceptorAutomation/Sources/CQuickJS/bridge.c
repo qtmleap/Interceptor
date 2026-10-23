@@ -277,21 +277,40 @@ typedef struct {
     uint8_t *arena;    // decoded keys; decoded length never exceeds raw length, so input_len suffices
     size_t arena_used;
     int max_depth;
+    RunState *st;      // optional: polled for cancel/CPU/wall budget; NULL = unbudgeted
+    unsigned tick;
+    int aborted;       // sticky: budget exhausted mid-scan (st->stop says why)
 } Scan;
 
-static uint32_t fnv1a(const uint8_t *p, size_t n) {
+// Cheap periodic budget poll for per-byte/per-probe loops. Returns 1 once the budget is exhausted (sticky).
+#define SCAN_POLL_MASK 255u
+static int scan_tick(Scan *s) {
+    if (s->aborted) return 1;
+    if (s->st && (++s->tick & SCAN_POLL_MASK) == 0 && budget_exceeded(s->st)) s->aborted = 1;
+    return s->aborted;
+}
+
+static uint32_t fnv1a(Scan *s, const uint8_t *p, size_t n) {
     uint32_t h = 2166136261u;
-    for (size_t i = 0; i < n; i++) { h ^= p[i]; h *= 16777619u; }
+    for (size_t i = 0; i < n; i++) {
+        if (scan_tick(s)) break;
+        h ^= p[i]; h *= 16777619u;
+    }
     return h;
 }
 
-static int keyset_grow_slots(KeySet *ks) {
+// 1 = ok, 0 = out of memory, -2 = budget exhausted
+static int keyset_grow_slots(Scan *sc, KeySet *ks) {
     size_t cap = ks->slot_cap ? ks->slot_cap * 2 : 16;
     uint32_t *slots = calloc(cap, sizeof(uint32_t));
     if (!slots) return 0;
     for (size_t i = 0; i < ks->n; i++) {
+        if (scan_tick(sc)) { free(slots); return -2; }
         size_t j = ks->recs[i].hash & (cap - 1);
-        while (slots[j]) j = (j + 1) & (cap - 1);
+        while (slots[j]) {
+            if (scan_tick(sc)) { free(slots); return -2; }
+            j = (j + 1) & (cap - 1);
+        }
         slots[j] = (uint32_t)(i + 1);
     }
     free(ks->slots);
@@ -300,12 +319,17 @@ static int keyset_grow_slots(KeySet *ks) {
     return 1;
 }
 
-// 1 = added, 0 = duplicate, -1 = out of memory
+// 1 = added, 0 = duplicate, -1 = out of memory, -2 = budget exhausted
 static int keyset_add(Scan *s, KeySet *ks, uint32_t off, uint32_t len) {
-    uint32_t h = fnv1a(s->arena + off, len);
-    if ((ks->n + 1) * 2 > ks->slot_cap && !keyset_grow_slots(ks)) return -1;
+    uint32_t h = fnv1a(s, s->arena + off, len);
+    if (s->aborted) return -2;
+    if ((ks->n + 1) * 2 > ks->slot_cap) {
+        int g = keyset_grow_slots(s, ks);
+        if (g != 1) return g == -2 ? -2 : -1;
+    }
     size_t j = h & (ks->slot_cap - 1);
     while (ks->slots[j]) {
+        if (scan_tick(s)) return -2;
         KeyRec *r = &ks->recs[ks->slots[j] - 1];
         if (r->hash == h && r->len == len && memcmp(s->arena + r->off, s->arena + off, len) == 0) return 0;
         j = (j + 1) & (ks->slot_cap - 1);
@@ -330,7 +354,10 @@ static void keyset_free(KeySet *ks) {
 }
 
 static void skip_ws(Scan *s) {
-    while (s->p < s->end && (*s->p == ' ' || *s->p == '\t' || *s->p == '\n' || *s->p == '\r')) s->p++;
+    while (s->p < s->end && (*s->p == ' ' || *s->p == '\t' || *s->p == '\n' || *s->p == '\r')) {
+        if (scan_tick(s)) return;
+        s->p++;
+    }
 }
 
 static int hexval(int c) {
@@ -371,7 +398,7 @@ static int scan_string(Scan *s, int want_key, uint32_t *off, uint32_t *len) {
     size_t start = s->arena_used;
     s->p++;
     for (;;) {
-        if (s->p >= s->end) return 0;
+        if (s->p >= s->end || scan_tick(s)) return 0;
         uint8_t c = *s->p;
         if (c == '"') { s->p++; break; }
         if (c < 0x20) return 0;
@@ -426,18 +453,18 @@ static int scan_number(Scan *s) {
     if (*q == '-') q++;
     if (q >= s->end) return 0;
     if (*q == '0') q++;
-    else if (*q >= '1' && *q <= '9') { while (is_digit(q, s->end)) q++; }
+    else if (*q >= '1' && *q <= '9') { while (is_digit(q, s->end)) { if (scan_tick(s)) return 0; q++; } }
     else return 0;
     if (q < s->end && *q == '.') {
         q++;
         if (!is_digit(q, s->end)) return 0;
-        while (is_digit(q, s->end)) q++;
+        while (is_digit(q, s->end)) { if (scan_tick(s)) return 0; q++; }
     }
     if (q < s->end && (*q == 'e' || *q == 'E')) {
         q++;
         if (q < s->end && (*q == '+' || *q == '-')) q++;
         if (!is_digit(q, s->end)) return 0;
-        while (is_digit(q, s->end)) q++;
+        while (is_digit(q, s->end)) { if (scan_tick(s)) return 0; q++; }
     }
     if (isinf(strtod((const char *)s->p, NULL))) return 0;
     s->p = q;
@@ -453,7 +480,7 @@ static int scan_literal(Scan *s, const char *lit) {
 
 static int scan_value(Scan *s, int depth) {
     skip_ws(s);
-    if (s->p >= s->end) return 0;
+    if (s->p >= s->end || s->aborted) return 0;
     switch (*s->p) {
         case '{': {
             if (depth + 1 > s->max_depth) return 0;
@@ -504,19 +531,29 @@ static int scan_value(Scan *s, int depth) {
     }
 }
 
-// `z` must be NUL-terminated at z[len].
-static int json_check(const uint8_t *z, size_t len, int max_depth) {
+// `z` must be NUL-terminated at z[len]. With `st`, the scan polls the run's cancel/CPU/wall budget and fails
+// (leaving st->stop set) once it is exhausted; a final check also covers the tail between polls.
+static int json_check_budgeted(const uint8_t *z, size_t len, int max_depth, RunState *st) {
     Scan s;
     s.p = z;
     s.end = z + len;
     s.arena = malloc(len + 1);
     s.arena_used = 0;
     s.max_depth = max_depth;
+    s.st = st;
+    s.tick = 0;
+    s.aborted = 0;
     if (!s.arena) return 0;
     int ok = scan_value(&s, 0);
     if (ok) { skip_ws(&s); ok = (s.p == s.end); }
     free(s.arena);
+    if (s.aborted) ok = 0;
+    if (ok && st && budget_exceeded(st)) ok = 0;
     return ok;
+}
+
+static int json_check(const uint8_t *z, size_t len, int max_depth) {
+    return json_check_budgeted(z, len, max_depth, NULL);
 }
 
 static uint8_t *copy_z(const uint8_t *p, size_t n) {
@@ -2272,7 +2309,11 @@ static JSValue js_resp_json(JSContext *ctx, JSValueConst this_val, int argc, JSV
     size_t n;
     const char *c = JS_ToCStringLen2(ctx, &n, data[0], 0);
     if (!c) return JS_EXCEPTION;
-    int ok = json_check((const uint8_t *)c, n, 64) && v2_safe_integer_tokens((const uint8_t *)c, n);
+    int ok = json_check_budgeted((const uint8_t *)c, n, 64, st) && v2_safe_integer_tokens((const uint8_t *)c, n);
+    if (st && budget_exceeded(st)) {
+        JS_FreeCString(ctx, c);
+        return JS_ThrowTypeError(ctx, "response JSON stopped");
+    }
     JSValue parsed = JS_UNDEFINED;
     if (ok) parsed = JS_ParseJSON(ctx, c, n, "<response>");
     JS_FreeCString(ctx, c);
@@ -2581,19 +2622,28 @@ static JSValue js_save_json(JSContext *ctx, JSValueConst this_val, int argc, JSV
     }
     if (budget_exceeded(st)) return JS_ThrowTypeError(ctx, "saveJSON stopped");
     if (argc != 2) return reject_error(ctx, 0, "invalid saveJSON arguments");
+    // Grant, callback and count are checked before any string conversion or scanning.
+    if (!st->write_files || !st->save_cb || st->nsaves >= SAVE_MAX_COUNT) return reject_error(ctx, 0, "saveJSON rejected");
     int valid = save_arg(ctx, argv[0], SAVE_MAX_KEY, &key, &key_len);
     if (valid < 0) return JS_EXCEPTION;
     if (valid) {
         valid = save_arg(ctx, argv[1], SAVE_MAX_JSON, &text, &text_len);
         if (valid < 0) { JS_FreeCString(ctx, key); return JS_EXCEPTION; }
     }
-    // The converted text is NUL-terminated, as json_check requires.
-    if (valid) valid = json_check((const uint8_t *)text, text_len, 64);
-    if (!valid || !st->write_files || !st->save_cb || st->nsaves >= SAVE_MAX_COUNT ||
-        text_len > SAVE_MAX_TOTAL - st->save_total) {
+    // Byte quota is known once the text length is; it precedes the scan. The converted text is NUL-terminated.
+    if (valid && text_len > SAVE_MAX_TOTAL - st->save_total) valid = 0;
+    if (valid) valid = json_check_budgeted((const uint8_t *)text, text_len, 64, st);
+    if (!valid) {
         JS_FreeCString(ctx, key);
         JS_FreeCString(ctx, text);
+        if (budget_exceeded(st)) return JS_ThrowTypeError(ctx, "saveJSON stopped");
         return reject_error(ctx, 0, "saveJSON rejected");
+    }
+    // Final budget check immediately before the host call.
+    if (budget_exceeded(st)) {
+        JS_FreeCString(ctx, key);
+        JS_FreeCString(ctx, text);
+        return JS_ThrowTypeError(ctx, "saveJSON stopped");
     }
     st->nsaves++;
     st->save_total += text_len;

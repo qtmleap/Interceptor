@@ -53,6 +53,21 @@ public actor PluginActivationStore {
         return current == admitted
     }
 
+    /// Runs `operation` while holding the activation lock, so a revocation cannot interleave. The admitted
+    /// snapshot must still be current and the revision actually granted (and selected, once initialized).
+    /// `operation` must be short, synchronous and must not await or block on other locks.
+    public func withCurrentActivation(admitted: PluginActivationSnapshot, revisionID: String,
+                                      _ operation: @Sendable (ActivatedPlugin) throws -> Void) throws {
+        try file.locked {
+            let document = try readUnlocked()
+            guard document.activation == admitted,
+                  let plugin = document.activation.revisions.first(where: { $0.revisionID == revisionID }),
+                  document.selections.map({ $0[InstallationIdentity.family(revisionID)] == revisionID }) ?? true
+            else { throw AutomationError.staleSnapshot }
+            try operation(plugin)
+        }
+    }
+
     /// Legacy caller compatibility. Once v2 is initialized, this cannot switch the selected revision.
     /// New app callers must use InstallationCoordinator's exact-byte approval and live-consent gate.
     @discardableResult

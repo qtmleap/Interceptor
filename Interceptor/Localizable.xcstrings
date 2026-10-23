@@ -1,6 +1,57 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "AUTO_APPROVAL_FILES" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSONファイルの保存"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save JSON files"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_FILES_ALLOWED" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "許可"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allowed"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_FILES_FOOTER" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取得したJSONをこの端末に保存します。Interceptorを開くと「ファイル」アプリの「Interceptor / Plugins」から確認できます。保存済みのファイルは無効化後も残り、バックアップには含まれません。"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saves JSON on this device. Open Interceptor to make saved files available in Files under Interceptor / Plugins. Saved files remain after disabling the plugin and are excluded from backups."
+          }
+        }
+      }
+    },
     "SSL_LIST_EDIT" : {
       "localizations" : {
         "en" : {

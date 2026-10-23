@@ -150,7 +150,8 @@ private let fetchCallback: QJSFetchCallback = { opaque, json, length, timeoutMs,
 /// C callback for `Interceptor.saveJSON`. The native layer already validated the key and JSON text; both arrive as the
 /// original UTF-8 bytes. Like fetch, it drives the async host closure on this owned thread and always awaits the task
 /// (cancelling it on timeout) before returning, so no host I/O outlives the callback. A cancellation after the host
-/// committed may leave the saved file; the script is still stopped.
+/// committed may leave the saved file; the script is still stopped. A callback timeout reports failure (1) even when the
+/// host committed late; task/executor cancellation (2) still takes precedence.
 private let saveJSONCallback: QJSSaveJSONCallback = { opaque, key, keyLength, text, textLength, timeoutMs in
     guard let opaque, let key, let text else { return 1 }
     let context = Unmanaged<FetchContext>.fromOpaque(opaque).takeUnretainedValue()
@@ -179,8 +180,10 @@ private let saveJSONCallback: QJSSaveJSONCallback = { opaque, key, keyLength, te
     if job.isCancelled {
         return 2
     }
+    // A callback timeout is always a failure, even if the host committed after the cancel; the write is retained.
+    if timedOut { return 1 }
     guard let error = box.error else { return 0 }
-    return error is CancellationError && !timedOut ? 2 : 1
+    return error is CancellationError ? 2 : 1
 }
 
 private final class SaveBox: @unchecked Sendable {

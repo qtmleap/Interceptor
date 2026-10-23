@@ -21,7 +21,7 @@ final class HTTPPluginFetchProcessorTests: XCTestCase, @unchecked Sendable {
     }
 
     /// One route with a synchronous request.onEnter (to observe the next sync phase) and the given response.onLeave body.
-    private func package(leave: String) throws -> PluginPackage {
+    private func package(leave: String, files: Bool = false) throws -> PluginPackage {
         let file = "hooks/api.example.com/credentials/GET.js"
         let manifest: JSONValue = .object([
             "schemaVersion": .integer(2), "id": .string(UUID().uuidString), "name": .string("Fetch test"), "version": .string("1.0.0"),
@@ -33,7 +33,7 @@ final class HTTPPluginFetchProcessorTests: XCTestCase, @unchecked Sendable {
             "read": .object(["metadata": .array(["method", "host", "path", "status"].map(JSONValue.string)),
                              "headers": .array([.string("set-cookie")]), "queryKeys": .array([]),
                              "body": .object(["mode": .string("json")])]),
-            "write": .object(["requestBody": .bool(true), "responseBody": .bool(false)]),
+            "write": .object(["requestBody": .bool(true), "responseBody": .bool(false), "files": .bool(files)]),
             "endpointBindings": .array([]), "settings": .object([:]),
             "outbound": .object(["profile": .object([
                 "url": .string("https://secondary.example.com/profile"), "method": .string("GET"),
@@ -50,8 +50,8 @@ final class HTTPPluginFetchProcessorTests: XCTestCase, @unchecked Sendable {
         let completions: Completions
     }
 
-    private func harness(leave: String, transport: FetchStubTransport) async throws -> Harness {
-        let package = try package(leave: leave)
+    private func harness(leave: String, files: Bool = false, transport: FetchStubTransport) async throws -> Harness {
+        let package = try package(leave: leave, files: files)
         let (store, revisions) = try await AutomationFixtures.activationContext(packages: [package],
                                                                                 activationURL: directory.appendingPathComponent("active.json"))
         var snapshot = try await store.snapshot()
@@ -60,6 +60,7 @@ final class HTTPPluginFetchProcessorTests: XCTestCase, @unchecked Sendable {
         }
         let completions = Completions()
         let processor = HTTPPluginProcessor(store: store, snapshot: snapshot, hasCaptureConsent: { true }, outboundTransport: transport,
+                                            fileStore: PluginJSONFileStore(directoryURL: directory.appendingPathComponent("saved")),
                                             fetchObserver: { completions.append($0) })
         return Harness(processor: processor, store: store, completions: completions)
     }
@@ -82,6 +83,48 @@ final class HTTPPluginFetchProcessorTests: XCTestCase, @unchecked Sendable {
 
     private func fetchScript(_ then: String = "") -> String {
         "return (async()=>{await fetch('\(fetchURL)');\(then)})();"
+    }
+
+    private func savedResponseBytes() throws -> [Data] {
+        let root = directory.appendingPathComponent("saved")
+        guard FileManager.default.fileExists(atPath: root.path) else { return [] }
+        let enumerator = try XCTUnwrap(FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
+        return try enumerator.compactMap { $0 as? URL }.filter { $0.pathExtension == "json" }.map { try Data(contentsOf: $0) }
+    }
+
+    func testFetchResponseIsSavedUnchangedUnderTheAdmittedRevision() async throws {
+        let raw = Data(" {\n \"data\": {\"results\": [1,2]}, \"label\": \"サーモン\"\n} ".utf8)
+        let transport = FetchStubTransport { _ in .response(status: 200, body: raw) }
+        // Bind the fetched Response explicitly; the captured response is deliberately different.
+        let scriptHarness = try await self.harness(leave: "return (async()=>{const fetched=await fetch('\(fetchURL)');await Interceptor.saveJSON('history',await fetched.text());})();", files: true, transport: transport)
+        defer { scriptHarness.processor.shutdown() }
+        _ = try await scriptHarness.processor.process(.responseLeave, request: request, response: response)
+        await awaitCompletion(scriptHarness, .completed)
+        XCTAssertEqual(try savedResponseBytes(), [raw])
+    }
+
+    func testRevocationAfterFetchPreventsJSONPublication() async throws {
+        let transport = FetchStubTransport()
+        let harness = try await harness(leave: "return (async()=>{const fetched=await fetch('\(fetchURL)');await Interceptor.saveJSON('history',await fetched.text());})();", files: true, transport: transport)
+        defer { harness.processor.shutdown() }
+        let store = harness.store
+        transport.setHandler { _ in
+            _ = try? await store.revokeAll()
+            return .response(status: 200, body: Data("{}".utf8))
+        }
+        _ = try await harness.processor.process(.responseLeave, request: request, response: response)
+        await awaitCompletion(harness, .failed)
+        XCTAssertTrue(try savedResponseBytes().isEmpty)
+    }
+
+    func testCommittedJSONSurvivesLaterFailure() async throws {
+        let transport = FetchStubTransport { _ in .response(status: 200, body: Data("{}".utf8)) }
+        let harness = try await harness(leave: "return (async()=>{await Interceptor.saveJSON('first','{\"ok\":true}');throw Error('later failure');})();", files: true, transport: transport)
+        defer { harness.processor.shutdown() }
+        _ = try await harness.processor.process(.responseLeave, request: request, response: response)
+        await awaitCompletion(harness, .failed)
+        XCTAssertEqual(try savedResponseBytes(), [Data(#"{"ok":true}"#.utf8)])
+        XCTAssertTrue(transport.fetched.isEmpty)
     }
 
     func testResponseLeaveReturnsBeforeABlockedFetchFinishesAndTheNextSyncPhaseRuns() async throws {
