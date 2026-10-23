@@ -20,6 +20,7 @@ CAPS = {
     "dimension": 8192,
     "pixels": 16 * 1024 * 1024,
     "icc_bytes": 1024 * 1024,
+    "exif_bytes": 64 * 1024,
     "png_chunks": 4096,
     "output_bytes": 96 * 1024 * 1024,
     "geometry_bytes": 8 * 1024,
@@ -78,7 +79,7 @@ def inspect_png(data):
     if not data.startswith(PNG_SIGNATURE):
         raise EvidenceError("not-png", "attachment is not a PNG")
     pos, chunks, seen = len(PNG_SIGNATURE), [], {}
-    ihdr = icc_raw = None
+    ihdr = icc_raw = exif = None
     color_chunks = {}
     while True:
         if len(chunks) >= CAPS["png_chunks"]:
@@ -106,6 +107,10 @@ def inspect_png(data):
                 raise EvidenceError("dimension-cap", "PNG dimensions exceed caps")
         elif kind == b"iCCP":
             icc_raw = body
+        elif kind == b"eXIf":
+            if exif is not None or length > CAPS["exif_bytes"] or body[:4] not in (b"II*\0", b"MM\0*"):
+                raise EvidenceError("exif-metadata", "unsupported PNG EXIF metadata")
+            exif = body
         elif kind in (b"sRGB", b"gAMA", b"cHRM"):
             color_chunks[kind] = body
         pos = end + 4
@@ -156,7 +161,7 @@ def inspect_png(data):
         policy = "standard-srgb"
     else:
         raise EvidenceError("ambiguous-color", "PNG has no explicit color metadata")
-    return {"width": width, "height": height, "has_alpha": color_type == 6, "policy": policy, "icc": icc}
+    return {"width": width, "height": height, "has_alpha": color_type == 6, "policy": policy, "icc": icc, "exif": exif}
 
 
 # ---------------------------------------------------------------- WebP conversion
@@ -204,11 +209,19 @@ def convert_to_lossless_webp(png_bytes, info, destination):
             raise EvidenceError("ambiguous-color", "decoded ICC profile differs from the PNG chunk")
         if info["policy"] == "standard-srgb" and source_icc:
             raise EvidenceError("ambiguous-color", "unexpected ICC profile")
+        source_exif = source.info.get("exif", b"")
+        if source_exif.removeprefix(b"Exif\0\0") != (info["exif"] or b""):
+            raise EvidenceError("exif-metadata", "decoded EXIF differs from PNG metadata")
+        orientation = source.getexif().get(274, 1)
+        if type(orientation) is not int or orientation not in range(1, 9):
+            raise EvidenceError("exif-metadata", "invalid EXIF orientation")
         rgba = source.convert("RGBA")
     source_pixels = rgba.tobytes()
     save_args = {"format": "WEBP", "lossless": True, "exact": True, "quality": 100, "method": 6}
     if info["policy"] == "icc":
         save_args["icc_profile"] = info["icc"]
+    if source_exif:
+        save_args["exif"] = source_exif
     rgba.save(destination, **save_args)
     with open(destination, "rb") as handle:
         encoded = handle.read(CAPS["encoded_bytes"] + 1)
@@ -224,10 +237,14 @@ def convert_to_lossless_webp(png_bytes, info, destination):
         output_icc = output.info.get("icc_profile")
         if (output_icc if info["policy"] == "icc" else (output_icc or None)) != (info["icc"] if info["policy"] == "icc" else None):
             raise EvidenceError("webp-profile", "WebP ICC profile differs from the PNG")
+        output_exif = output.info.get("exif", b"")
+        if output_exif.removeprefix(b"Exif\0\0") != (info["exif"] or b"") or output.getexif().get(274, 1) != orientation:
+            raise EvidenceError("webp-exif", "WebP EXIF metadata or orientation differs from the PNG")
         output_pixels = output.convert("RGBA").tobytes()
     if output_pixels != source_pixels:
         raise EvidenceError("webp-pixels", "WebP pixels differ from the PNG (including RGB under alpha)")
-    return {"sha256": sha256(encoded), "bytes": len(encoded)}
+    return {"sha256": sha256(encoded), "bytes": len(encoded), "exif_orientation": orientation,
+            "exif_sha256": sha256(info["exif"]) if info["exif"] is not None else None}
 
 
 # ---------------------------------------------------------------- manifest handling
@@ -531,7 +548,8 @@ def build_evidence(bundle, staging, source, environment, export_fn=xcresult_expo
             total += result["bytes"]
             if total > CAPS["output_bytes"]:
                 raise EvidenceError("output-bytes", "verified output exceeds the byte cap")
-            record.update(webp_sha256=result["sha256"], webp_bytes=result["bytes"], verified_lossless_exact=True)
+            record.update(webp_sha256=result["sha256"], webp_bytes=result["bytes"], verified_lossless_exact=True,
+                          exif_sha256=result["exif_sha256"], exif_orientation=result["exif_orientation"])
             os.remove(item["path"])  # the verified WebP replaces the exported PNG
             item["data"] = None
             records.append(record)

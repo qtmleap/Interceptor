@@ -179,6 +179,27 @@ class ConversionTests(unittest.TestCase):
         result = ev.convert_to_lossless_webp(data, ev.inspect_png(data), dest)
         return dest, result
 
+    def test_exif_orientation_and_pixels_survive_without_rotation(self):
+        from PIL import ImageOps
+        for orientation in range(1, 9):
+            exif = Image.Exif()
+            exif[274] = orientation
+            data = png(extra=[(b'eXIf', exif.tobytes()[6:])])
+            dest, result = self.convert(data)
+            with Image.open(dest) as output:
+                self.assertEqual(output.size, (WIDTH, HEIGHT))
+                self.assertEqual(output.getexif()[274], orientation)
+                self.assertEqual(output.info['exif'].removeprefix(b'Exif\0\0'), exif.tobytes()[6:])
+                self.assertEqual(ImageOps.exif_transpose(output).size,
+                                 (HEIGHT, WIDTH) if orientation in (5, 6, 7, 8) else (WIDTH, HEIGHT))
+            self.assertEqual(result['exif_orientation'], orientation)
+
+    def test_invalid_exif_orientation_rejected(self):
+        exif = Image.Exif()
+        exif[274] = 9
+        with self.assertRaises(ev.EvidenceError):
+            self.convert(png(extra=[(b'eXIf', exif.tobytes()[6:])]))
+
     def test_transparent_rgba_and_icc_roundtrip(self):
         pixels = [bytes((10, 20, 30, 0)), bytes((255, 0, 0, 0)), bytes((1, 2, 3, 128)), bytes((9, 8, 7, 255))] * 3
         data = png(pixels=pixels)
