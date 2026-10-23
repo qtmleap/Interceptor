@@ -1224,6 +1224,34 @@ static int source_path_ok(const Str *s) {
     return 1;
 }
 
+// Image bytes are display-only; Core/SDK validate the media structure before installation.
+// The runtime independently bounds and validates the inert asset envelope without evaluating it.
+static int icon_path_ok(const Str *s) {
+    return source_path_ok(s) &&
+        ((s->n >= 4 && memcmp(s->s + s->n - 4, ".png", 4) == 0) ||
+         (s->n >= 5 && memcmp(s->s + s->n - 5, ".webp", 5) == 0));
+}
+
+static int asset_b64_digit(unsigned char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+static int asset_base64_ok(const Str *s) {
+    if (s->n < 4 || s->n > 87384 || s->n % 4) return 0;
+    size_t padding = s->s[s->n - 1] == '=' ? 1 : 0;
+    if (padding && s->s[s->n - 2] == '=') padding++;
+    size_t length = s->n - padding;
+    for (size_t i = 0; i < length; i++) if (asset_b64_digit((unsigned char)s->s[i]) < 0) return 0;
+    if (padding && (asset_b64_digit((unsigned char)s->s[length - 1]) & ((1 << (padding * 2)) - 1))) return 0;
+    size_t raw = s->n / 4 * 3 - padding;
+    return raw >= 1 && raw <= 65536;
+}
+
 static int parse_match(RunState *st, JSContext *ctx, JSValueConst obj, Match *m) {
     static const char *const mk[] = {"hosts", "methods", "path", "hooks"};
     static const char *const pk[] = {"kind", "value"};
@@ -1857,14 +1885,14 @@ done:
 static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *write_request, int *write_response) {
     static const char *const mk[] = {"schemaVersion", "id", "name", "version", "matches", "read", "write",
                                      "endpointBindings", "settings", "author", "summary", "category",
-                                     "publishedAt", "outbound"};
+                                     "publishedAt", "outbound", "icon"};
     static const char *const wk[] = {"requestBody", "responseBody", "files"};
-    JSValue f[14], w[3];
+    JSValue f[15], w[3];
     Str s = {NULL, 0}, *bind = NULL;
     size_t nbind = 0;
     int ok = 0;
     w[0] = w[1] = w[2] = JS_UNDEFINED;
-    if (!read_obj(st, ctx, root, mk, 14, 0x1FFu, f)) return 0;
+    if (!read_obj(st, ctx, root, mk, 15, 0x1FFu, f)) return 0;
     if (JS_VALUE_GET_TAG(f[0]) != JS_TAG_INT || JS_VALUE_GET_INT(f[0]) != 2) goto done;
     if (!get_str(ctx, f[1], &s, 36) || !uuid_ok(&s)) goto done;
     str_free(&s);
@@ -1886,6 +1914,10 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
     }
     if (!JS_IsUndefined(f[12])) {
         if (!get_str(ctx, f[12], &s, 20) || !published_at_ok(&s)) goto done;
+        str_free(&s);
+    }
+    if (!JS_IsUndefined(f[14])) {
+        if (!get_str(ctx, f[14], &s, 256) || !icon_path_ok(&s)) goto done;
         str_free(&s);
     }
     {
@@ -1928,7 +1960,7 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
 done:
     str_free(&s);
     strs_free(bind, nbind);
-    for (int i = 0; i < 14; i++) JS_FreeValue(ctx, f[i]);
+    for (int i = 0; i < 15; i++) JS_FreeValue(ctx, f[i]);
     JS_FreeValue(ctx, w[0]);
     JS_FreeValue(ctx, w[1]);
     JS_FreeValue(ctx, w[2]);
@@ -1937,14 +1969,24 @@ done:
 
 // Validate every decoded source and all references, including files that will never evaluate.
 static int load_package(RunState *st, JSContext *ctx, JSValueConst root, int *write_request, int *write_response) {
-    static const char *const keys[] = {"manifest", "sourceFiles"};
-    JSValue f[2];
-    if (!read_obj(st, ctx, root, keys, 2, 3u, f)) return 0;
+    static const char *const keys[] = {"manifest", "sourceFiles", "assets"};
+    JSValue f[3];
+    if (!read_obj(st, ctx, root, keys, 3, 3u, f)) return 0;
     int ok = 0;
     Buf manifest = {NULL, 0, 0, 0};
+    Str icon = {NULL, 0}, encoded = {NULL, 0};
+    JSValue raw_icon = JS_UNDEFINED, asset[1] = {JS_UNDEFINED};
     if (!serialize_value(st, ctx, f[0], 1, 32, QJS_MAX_MANIFEST_BYTES, &manifest)) goto done;
     free(manifest.p); manifest.p = NULL;
     if (!load_manifest(st, ctx, f[0], write_request, write_response)) goto done;
+    raw_icon = JS_GetPropertyStr(ctx, f[0], "icon");
+    if (JS_IsException(raw_icon) || JS_IsUndefined(raw_icon) != JS_IsUndefined(f[2])) goto done;
+    if (!JS_IsUndefined(raw_icon)) {
+        if (!get_str(ctx, raw_icon, &icon, 256) || !icon_path_ok(&icon)) goto done;
+        const char *const asset_keys[] = {icon.s};
+        if (!read_obj(st, ctx, f[2], asset_keys, 1, 1u, asset) ||
+            !get_str(ctx, asset[0], &encoded, 87384) || !asset_base64_ok(&encoded)) goto done;
+    }
     if (JS_GetClassID(f[1]) != st->cls_object) goto done;
     JSPropertyEnum *tab;
     uint32_t count;
@@ -1955,6 +1997,7 @@ static int load_package(RunState *st, JSContext *ctx, JSValueConst root, int *wr
         SourceFile *file = &st->files[st->nfiles++];
         JSValue key = JS_AtomToValue(ctx, tab[i].atom), code = JS_UNDEFINED;
         good = get_str(ctx, key, &file->name, 256) && source_path_ok(&file->name) &&
+               (!icon.s || str_cmp(&icon, &file->name) != 0) &&
                own_data(ctx, f[1], tab[i].atom, &code) && get_str(ctx, code, &file->code, 128u * 1024u);
         JS_FreeValue(ctx, key); JS_FreeValue(ctx, code);
         total += file->code.n;
@@ -1975,7 +2018,9 @@ static int load_package(RunState *st, JSContext *ctx, JSValueConst root, int *wr
     ok = 1;
 done:
     free(manifest.p);
-    JS_FreeValue(ctx, f[0]); JS_FreeValue(ctx, f[1]);
+    str_free(&icon); str_free(&encoded);
+    JS_FreeValue(ctx, raw_icon); JS_FreeValue(ctx, asset[0]);
+    JS_FreeValue(ctx, f[0]); JS_FreeValue(ctx, f[1]); JS_FreeValue(ctx, f[2]);
     return ok;
 }
 
