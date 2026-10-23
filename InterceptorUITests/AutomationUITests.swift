@@ -97,7 +97,7 @@ final class AutomationUITests: XCTestCase {
     }
 
     @MainActor
-    func testFourHookDryRunAndExplicitApproval() async {
+    func testExplicitApprovalCanBeGrantedAndRevoked() async {
         guard let repositoryURL = await requiredRepositoryURL() else { return }
         XCUIDevice.shared.orientation = .portrait
         for japanese in [false, true] {
@@ -122,43 +122,8 @@ final class AutomationUITests: XCTestCase {
             tapEnabled(app)
             assertEnabled(false, app: app)
 
-            openPackageTest(app)
-            XCTAssertFalse(app.buttons.matching(identifier: "script.activate").firstMatch.exists, "Test has its own task, separate from grants")
-            XCTAssertFalse(app.buttons.matching(identifier: "script.openSource").firstMatch.exists)
-            let form = scrollContainer(app, "script.form")
-            for phase in ["request.onEnter", "request.onLeave", "response.onEnter", "response.onLeave"] {
-                reach(app.buttons.matching(identifier: "script.hook").firstMatch, in: form).tap()
-                let choice = app.buttons.matching(identifier: phase).firstMatch
-                XCTAssertTrue(choice.waitForExistence(timeout: 5))
-                choice.tap()
-                let run = app.buttons.matching(identifier: "script.run").firstMatch
-                let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in run.isHittable && run.isEnabled }, object: nil)
-                let settled = XCTWaiter.wait(for: [ready], timeout: 5)
-                if settled != .completed { attachDiagnostic("Run after Hook selection", app: app, detail: phase) }
-                XCTAssertEqual(settled, .completed, "Run stays at the bottom of the Test screen")
-                run.tap()
-                let expectsMutation = phase == "request.onEnter"
-                if !expectsMutation {
-                    let alert = app.alerts.firstMatch
-                    XCTAssertTrue(alert.waitForExistence(timeout: 5))
-                    XCTAssertEqual(alert.label, japanese ? "テスト完了" : "Test completed")
-                    alert.buttons.matching(identifier: "OK").firstMatch.tap()
-                    XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
-                }
-                let validated = app.staticTexts["script.validated"]
-                XCTAssertTrue(validated.waitForExistence(timeout: 5))
-                reach(validated, in: form)
-                XCTAssertFalse(app.staticTexts["script.error"].exists)
-                if expectsMutation {
-                    let json = openSampleJSON("script.bodyPreview", app: app)
-                    // The first declared route is GET /other, which executes the secondary file.
-                    assertJSON(json.value as? String ?? "", equals: #"{"limit":15}"#)
-                    app.buttons.matching(identifier: "script.closeJSON").firstMatch.tap()
-                } else {
-                    XCTAssertFalse(app.buttons.matching(identifier: "script.bodyPreview").firstMatch.exists)
-                }
-                if !japanese && phase == "request.onEnter" { attach("Separate package Test result en") }
-            }
+            XCTAssertFalse(app.buttons.matching(identifier: "plugins.package.test").firstMatch.exists)
+            XCTAssertFalse(app.buttons.matching(identifier: "script.run").firstMatch.exists)
         }
     }
 
@@ -235,7 +200,7 @@ final class AutomationUITests: XCTestCase {
     }
 
     @MainActor
-    func testJSONSamplesAreReadOnlyAndFormatted() async {
+    func testManifestJSONIsReadOnlyAndFormatted() async {
         guard let repositoryURL = await requiredRepositoryURL() else { return }
         let app = launch(japanese: false, suite: "Interceptor.UITests.\(UUID().uuidString)")
         defer { app.terminate() }
@@ -252,33 +217,7 @@ final class AutomationUITests: XCTestCase {
         attach("Full screen manifest JSON en")
         app.buttons.matching(identifier: "plugins.manifest.close").firstMatch.tap()
         XCTAssertTrue(scrollContainer(app, "plugins.package.detail").waitForExistence(timeout: 5))
-        openPackageTest(app)
-        attach("Sample traffic and plugin configuration en")
-        let event = openSampleJSON("script.event", app: app)
-        let eventText = event.value as? String ?? ""
-        let sample = try? JSONSerialization.jsonObject(with: Data(eventText.utf8)) as? [String: Any]
-        let request = sample?["request"] as? [String: Any]
-        XCTAssertEqual(request?["host"] as? String, "example.com")
-        XCTAssertEqual(request?["method"] as? String, "GET")
-        XCTAssertEqual(request?["path"] as? String, "/other")
-        XCTAssertTrue(eventText.contains("\n  "))
-        assertReadOnly(event, app: app)
-        app.buttons.matching(identifier: "script.closeJSON").firstMatch.tap()
-        let config = openSampleJSON("script.config", app: app)
-        assertJSON(config.value as? String ?? "", equals: #"{"settings":{},"endpoints":{}}"#)
-        assertReadOnly(config, app: app)
-        app.buttons.matching(identifier: "script.closeJSON").firstMatch.tap()
-        app.buttons.matching(identifier: "script.run").firstMatch.tap()
-        let validated = app.staticTexts["script.validated"]
-        XCTAssertTrue(validated.waitForExistence(timeout: 5))
-        reach(validated, in: scrollContainer(app, "script.form"))
-        let result = openSampleJSON("script.bodyPreview", app: app)
-        assertJSON(result.value as? String ?? "", equals: #"{"limit":15}"#)
-        assertReadOnly(result, app: app)
-        attach("Full screen formatted Test JSON en")
-        app.buttons.matching(identifier: "script.closeJSON").firstMatch.tap()
-        XCTAssertTrue(app.buttons.matching(identifier: "script.bodyPreview").firstMatch.exists, "Done preserves the completed result")
-        XCTAssertFalse(app.buttons.matching(identifier: "script.save").firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(identifier: "plugins.package.test").firstMatch.exists)
     }
 
     @MainActor
@@ -879,27 +818,6 @@ private extension AutomationUITests {
             toggle.value as? String == (expected ? "1" : "0")
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed, file: file, line: line)
-    }
-
-    @MainActor
-    func openPackageTest(_ app: XCUIApplication) {
-        reach(app.buttons.matching(identifier: "plugins.package.test").firstMatch, in: scrollContainer(app, "plugins.package.detail")).tap()
-        XCTAssertTrue(scrollContainer(app, "script.form").waitForExistence(timeout: 5))
-        let run = app.buttons.matching(identifier: "script.run").firstMatch
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in run.isHittable }, object: nil)
-        let visible = XCTWaiter.wait(for: [ready], timeout: 5)
-        if visible != .completed { attachDiagnostic("Package Test controls", app: app) }
-        XCTAssertEqual(visible, .completed)
-    }
-
-    @MainActor
-    func openSampleJSON(_ id: String, app: XCUIApplication) -> XCUIElement {
-        reach(app.buttons.matching(identifier: id).firstMatch, in: scrollContainer(app, "script.form")).tap()
-        let viewer = app.textViews["script.sampleJSON"]
-        XCTAssertTrue(viewer.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons.matching(identifier: "script.closeJSON").firstMatch.isHittable)
-        assertFullScreen(viewer, app: app)
-        return viewer
     }
 
     @MainActor

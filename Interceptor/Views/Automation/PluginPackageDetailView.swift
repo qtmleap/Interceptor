@@ -214,12 +214,6 @@ struct PluginPackageDetailView: View {
                     .contentShape(Rectangle())
                 }
                 .accessibilityIdentifier("plugins.package.manifestJSON")
-                if let selected {
-                    NavigationLink("AUTO_BROWSER_TEST") {
-                        ScriptDetailView(session: ScriptSession(controller: model.controller, revision: selected), testOnly: true)
-                    }
-                    .accessibilityIdentifier("plugins.package.test")
-                }
             } header: { Text("AUTO_BROWSER_CONTENTS") }
         }
     }
