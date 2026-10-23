@@ -112,6 +112,18 @@ enum Text {
         return isDisplayName(s, max: maxCharacters, maxBytes: maxBytes)
     }
 
+    /// Like `isOptionalText` but bounded in Unicode scalars (not grapheme clusters), matching the C runtime and SDK.
+    static func isScalarBoundedText(_ s: String, maxScalars: Int, maxBytes: Int) -> Bool {
+        guard !s.isEmpty, s.utf8.count <= maxBytes, s.unicodeScalars.count <= maxScalars,
+              !s.unicodeScalars.allSatisfy({ $0.properties.isWhitespace }) else { return false }
+        return !s.unicodeScalars.contains { scalar in
+            switch scalar.properties.generalCategory {
+            case .control, .format, .lineSeparator, .paragraphSeparator: return true
+            default: return false
+            }
+        }
+    }
+
     static func isDisplayName(_ s: String, max: Int = 80, maxBytes: Int = 256) -> Bool {
         guard !s.isEmpty, s.utf8.count <= maxBytes, s.count <= max else { return false }
         return !s.unicodeScalars.contains { scalar in

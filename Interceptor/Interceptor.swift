@@ -21,14 +21,17 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 struct Interceptor: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     private let tuberose = Tuberose.default
+    @State private var automation = AutomationController.live()
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(tuberose)
                 .environment(tuberose.mudmouth)
+                .environment(automation)
                 .environmentIsFirstLaunch()
                 .modelContainer(ModelContainer.default)
                 .onAppear { appDelegate.tuberose = tuberose }
+                .task { await automation.start() }
         }
     }
 }

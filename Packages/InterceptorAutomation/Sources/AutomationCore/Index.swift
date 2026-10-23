@@ -26,6 +26,50 @@ public struct SemVer: Equatable, Sendable {
         }
         text = s
     }
+
+    /// SemVer 2.0.0 item 11 precedence. Build metadata is ignored, so this is not `==` (which compares exact text).
+    public func comparePrecedence(to other: SemVer) -> ComparisonResult {
+        func parts(_ v: SemVer) -> (core: [Substring], pre: [Substring]?) {
+            let noBuild = v.text.split(separator: "+", maxSplits: 1, omittingEmptySubsequences: false)[0]
+            let pieces = noBuild.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
+            return (pieces[0].split(separator: ".", omittingEmptySubsequences: false),
+                    pieces.count > 1 ? pieces[1].split(separator: ".", omittingEmptySubsequences: false) : nil)
+        }
+        func bytewise(_ a: Substring, _ b: Substring) -> ComparisonResult {
+            let x = Array(a.utf8), y = Array(b.utf8)
+            if x == y { return .orderedSame }
+            return x.lexicographicallyPrecedes(y) ? .orderedAscending : .orderedDescending
+        }
+        // Canonical (no leading zero) ASCII digits: longer is larger, equal length compares bytewise. Never overflows.
+        func numeric(_ a: Substring, _ b: Substring) -> ComparisonResult {
+            if a.utf8.count != b.utf8.count { return a.utf8.count < b.utf8.count ? .orderedAscending : .orderedDescending }
+            return bytewise(a, b)
+        }
+        func isNumeric(_ x: Substring) -> Bool { x.utf8.allSatisfy { $0 >= 0x30 && $0 <= 0x39 } }
+        let l = parts(self), r = parts(other)
+        for (a, b) in zip(l.core, r.core) {
+            let c = numeric(a, b)
+            if c != .orderedSame { return c }
+        }
+        switch (l.pre, r.pre) {
+        case (nil, nil): return .orderedSame
+        case (nil, _?): return .orderedDescending
+        case (_?, nil): return .orderedAscending
+        case let (a?, b?):
+            for (x, y) in zip(a, b) {
+                let c: ComparisonResult
+                switch (isNumeric(x), isNumeric(y)) {
+                case (true, true): c = numeric(x, y)
+                case (true, false): c = .orderedAscending
+                case (false, true): c = .orderedDescending
+                case (false, false): c = bytewise(x, y)
+                }
+                if c != .orderedSame { return c }
+            }
+            if a.count == b.count { return .orderedSame }
+            return a.count < b.count ? .orderedAscending : .orderedDescending
+        }
+    }
 }
 
 public struct IndexEntry: Equatable, Sendable {
@@ -35,6 +79,17 @@ public struct IndexEntry: Equatable, Sendable {
     public let packagePath: String
     public let sha256: String
     public let size: Int
+    /// Optional display metadata; when present it must equal the fetched manifest's field. Display text only.
+    public let author: String?
+    public let summary: String?
+    public let category: String?
+
+    init(id: UUID, name: String, version: String, packagePath: String, sha256: String, size: Int,
+         author: String? = nil, summary: String? = nil, category: String? = nil) {
+        self.id = id; self.name = name; self.version = version; self.packagePath = packagePath
+        self.sha256 = sha256; self.size = size
+        self.author = author; self.summary = summary; self.category = category
+    }
 }
 
 public struct RepositoryIndex: Equatable, Sendable {
@@ -125,13 +180,30 @@ public enum RepositoryEnvelope {
         guard raw.count <= Limits.plugins else { throw AutomationError.limitExceeded }
         var entries = [IndexEntry](), seen = Set<UUID>()
         for p in raw {
-            let e = try JSONFields(p, required: ["id", "name", "version", "packagePath", "sha256", "size"])
+            let e = try JSONFields(p, required: ["id", "name", "version", "packagePath", "sha256", "size"], optional: ["author", "summary", "category"])
             let id = try e.uuid("id"), size = try e.int("size")
             let version = try e.string("version"), path = try e.string("packagePath"), sha = try e.string("sha256")
             guard Text.isDisplayName(try e.string("name")), (1...Int64(Limits.package)).contains(size),
                   RepositoryURL.isValidRelativePath(path), Digest.isHex64(sha), seen.insert(id).inserted,
                   (try? SemVer(parsing: version)) != nil else { throw AutomationError.invalidJSON }
-            entries.append(IndexEntry(id: id, name: try e.string("name"), version: version, packagePath: path, sha256: sha, size: Int(size)))
+            var author: String?, summary: String?, category: String?
+            if e.has("author") {
+                let a = try e.string("author")
+                guard Text.isOptionalText(a, maxCharacters: 80, maxBytes: 256) else { throw AutomationError.invalidJSON }
+                author = a
+            }
+            if e.has("summary") {
+                let t = try e.string("summary")
+                guard Text.isOptionalText(t, maxCharacters: 280, maxBytes: 1024) else { throw AutomationError.invalidJSON }
+                summary = t
+            }
+            if e.has("category") {
+                let c = try e.string("category")
+                guard Text.isScalarBoundedText(c, maxScalars: 80, maxBytes: 256) else { throw AutomationError.invalidJSON }
+                category = c
+            }
+            entries.append(IndexEntry(id: id, name: try e.string("name"), version: version, packagePath: path, sha256: sha, size: Int(size),
+                                      author: author, summary: summary, category: category))
         }
         return RepositoryIndex(id: try f.uuid("id"), name: name, sequence: seq, issuedAt: issued, expiresAt: expires, plugins: entries)
     }

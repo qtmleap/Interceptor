@@ -16,14 +16,14 @@ public struct PluginSubscription: Equatable, Sendable {
 }
 
 public struct PluginReadDeclaration: Equatable, Sendable {
-    public enum Body: Equatable, Sendable { case none, jsonPointers([String]), raw }
+    public enum Body: Equatable, Sendable { case none, jsonPointers([String]), raw, json }
     public let metadata: [String]
     public let headers: [String]
     public let queryKeys: [String]
     public let body: Body
 }
 
-/// Fully validated v1 manifest. Declarations grant no data access or execution; `json` preserves the
+/// Fully validated schema 1 or 2 manifest. Declarations grant no data access or execution; `json` preserves the
 /// complete validated manifest so source edits keep every declaration.
 public struct PluginManifest: Equatable, Sendable {
     public let id: UUID
@@ -36,32 +36,65 @@ public struct PluginManifest: Equatable, Sendable {
     /// Optional publisher-supplied display text. Unauthenticated and unverified; never an identity claim.
     public let author: String?
     public let summary: String?
+    /// Optional display-only grouping label (1...80 Unicode scalars, <=256 UTF-8 bytes), preserved verbatim. Not a trust claim.
+    public let category: String?
+    /// Optional publisher-declared static release date (`yyyy-MM-ddTHH:mm:ssZ`, UTC whole seconds). Display only; not a
+    /// trust, ordering or freshness claim. Covered by the package bytes/revision hash.
+    public let publishedAt: Date?
+    /// Schema 2 only: fixed GET destinations keyed by binding name. Empty when absent. Grants nothing by itself.
+    public let outbound: [String: PluginOutboundEndpoint]
     public let json: JSONValue
+
+    public let schemaVersion: Int64
+    public let matches: [PluginMatch]
+    public let writeRequestBody: Bool
+    public let writeResponseBody: Bool
 
     static let metadataNames: Set<String> = ["method", "host", "status", "path"]
 
     init(validating v: JSONValue) throws {
         let bad = AutomationError.invalidManifest
-        let f = try JSONFields(v, required: ["schemaVersion", "id", "name", "version", "subscriptions", "read", "endpointBindings", "settings"], optional: ["author", "summary"], error: bad)
-        guard try f.int("schemaVersion") == 1 else { throw bad }
+        guard case .object(let raw) = v, case .integer(let version2)? = raw["schemaVersion"], version2 == 1 || version2 == 2 else { throw bad }
+        let isV2 = version2 == 2
+        let f = try JSONFields(v, required: isV2
+                               ? ["schemaVersion", "id", "name", "version", "matches", "read", "write", "endpointBindings", "settings"]
+                               : ["schemaVersion", "id", "name", "version", "subscriptions", "read", "endpointBindings", "settings"],
+                               optional: isV2 ? ["author", "summary", "category", "publishedAt", "outbound"]
+                                              : ["author", "summary", "category", "publishedAt"], error: bad)
         let name = try f.string("name"), version = try f.string("version")
         guard Text.isDisplayName(name) else { throw bad }
         _ = try SemVer(parsing: version)
 
-        let subsRaw = try f.array("subscriptions")
-        guard (1...8).contains(subsRaw.count) else { throw bad }
-        let subs = try subsRaw.map(PluginManifest.subscription)
-        let read = try PluginManifest.readDeclaration(try f.value("read"))
-        if subs.contains(where: \.phase.isHeadersPhase), read.body != .none { throw bad }
+        var subs: [PluginSubscription] = []
+        var matches: [PluginMatch] = []
+        var writeRequest = false, writeResponse = false
+        let read: PluginReadDeclaration
+        if isV2 {
+            let rawMatches = try f.array("matches")
+            guard (1...16).contains(rawMatches.count) else { throw bad }
+            matches = try rawMatches.map { try PluginMatch(validating: $0) }
+            read = try PluginManifest.readDeclaration(try f.value("read"), allowJSON: true)
+            let w = try JSONFields(try f.value("write"), required: ["requestBody", "responseBody"], error: bad)
+            writeRequest = try w.bool("requestBody")
+            writeResponse = try w.bool("responseBody")
+        } else {
+            let subsRaw = try f.array("subscriptions")
+            guard (1...8).contains(subsRaw.count) else { throw bad }
+            subs = try subsRaw.map(PluginManifest.subscription)
+            read = try PluginManifest.readDeclaration(try f.value("read"), allowJSON: false)
+            if subs.contains(where: \.phase.isHeadersPhase), read.body != .none { throw bad }
+        }
 
         let bindings = try f.strings("endpointBindings")
         guard bindings.count <= 4, Set(bindings).count == bindings.count, bindings.allSatisfy(PluginManifest.isBindingName) else { throw bad }
+
+        let outbound = try f.has("outbound") ? PluginOutboundEndpoint.validatingAll(f.value("outbound")) : [:]
 
         let settings = try f.value("settings")
         guard case .object = settings, settings.nesting <= Limits.settingsDepth,
               let encoded = try? settings.data(), encoded.count <= Limits.settingsBytes else { throw bad }
 
-        var author: String?, summary: String?
+        var author: String?, summary: String?, category: String?
         if f.has("author") {
             let a = try f.string("author")
             guard Text.isOptionalText(a, maxCharacters: 80, maxBytes: 256) else { throw bad }
@@ -72,13 +105,31 @@ public struct PluginManifest: Equatable, Sendable {
             guard Text.isOptionalText(t, maxCharacters: 280, maxBytes: 1024) else { throw bad }
             summary = t
         }
+        if f.has("category") {
+            let c = try f.string("category")
+            guard Text.isScalarBoundedText(c, maxScalars: 80, maxBytes: 256) else { throw bad }
+            category = c
+        }
+
+        var publishedAt: Date?
+        if f.has("publishedAt") {
+            guard let d = DateCodec.parse(try f.string("publishedAt")) else { throw bad }
+            publishedAt = d
+        }
 
         id = try f.uuid("id")
+        self.publishedAt = publishedAt
+        self.outbound = outbound
         self.author = author
         self.summary = summary
+        self.category = category
         self.name = name
         self.version = version
         subscriptions = subs
+        schemaVersion = version2
+        self.matches = matches
+        writeRequestBody = writeRequest
+        writeResponseBody = writeResponse
         self.read = read
         endpointBindings = bindings
         self.settings = settings
@@ -126,7 +177,7 @@ public struct PluginManifest: Equatable, Sendable {
         return PluginSubscription(phase: phase, hosts: hosts, methods: methods, path: path, status: status)
     }
 
-    private static func readDeclaration(_ v: JSONValue) throws -> PluginReadDeclaration {
+    private static func readDeclaration(_ v: JSONValue, allowJSON: Bool) throws -> PluginReadDeclaration {
         let bad = AutomationError.invalidManifest
         let f = try JSONFields(v, required: ["metadata", "headers", "queryKeys", "body"], error: bad)
         let metadata = try f.strings("metadata")
@@ -141,8 +192,10 @@ public struct PluginManifest: Equatable, Sendable {
         let body: PluginReadDeclaration.Body
         switch try b.string("mode") {
         case "none": guard !b.has("pointers") else { throw bad }; body = .none
-        case "raw": guard !b.has("pointers") else { throw bad }; body = .raw
+        case "raw": guard !allowJSON, !b.has("pointers") else { throw bad }; body = .raw
+        case "json": guard allowJSON, !b.has("pointers") else { throw bad }; body = .json
         case "jsonPointers":
+            guard !allowJSON else { throw bad }
             let ps = try b.strings("pointers")
             guard (1...32).contains(ps.count), Set(ps).count == ps.count, ps.allSatisfy(isJSONPointer) else { throw bad }
             body = .jsonPointers(ps)
@@ -151,7 +204,7 @@ public struct PluginManifest: Equatable, Sendable {
         return PluginReadDeclaration(metadata: metadata, headers: headers, queryKeys: keys, body: body)
     }
 
-    private static func isMatchHost(_ h: String) -> Bool {
+    static func isMatchHost(_ h: String) -> Bool {
         guard !h.isEmpty, h.utf8.count <= 253 else { return false }
         return h.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { l in
             !l.isEmpty && l.utf8.count <= 63 && l.first != "-" && l.last != "-"
@@ -159,7 +212,7 @@ public struct PluginManifest: Equatable, Sendable {
         }
     }
 
-    private static func isEncodedPath(_ s: String) -> Bool {
+    static func isEncodedPath(_ s: String) -> Bool {
         let u = Array(s.utf8)
         guard u.first == 0x2F, u.count <= 1024 else { return false }
         func isHex(_ c: UInt8) -> Bool { (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x46) || (c >= 0x61 && c <= 0x66) }

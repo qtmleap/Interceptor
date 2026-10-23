@@ -2068,13 +2068,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scripts are stored disabled. This feature is for testing only: it does not read captures, enable hooks or send webhooks."
+            "value" : "Test imported scripts, then approve the content to use on live traffic."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "スクリプトは無効状態で保存されます。この機能はテスト専用で、キャプチャの読み取り、フックの有効化、Webhookの送信は行いません。"
+            "value" : "追加したスクリプトをテストし、実通信で使う内容を承認できます。"
           }
         }
       }
@@ -2180,13 +2180,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This saved revision is removed from this device. Nothing is run or sent."
+            "value" : "Delete this script from this device."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "この保存済みリビジョンを端末から削除します。実行や送信は行われません。"
+            "value" : "このスクリプトを端末から削除します。"
           }
         }
       }
@@ -2196,13 +2196,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The repository is hidden. Installed scripts stay, and its trust and rollback records are kept."
+            "value" : "Remove this repository from the list. Installed scripts stay."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リポジトリを非表示にします。取り込み済みのスクリプトは残り、信頼とロールバック防止の記録も保持されます。"
+            "value" : "リポジトリを一覧から削除します。スクリプトは残ります。"
           }
         }
       }
@@ -2532,13 +2532,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The publisher cannot be confirmed. Anyone who controls this server could change its scripts. Add only if you trust it."
+            "value" : "Add only if you trust the publisher. Packages run on live traffic only after you enable them."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "発行元を確認できません。このサーバーを管理する人は誰でもスクリプトを変更できます。信頼できる場合のみ追加してください。"
+            "value" : "信頼できる発行元のみ追加してください。パッケージは有効にするまで実通信に適用されません。"
           }
         }
       }
@@ -2548,13 +2548,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unsigned – publisher cannot be confirmed"
+            "value" : "Unsigned (publisher cannot be confirmed)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未署名—発行元を確認できません"
+            "value" : "未署名（発行元を確認できません）"
           }
         }
       }
@@ -2596,13 +2596,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local edit – not from a publisher"
+            "value" : "Locally edited content"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ローカル編集—発行元とは無関係"
+            "value" : "ローカルで編集した内容"
           }
         }
       }
@@ -2612,13 +2612,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local file – publisher unknown"
+            "value" : "Local file (publisher unverified)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ローカルファイル—発行元不明"
+            "value" : "ローカルファイル（発行元未確認）"
           }
         }
       }
@@ -2740,13 +2740,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Declared matching rules. Currently available for synthetic tests only."
+            "value" : "These rules select traffic. Add the host to your capture targets separately."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "対象条件の宣言です。現在はサンプルデータでのテスト実行のみ利用できます。"
+            "value" : "実行する通信の条件です。対象ホストはキャプチャ対象に別途追加してください。"
           }
         }
       }
@@ -3124,13 +3124,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Disabled. Not connected to captures or webhooks."
+            "value" : "Live traffic requires approval. Legacy scripts support tests only."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "無効状態です。キャプチャやWebhookには接続されていません。"
+            "value" : "承認するまで実通信には適用されません。旧形式はテスト専用です。"
           }
         }
       }
@@ -3151,50 +3151,18 @@
         }
       }
     },
-    "AUTO_SAVE_FOOTER" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Saving creates a new revision and keeps the original. It does not run the script."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存すると新しいリビジョンが作られ、元のリビジョンは残ります。スクリプトは実行されません。"
-          }
-        }
-      }
-    },
-    "AUTO_SAVE_BEFORE_RUN" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save the edit before testing."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "テストの前に編集を保存してください。"
-          }
-        }
-      }
-    },
     "AUTO_DRY_RUN" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synthetic test"
+            "value" : "Test with sample data"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "合成データでのテスト"
+            "value" : "テスト用データでの実行"
           }
         }
       }
@@ -3252,13 +3220,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synthetic event (JSON)"
+            "value" : "Sample traffic (JSON)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "合成イベント（JSON）"
+            "value" : "サンプルの通信データ（JSON）"
           }
         }
       }
@@ -3268,13 +3236,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Synthetic config (JSON)"
+            "value" : "Plugin configuration (JSON)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "合成設定（JSON）"
+            "value" : "プラグイン設定（JSON）"
           }
         }
       }
@@ -3284,13 +3252,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Run Synthetic Test"
+            "value" : "Run Test"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "合成データでテスト"
+            "value" : "テストを実行"
           }
         }
       }
@@ -3300,13 +3268,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uses only the data above, never saved captures. Actions are shown, not sent."
+            "value" : "Runs with sample data, without applying changes to live traffic or sending data."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上のデータのみを使い、保存済みキャプチャは使いません。アクションは表示のみで送信されません。"
+            "value" : "テスト用データで実行します。実通信への適用や外部への送信は行いません。"
           }
         }
       }
@@ -3348,13 +3316,61 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not sent"
+            "value" : "No data sent externally"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未送信"
+            "value" : "外部送信なし（テスト）"
+          }
+        }
+      }
+    },
+    "AUTO_TEST_COMPLETE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test completed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト完了"
+          }
+        }
+      }
+    },
+    "AUTO_TEST_NO_CHANGES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No JSON changes or actions were returned."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSONの変更やアクションはありませんでした。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_OK" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
           }
         }
       }
@@ -3951,22 +3967,6 @@
         }
       }
     },
-    "AUTO_SAVE_SHORT" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存"
-          }
-        }
-      }
-    },
     "AUTO_KEYBOARD_DONE" : {
       "localizations" : {
         "en" : {
@@ -3979,6 +3979,2046 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完了"
+          }
+        }
+      }
+    }
+,
+    "AUTO_LIVE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use on live traffic"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実通信での使用"
+          }
+        }
+      }
+    }
+,
+    "AUTO_LIVE_STATUS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current content"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在の内容"
+          }
+        }
+      }
+    }
+,
+    "AUTO_LIVE_ACTIVE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認済み"
+          }
+        }
+      }
+    }
+,
+    "AUTO_LIVE_INACTIVE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not approved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未承認"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approve for Live Traffic…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実通信での使用を承認…"
+          }
+        }
+      }
+    }
+,
+    "AUTO_REVOKE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revoke Approval"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認を取り消す"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATE_CONFIRM_TITLE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approve this script content?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この内容を実通信で使うことを承認しますか？"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATE_CONFIRM" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATE_CONFIRM_MESSAGE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval stops the current capture connection. Reconnect manually to use this content. Approval does not start capture; capture consent is also required. Revision ID:"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認すると現在のキャプチャ接続が停止します。この内容を使うには手動で再接続してください。承認だけではキャプチャは始まりません。通信キャプチャへの同意も必要です。リビジョンID："
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_SCOPE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Runs on this device only for captured HTTPS traffic matching these hosts. Approval applies to the current content; changed content needs separate approval."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次のホストに一致する、キャプチャ中のHTTPS通信に対して端末内で実行します。承認は現在の内容に対するものです。変更後の内容を使うには、改めて承認してください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_DATA" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data this script can read from matching traffic:"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対象通信から読み取れるデータ："
+          }
+        }
+      }
+    }
+,
+    "AUTO_WRITE_REQUEST" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It may change the request JSON body sent to the server."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーへ送るリクエストのJSON本文を変更できます。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_NO_WRITE_REQUEST" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It cannot change request bodies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエスト本文は変更できません。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_WRITE_RESPONSE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It may change the response JSON body delivered to the app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリへ返すレスポンスのJSON本文を変更できます。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_NO_WRITE_RESPONSE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It cannot change response bodies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レスポンス本文は変更できません。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_CONNECTION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changing approval or deleting stops capture. Restart it in Settings → VPN Settings."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認の変更や削除でキャプチャが停止します。再開は「設定」→「VPN設定」から行えます。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_ERROR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval could not be changed. Check capture consent and the activation store."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認を変更できませんでした。キャプチャへの同意と承認情報の状態を確認してください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_READ_NONE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No traffic data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信データなし"
+          }
+        }
+      }
+    }
+,
+    "AUTO_BODY_PREVIEW" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSON body after the test"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト後のJSON本文"
+          }
+        }
+      }
+    }
+,
+    "AUTO_TEST_RESULT" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test completed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト完了"
+          }
+        }
+      }
+    }
+,
+    "AUTO_JSON_BODY" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request and response JSON bodies"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストとレスポンスのJSON本文"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_CONSENT" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow capture in Settings before approving a revision."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リビジョンを承認する前に、設定で通信キャプチャに同意してください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_LIMIT" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Up to four revisions can be active. Revoke another approval before adding this one."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認できるリビジョンは4つまでです。別の承認を取り消してから、もう一度お試しください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_STALE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval changed while this screen was open. Review the current revision and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画面を開いている間に承認情報が変わりました。現在のリビジョンを確認し、もう一度お試しください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_STORE_PRESERVED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval data is unreadable and was preserved. Approval changes, and saving or deleting scripts with live hooks, are blocked."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認情報を読み取れませんでした。データはそのまま保持しています。承認の変更や、通信に適用できるスクリプトの保存・削除は行えません。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_ACTIVATION_REVOCATION_PENDING" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval could not be revoked. Capture shutdown was requested, but approval may remain stored. Open this screen again to retry."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認を取り消せなかったため、キャプチャの停止を要求しました。承認情報が残っている可能性があります。この画面を開き直して、もう一度お試しください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_CAPTURE_APPROVAL_CHANGED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture stopped because script approvals changed. Reconnect manually."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリプトの承認情報が変更されたため、キャプチャを停止しました。手動で再接続してください。"
+          }
+        }
+      }
+    }
+,
+    "AUTO_CAPTURE_CONSENT_REQUIRED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture stopped because capture consent was withdrawn."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信キャプチャへの同意が取り消されたため、キャプチャを停止しました。"
+          }
+        }
+      }
+    },
+    "AUTO_SOURCE_FILE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイル"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_RULES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matching traffic (method, host, exact path):"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対象通信（メソッド・ホスト・パスの完全一致）："
+          }
+        }
+      }
+    },
+    "AUTO_RULE_ANY_METHOD" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "any method"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任意のメソッド"
+          }
+        }
+      }
+    },
+    "AUTO_RULE_ANY_PATH" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(any path)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "（任意のパス）"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_WRITE_BOTH" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "May change request and response JSON bodies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストとレスポンスのJSON本文を変更できます。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_WRITE_REQUEST" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "May change request JSON bodies only."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストのJSON本文のみ変更できます。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_WRITE_RESPONSE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "May change response JSON bodies only."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レスポンスのJSON本文のみ変更できます。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_WRITE_NONE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot change request or response bodies."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストもレスポンスも本文は変更できません。"
+          }
+        }
+      }
+    },
+    "AUTO_WEBHOOK_FOOTER" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Webhook actions are not sent, including on live traffic. A test can show their contents."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実通信でもWebhookアクションは外部へ送信しません。送信予定の内容はテストで確認できます。"
+          }
+        }
+      }
+    },
+    "AUTO_SOURCE_READ_ONLY" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source is read-only. Make changes in your development environment."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソースは閲覧専用です。変更は開発環境で行います。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_READ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reads:"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取り："
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_OUTBOUND" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send to external APIs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外部APIへの送信"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_OUTBOUND_HEADERS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outgoing headers"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信するヘッダー"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_OUTBOUND_FOOTER" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Any readable data, including sign-in information, may be sent to these APIs."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取りを許可したデータは、認証情報も含めて外部APIへ送信される可能性があります。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_WEBHOOK" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No data is sent via webhooks."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Webhookによる外部送信は行いません。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_CONNECTION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval stops capture. Allow traffic capture, then reconnect in VPN Settings."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認するとキャプチャが停止します。通信キャプチャに同意し、VPN設定で再開してください。"
+          }
+        }
+      }
+    },
+    "AUTO_ALERT_REVISION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revision ID:"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リビジョンID："
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_REVIEW" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review live use"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用の確認"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_COUNTS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Target rules: %1$lld · Read fields: %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対象条件：%1$lld件／読み取れる項目：%2$lld件"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_REQUEST_JSON" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request JSON"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストのJSON"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_RESPONSE_JSON" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response JSON"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レスポンスのJSON"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_CAN_CHANGE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "May change"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更可"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_CANNOT_CHANGE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot change"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更不可"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_READ_DATA" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Readable data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取れるデータ"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_TARGETS_FOOTER" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applies to captured traffic matching these rules. Configure capture hosts separately."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "条件が一致するキャプチャ中の通信に適用します。対象ホストは別途設定してください。"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_READ_METHOD" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HTTP method"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HTTPメソッド"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_READ_HOST" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホスト"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_READ_PATH" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Path"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パス"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_READ_STATUS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status code"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ステータスコード"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_HEADER_PREFIX" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Header: "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ヘッダー："
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_QUERY_PREFIX" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Query parameter: "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クエリパラメータ："
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_INSTALLED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストール済み"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_TARGET_HOSTS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Target hosts"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対象ホスト"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_QUEUED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Queued"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キュー"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_QUEUE_WAITING" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Queued"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待機中"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_CLOSE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じる"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_INSTALL" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストール"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_QUEUE_EMPTY" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Queue is empty"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キューは空です"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_QUEUE_REMOVE %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove %@ from Queue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@をキューから取り消す"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_INSTALLING" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installing…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストール中…"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_CONFIRM" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストール"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_QUEUE_CLEAR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Queue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キューを消去"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_REINSTALL" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reinstall"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再インストール"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_DELETE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_CANCEL" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャンセル"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_SOURCES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sources"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sources"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_PACKAGES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Packages"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Packages"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_SCRIPTS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scripts"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scripts"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_INSTALL_COMPLETE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストールしました"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_REPOSITORIES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repositories"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リポジトリ"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_LOCAL" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカル"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_LOCAL_DESCRIPTION" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Packages added from files"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルから追加したパッケージ"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_ALL_PACKAGES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All Packages"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのパッケージ"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_REFRESHING" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refreshing…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一覧を更新中…"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_REFRESH_FAILED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not refresh Sources. Cached catalogs are kept."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一覧を更新できませんでした。保存済みの一覧を表示しています。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_RETRY" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再試行"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_REFRESHED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sources refreshed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一覧を更新しました"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_REFRESH_DETAILS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refresh Sources to load package details."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sourcesを更新すると、詳細を表示できます。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_REFRESH" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refresh"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_ADD" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_REMOVE_SOURCE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove this Source?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このリポジトリを削除しますか？"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_REMOVE_SOURCE_FOOTER" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added Packages are kept."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストール済みのパッケージは残ります。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_CATEGORIES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Categories"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カテゴリ"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_CATALOG_EMPTY" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Packages"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パッケージはありません"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_SOURCE_UNAVAILABLE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Source is no longer available."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このリポジトリは削除されています。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_SEARCH_TAB" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_SEARCH" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search for Packages"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パッケージを検索"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_UNCATEGORIZED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uncategorized"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未分類"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_SORT" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sort Packages"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パッケージを並べ替え"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_NAME_ASCENDING" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name ↑"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前 ↑"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_NAME_DESCENDING" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name ↓"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前 ↓"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_DELETE_QUESTION %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete %@?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を削除しますか？"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_NO_SCRIPTS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Scripts"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリプトはありません"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_ADD_TO_SEE_SCRIPTS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a Package to see its Scripts."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パッケージをインストールすると表示されます。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_NO_PACKAGES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Packages"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パッケージはありません"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_NO_MATCHES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No matching Packages"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一致するパッケージはありません"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_ADD_FROM_SOURCES" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Packages from Sources."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sourcesからパッケージを追加できます。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_UNAVAILABLE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Package changes are unavailable. Reopen the browser to retry."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パッケージを変更できません。開き直して再試行してください。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_QUEUE_CHANGED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The queued Packages changed. Remove the changed items and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キューの内容が変わりました。変更された項目を取り消して再試行してください。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_QUEUE_ITEM_CHANGED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changed — remove from Queue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更されています・キューから取り消してください"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_BUSY" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please wait for the current operation."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "処理が終わるまでお待ちください。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_QUEUE_LIMIT" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Queue is full. Remove an item to add another."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キューがいっぱいです。項目を取り消してから追加してください。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_UPDATE_UNAVAILABLE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This update is no longer available. Refresh Sources and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この更新は適用できません。Sourcesを更新して再試行してください。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_PACKAGE_UNAVAILABLE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Package unavailable"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Packageを表示できません"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_LOADING" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込み中…"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_MODIFY" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modify"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_GET" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_DETAILS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_ENABLED" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enabled"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_ENABLED_FOOTER" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When enabled, runs scripts on matching traffic."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効にすると、一致する通信でスクリプトを実行します。"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_UPDATE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_REPOSITORY" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repository"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リポジトリ"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_CONTENTS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contents"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内容"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_MANIFEST_JSON" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manifest JSON"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manifest JSON"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_TEST" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_SOURCE_CODE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source Code"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソースコード"
+          }
+        }
+      }
+    },
+    "AUTO_BROWSER_PACKAGE_COUNT %lld" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Package"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Packages"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld件"
           }
         }
       }

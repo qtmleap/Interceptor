@@ -259,11 +259,11 @@ final class StoreTests: AutomationTestCase {
         XCTAssertEqual(edited.package.manifest, parent.package.manifest)
         XCTAssertEqual(edited.provenance.origin, .localEdit(parent: parent.package.revision))
         XCTAssertNil(edited.provenance.trustAtImport)
-        XCTAssertEqual(edited.package.bytes, try JSONValue.object(["manifest": parent.package.manifest.json, "source": .string(edited.package.source)]).data())
+        XCTAssertEqual(edited.package.bytes, try JSONValue.object(["manifest": parent.package.manifest.json, "source": .string(try XCTUnwrap(edited.package.source))]).data())
         XCTAssertNoThrow(try PluginPackage.validate(edited.package.bytes))
         let c = await st.catalog()
         XCTAssertEqual(c.revisions.count, 2)
-        do { _ = try await st.editSource(of: parent.id, to: parent.package.source); XCTFail() }
+        do { _ = try await st.editSource(of: parent.id, to: try XCTUnwrap(parent.package.source)); XCTFail() }
         catch { XCTAssertEqual(error as? AutomationError, .noChange) }
         do { _ = try await st.editSource(of: "nope", to: "x"); XCTFail() }
         catch { XCTAssertEqual(error as? AutomationError, .unknownRevision) }

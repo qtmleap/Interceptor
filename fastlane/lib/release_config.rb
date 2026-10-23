@@ -33,7 +33,7 @@ module ReleaseConfig
 
   # Pinned sibling checkouts that the project references by relative path: name => revision.
   SIBLINGS = {
-    "Mudmouth" => "dddd2cb92fc67e414517dd316de33f6f2c6a9f4c"
+    "Mudmouth" => "65686d24858822627f674d8b9a22aaaa3b026812"
   }.freeze
 
   # Secret => file written (validated, never printed) into the temporary build copy only.

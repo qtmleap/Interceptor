@@ -18,6 +18,7 @@ struct SettingsView: View {
     @Environment(\.requestReview) private var requestReview
     @State private var showCaptureSetup = false
     @State private var showDataUse = false
+    @State private var showPlugins = false
 
     var body: some View {
         Form(content: {
@@ -25,7 +26,8 @@ struct SettingsView: View {
             QuantumLeap.VPNSettingList()
             QuantumLeap.Tools()
             Section {
-                NavigationLink("AUTO_PLUGINS") { PluginsView() }
+                Button("AUTO_PLUGINS") { showPlugins = true }
+                    .foregroundStyle(.primary)
                     .accessibilityIdentifier("settings.plugins")
             }
             Section {
@@ -55,15 +57,16 @@ struct SettingsView: View {
         .sheet(isPresented: $showDataUse) {
             NavigationStack {
                 DataUseDetailsView(showsWithdrawal: true)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") { showDataUse = false }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close") { showDataUse = false }
+                        }
                     }
-                }
             }
             .presentationDetents([.large])
             .modifier(CaptureSetupSheetSizing())
         }
+        .fullScreenCover(isPresented: $showPlugins) { PluginsView() }
         .navigationTitle(Text("TITLE_SETTINGS"))
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -98,7 +101,9 @@ struct SettingsView: View {
 private struct ContactView: View {
     private struct Page: Identifiable {
         let url: URL
-        var id: URL { url }
+        var id: URL {
+            url
+        }
     }
 
     @State private var page: Page?
@@ -158,7 +163,9 @@ private struct ContactSafariView: UIViewControllerRepresentable {
     final class Coordinator: NSObject, SFSafariViewControllerDelegate {
         private let onFinish: () -> Void
 
-        init(onFinish: @escaping () -> Void) { self.onFinish = onFinish }
+        init(onFinish: @escaping () -> Void) {
+            self.onFinish = onFinish
+        }
 
         func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
             onFinish()

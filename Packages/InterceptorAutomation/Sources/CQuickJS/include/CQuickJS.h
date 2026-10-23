@@ -59,6 +59,21 @@ QJSResult qjs_run(QJSCancelToken *token, const QJSLimits *limits,
                   const uint8_t *event_json, size_t event_len,
                   const uint8_t *config_json, size_t config_len);
 
+/// Maximum accepted manifest size for `qjs_run_v2`.
+#define QJS_MAX_MANIFEST_BYTES (32u * 1024u)
+
+#define QJS_MAX_PACKAGE_BYTES (256u * 1024u)
+
+/// Four-phase HTTP lifecycle entry. `package_json` is exactly {manifest,sourceFiles} for schema 2.
+/// Validates the entire package before matching the raw event and requested phase. Zero matches
+/// return empty actions without evaluation; ambiguity is invalid input. Only the selected source
+/// evaluates, with native one-argument Interceptor.attach(callbacks) bound to that route.
+QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
+                     const uint8_t *package_json, size_t package_len,
+                     const char *hook,
+                     const uint8_t *event_json, size_t event_len,
+                     const uint8_t *config_json, size_t config_len);
+
 void qjs_result_free(QJSResult *result);
 
 #ifdef __cplusplus

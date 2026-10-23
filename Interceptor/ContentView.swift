@@ -15,6 +15,8 @@ struct ContentView: View {
     @Environment(\.isFirstLaunch) private var isFirstLaunch: Binding<Bool>
     @EnvironmentObject private var client: Tuberose
     @Environment(\.scenePhase) private var scenePhase
+    @State private var selectedTab = 0
+    @StateObject private var tabNavigationAlignment = TabNavigationAlignment()
     @AppStorage(CaptureAuthorization.key, store: CaptureAuthorization.defaults) private var consentVersion = 0
 
     private var requiresConsent: Bool {
@@ -48,10 +50,15 @@ struct ContentView: View {
     }
 
     private var mainTabs: some View {
-        TabView(content: {
+        TabView(selection: $selectedTab, content: {
             NavigationView(content: {
                 HomeView()
             })
+            .background {
+                if #available(iOS 27, *) {
+                    TabNavigationAlignmentObserver(alignment: tabNavigationAlignment)
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
                 controller.preferredDisplayMode = .oneBesideSecondary
@@ -68,6 +75,11 @@ struct ContentView: View {
                                        description: Text("EMPTY_SETTINGS_DESCRIPTION"))
                     .navigationBarTitleDisplayMode(.inline)
             })
+            .background {
+                if #available(iOS 27, *) {
+                    TabNavigationAlignmentObserver(alignment: tabNavigationAlignment)
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .introspect(.navigationSplitView, on: .iOS(.v17...), customize: { controller in
                 controller.preferredDisplayMode = .oneBesideSecondary
@@ -79,6 +91,10 @@ struct ContentView: View {
             }
             .tag(1)
         })
+        .onChange(of: selectedTab) { tabNavigationAlignment.update() }
+        .introspect(.tabView, on: .iOS(.v27)) { tabView in
+            tabNavigationAlignment.configure(tabView)
+        }
         .introspect(.tabView, on: .iOS(.v17, .v18, .v26, .v27)) { tabView in
             // Change only selected tab items; the shared accent still colors primary buttons.
             let selectedColor = UIColor { traits in

@@ -2,14 +2,14 @@ import AutomationCore
 import AutomationRepository
 import AutomationRuntime
 import CryptoKit
-import XCTest
 @testable import Interceptor
+import XCTest
 
 @MainActor
 final class AutomationControllerTests: XCTestCase {
     func testAppBundleContainsPinnedQuickJSLicense() throws {
         let url = try XCTUnwrap(Bundle.main.url(forResource: "QuickJS-LICENSE", withExtension: "txt"))
-        let digest = SHA256.hash(data: try Data(contentsOf: url))
+        let digest = try SHA256.hash(data: Data(contentsOf: url))
             .map { String(format: "%02x", $0) }.joined()
         XCTAssertEqual(digest, "598fd7fc928e4350abce36e337ba5a1346923c5c692f5be92c3d8e29ddd7c18d")
     }
@@ -17,14 +17,12 @@ final class AutomationControllerTests: XCTestCase {
     private var storeURL = AutomationFixtures.tempStoreURL()
     private var runner = FakeScriptRunner()
 
-    override func setUp() { storeURL = AutomationFixtures.tempStoreURL(); runner = FakeScriptRunner() }
-    override func tearDown() { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+    override func setUp() {
+        storeURL = AutomationFixtures.tempStoreURL(); runner = FakeScriptRunner()
+    }
 
-    private func controller(client: FakeRepositoryClient? = nil) throws -> (AutomationController, FakeRepositoryClient) {
-        let package = try AutomationFixtures.package(name: "Zeta")
-        let fake = try client ?? FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [package]), packages: [package])
-        let c = AutomationController(store: AutomationStore(fileURL: storeURL), client: fake, executor: runner, clock: { AutomationFixtures.now })
-        return (c, fake)
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent())
     }
 
     // MARK: Lists and local scripts
@@ -37,8 +35,8 @@ final class AutomationControllerTests: XCTestCase {
         XCTAssertEqual(c.scripts.map(\.package.manifest.name), ["Alpha", "beta"])
         let r = try XCTUnwrap(beta)
         XCTAssertFalse(r.enabled)
-        XCTAssertEqual(r.package.manifest.read.body, .none)
-        XCTAssertEqual(r.package.manifest.subscriptions.flatMap(\.hosts), ["example.com", "example.com"])
+        XCTAssertEqual(r.package.manifest.read.body, .json)
+        XCTAssertEqual(r.package.manifest.matches.flatMap(\.hosts), ["example.com"])
         XCTAssertEqual(AutomationTrustBadge(r.provenance), .localFile)
         XCTAssertTrue(runner.runs.isEmpty, "creating a script must not execute it")
     }
@@ -96,62 +94,19 @@ final class AutomationControllerTests: XCTestCase {
     }
 
     func testAppLinkedEngineRejectsOversizeBigIntAndRecovers() async throws {
-        let executor = JavaScriptExecutor()
-        let start = ContinuousClock.now
-        do {
-            _ = try await executor.run(source: "function onRequest(){let n=(1n<<1000000n)-1n;return {actions:[]};}",
-                                       hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
-            XCTFail("expected the operand cap")
-        } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .memoryOrStack) }
-        XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
-        let recovered = try await executor.run(source: "function onRequest(){return {actions:[]};}",
-                                               hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
-        XCTAssertTrue(try ValidatedAction.parse(recovered).isEmpty)
+        try await assertAppLinkedEngineRejectsOversizeBigIntAndRecovers()
     }
 
     func testAppLinkedEngineInterruptsRepeatedNativeWork() async throws {
-        let executor = JavaScriptExecutor()
-        let start = ContinuousClock.now
-        do {
-            _ = try await executor.run(source: "function onRequest(){let n=(1n<<4000n)-1n;while(true){let x=n*n;let s=x.toString(10)+x.toString(36)}}",
-                                       hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
-            XCTFail("expected the deadline")
-        } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .timeout) }
-        XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
+        try await assertAppLinkedEngineInterruptsRepeatedNativeWork()
     }
 
     func testAppLinkedEngineInterruptsSparseNativeWorkAndRecovers() async throws {
-        let executor = JavaScriptExecutor()
-        for expression in ["new Array(4294967295).indexOf(1)", "Array.prototype.join.call({length:9007199254740991},'')",
-                           "(()=>{let s='x'.repeat(1000000);return new Array(100000).fill(s).sort()})()",
-                           "(()=>{let s='x'.repeat(1000000);let t=s.slice(0,-1)+'y';return new Array(100000).fill(s).indexOf(t)})()"] {
-            let start = ContinuousClock.now
-            do {
-                _ = try await executor.run(source: "function onRequest(){\(expression);return {actions:[]};}",
-                                           hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
-                XCTFail("expected sparse native deadline")
-            } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .timeout) }
-            XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
-            let recovered = try await executor.run(source: "const onRequest=()=>({actions:[]});",
-                                                   hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
-            XCTAssertTrue(try ValidatedAction.parse(recovered).isEmpty)
-        }
+        try await assertAppLinkedEngineInterruptsSparseNativeWorkAndRecovers()
     }
 
     func testAppLinkedEngineInterruptsStringSearchAndRecovers() async throws {
-        let executor = JavaScriptExecutor()
-        for operation in ["indexOf(n)", "lastIndexOf(n)", "includes(n)", "replace(n,'x')", "replaceAll(n,'x')", "split(n)"] {
-            let start = ContinuousClock.now
-            do {
-                _ = try await executor.run(source: "function onRequest(){let n='a'.repeat(1000000)+'b',h='a'.repeat(2000000);h.\(operation);return {actions:[]};}",
-                                           hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
-                XCTFail("expected string search deadline: \(operation)")
-            } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .timeout, operation) }
-            XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
-            let recovered = try await executor.run(source: "function onRequest(){if('abc'.indexOf('b')!==1)throw 1;return {actions:[]};}",
-                                                   hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
-            XCTAssertTrue(try ValidatedAction.parse(recovered).isEmpty)
-        }
+        try await assertAppLinkedEngineInterruptsStringSearchAndRecovers()
     }
 
     // MARK: Add repository
@@ -216,7 +171,7 @@ final class AutomationControllerTests: XCTestCase {
     func testVerifyAndAddRequiresExactFingerprintAndMismatchPersistsNothing() async throws {
         let key = Curve25519.Signing.PrivateKey()
         let package = try AutomationFixtures.package(name: "Signed")
-        let client = FakeRepositoryClient(snapshot: try AutomationFixtures.snapshot(packages: [package], key: key), packages: [package])
+        let client = try FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [package], key: key), packages: [package])
         let (c, _) = try controller(client: client)
         await c.load()
         let model = AddRepositoryModel(controller: c)
@@ -241,7 +196,7 @@ final class AutomationControllerTests: XCTestCase {
     func testSignedUnverifiedBadgeIsDistinctFromUnsignedAndVerified() async throws {
         let key = Curve25519.Signing.PrivateKey()
         let package = try AutomationFixtures.package(name: "S")
-        let client = FakeRepositoryClient(snapshot: try AutomationFixtures.snapshot(packages: [package], key: key), packages: [package])
+        let client = try FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [package], key: key), packages: [package])
         let (c, _) = try controller(client: client)
         await c.load()
         let model = AddRepositoryModel(controller: c)
@@ -250,23 +205,18 @@ final class AutomationControllerTests: XCTestCase {
         _ = await waitUntil { model.phase == .previewed }
         model.addUnverified()
         _ = await waitUntil { model.phase == .added }
-        XCTAssertEqual(AutomationTrustBadge(try XCTUnwrap(c.repositories.first).trust), .signedKeyUnverified)
+        XCTAssertEqual(try AutomationTrustBadge(XCTUnwrap(c.repositories.first).trust), .signedKeyUnverified)
         XCTAssertEqual(Set([AutomationTrustBadge.unsigned, .signedKeyUnverified, .publisherKeyVerified]).count, 3)
     }
 
     // MARK: Repository detail and import
-
-    private func acceptedRecord(_ c: AutomationController, client: FakeRepositoryClient) async throws -> RepositoryRecord {
-        _ = await c.mutate { try await c.store.accept(client.snapshot, acknowledgeUnverified: true, now: AutomationFixtures.now) }
-        return try XCTUnwrap(c.repositories.first)
-    }
 
     func testSelectFetchesOnlyReviewPackageAndImportIsSeparateAndDisabled() async throws {
         let (c, client) = try controller()
         await c.load()
         let record = try await acceptedRecord(c, client: client)
         let detail = RepositoryDetailModel(controller: c, record: record)
-        detail.select(try XCTUnwrap(detail.entries.first))
+        try detail.select(XCTUnwrap(detail.entries.first))
         _ = await waitUntil { detail.phase == .reviewing }
         XCTAssertEqual(client.packageCount, 1)
         XCTAssertEqual(client.previewCount, 0, "no implicit index refetch")
@@ -286,7 +236,7 @@ final class AutomationControllerTests: XCTestCase {
         let stale = try await acceptedRecord(c, client: client)
         _ = await c.mutate { try await c.store.accept(client.snapshot, acknowledgeUnverified: true, now: AutomationFixtures.now) }
         let detail = RepositoryDetailModel(controller: c, record: stale)
-        detail.select(try XCTUnwrap(detail.entries.first))
+        try detail.select(XCTUnwrap(detail.entries.first))
         _ = await waitUntil { detail.phase == .reviewing }
         detail.importDisabled()
         _ = await waitUntil { detail.error != nil }
@@ -300,7 +250,7 @@ final class AutomationControllerTests: XCTestCase {
         let record = try await acceptedRecord(c, client: client)
         client.delayNanoseconds = 200_000_000
         let detail = RepositoryDetailModel(controller: c, record: record)
-        detail.select(try XCTUnwrap(detail.entries.first))
+        try detail.select(XCTUnwrap(detail.entries.first))
         detail.close()
         try await Task.sleep(nanoseconds: 400_000_000)
         XCTAssertNil(detail.package)
@@ -313,7 +263,7 @@ final class AutomationControllerTests: XCTestCase {
         client.delayNanoseconds = 150_000_000
         let parent = RepositoryDetailModel(controller: c, record: record)
         let child = parent.makeEntryModel()
-        child.select(try XCTUnwrap(parent.entries.first))
+        try child.select(XCTUnwrap(parent.entries.first))
         parent.close()
         let ready1 = await waitUntil { child.phase == .reviewing }
         XCTAssertTrue(ready1)
@@ -375,21 +325,7 @@ final class AutomationControllerTests: XCTestCase {
     }
 
     func testReviewedPackageExposesAuthorAndSummary() async throws {
-        let base = try XCTUnwrap(StrictJSON.parse(AutomationTemplate.packageBytes(name: "Meta")).objectValue)
-        var manifest = try XCTUnwrap(base["manifest"]?.objectValue)
-        manifest["author"] = .string("Example Author"); manifest["summary"] = .string("Summarizes requests.")
-        let package = try PluginPackage.validate(JSONValue.object(["manifest": .object(manifest), "source": .string("function onRequest(){}")]).data())
-        let fake = try FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [package]), packages: [package])
-        let (c, _) = try controller(client: fake)
-        await c.load()
-        let record = try await acceptedRecord(c, client: fake)
-        let child = RepositoryDetailModel(controller: c, record: record).makeEntryModel()
-        child.select(try XCTUnwrap(child.entries.first))
-        let ready6 = await waitUntil { child.phase == .reviewing }
-        XCTAssertTrue(ready6)
-        XCTAssertEqual(child.package?.manifest.author, "Example Author")
-        XCTAssertEqual(child.package?.manifest.summary, "Summarizes requests.")
-        XCTAssertEqual(child.package?.revision, Digest.sha256Hex(try XCTUnwrap(child.package).bytes))
+        try await assertReviewedPackageExposesAuthorAndSummary()
     }
 
     func testDeletingRepositoryKeepsInstalledScripts() async throws {
@@ -397,7 +333,7 @@ final class AutomationControllerTests: XCTestCase {
         await c.load()
         let record = try await acceptedRecord(c, client: client)
         let detail = RepositoryDetailModel(controller: c, record: record)
-        detail.select(try XCTUnwrap(detail.entries.first))
+        try detail.select(XCTUnwrap(detail.entries.first))
         _ = await waitUntil { detail.phase == .reviewing }
         detail.importDisabled()
         _ = await waitUntil { detail.phase == .imported }
@@ -408,7 +344,88 @@ final class AutomationControllerTests: XCTestCase {
 
     // MARK: Script session
 
-    private func session() async throws -> (ScriptSession, AutomationController) {
+    func testSaveAsLocalEditCreatesChildRevisionWithoutPublisherTrustOrRunning() async throws {
+        try await assertSaveAsLocalEditCreatesChildRevisionWithoutPublisherTrustOrRunning()
+    }
+
+    func testRunShowsValidatedActionsAndEditsInvalidateResult() async throws {
+        try await assertRunShowsValidatedActionsAndEditsInvalidateResult()
+    }
+
+    func testInvalidResultAndInvalidInputAreRejected() async throws {
+        try await assertInvalidResultAndInvalidInputAreRejected()
+    }
+
+    func testCancelAndLeaveCancelRuntimeAndDropLateResult() async throws {
+        try await assertCancelAndLeaveCancelRuntimeAndDropLateResult()
+    }
+
+    func testCancellationDiscardsLateSuccessfulRuntimeResult() async throws {
+        try await assertCancellationDiscardsLateSuccessfulRuntimeResult()
+    }
+
+    func testActionParserEnforcesShape() throws {
+        let id = UUID().uuidString
+        let three = (0 ..< 3).map { _ in #"{"type":"webhook","endpointId":"\#(id)","json":null}"# }.joined(separator: ",")
+        XCTAssertThrowsError(try ValidatedAction.parse(Data(#"{"actions":[\#(three)]}"#.utf8)))
+        XCTAssertThrowsError(try ValidatedAction.parse(Data(#"{"actions":[],"extra":1}"#.utf8)))
+        XCTAssertThrowsError(try ValidatedAction.parse(Data(#"{"actions":[{"type":"webhook","endpointId":"nope","json":1}]}"#.utf8)))
+        XCTAssertEqual(try ValidatedAction.parse(Data(#"{"actions":[]}"#.utf8)), [])
+    }
+
+    func testTemplateUsesFourHooksAndDirectJSONBodyEdits() throws {
+        let p = try PluginPackage.validate(AutomationTemplate.packageBytes(name: "T"))
+        XCTAssertEqual(p.manifest.read.body, .json)
+        XCTAssertEqual(p.manifest.endpointBindings, [])
+        XCTAssertEqual(p.manifest.schemaVersion, 2)
+        XCTAssertNil(p.source)
+        XCTAssertEqual(p.sourceFiles.keys.sorted(), [AutomationTemplate.sourceFile])
+        XCTAssertTrue(p.sourceFiles[AutomationTemplate.sourceFile]?.contains("request.body.limit = 5") == true)
+        XCTAssertTrue(p.sourceFiles[AutomationTemplate.sourceFile]?.contains("response.body.maintenance = true") == true)
+        XCTAssertLessThanOrEqual(p.bytes.count, Limits.package)
+    }
+
+    func testFingerprintNormalization() {
+        let hex = String(repeating: "ab", count: 32)
+        XCTAssertEqual(FingerprintInput.normalized(" \(hex.uppercased())\n"), hex)
+        XCTAssertNil(FingerprintInput.normalized(String(hex.dropLast())))
+        XCTAssertNil(FingerprintInput.normalized(String(repeating: "g", count: 64)))
+    }
+}
+
+private extension AutomationControllerTests {
+    func assertReviewedPackageExposesAuthorAndSummary() async throws {
+        var base = try XCTUnwrap(StrictJSON.parse(AutomationTemplate.packageBytes(name: "Meta")).objectValue)
+        var manifest = try XCTUnwrap(base["manifest"]?.objectValue)
+        manifest["author"] = .string("Example Author"); manifest["summary"] = .string("Summarizes requests.")
+        base["manifest"] = .object(manifest)
+        let package = try PluginPackage.validate(JSONValue.object(base).data())
+        let fake = try FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [package]), packages: [package])
+        let (c, _) = try controller(client: fake)
+        await c.load()
+        let record = try await acceptedRecord(c, client: fake)
+        let child = RepositoryDetailModel(controller: c, record: record).makeEntryModel()
+        try child.select(XCTUnwrap(child.entries.first))
+        let ready6 = await waitUntil { child.phase == .reviewing }
+        XCTAssertTrue(ready6)
+        XCTAssertEqual(child.package?.manifest.author, "Example Author")
+        XCTAssertEqual(child.package?.manifest.summary, "Summarizes requests.")
+        XCTAssertEqual(child.package?.revision, try Digest.sha256Hex(XCTUnwrap(child.package).bytes))
+    }
+
+    func controller(client: FakeRepositoryClient? = nil) throws -> (AutomationController, FakeRepositoryClient) {
+        let package = try AutomationFixtures.package(name: "Zeta")
+        let fake = try client ?? FakeRepositoryClient(snapshot: AutomationFixtures.snapshot(packages: [package]), packages: [package])
+        let c = AutomationController(store: AutomationStore(fileURL: storeURL), client: fake, executor: runner, clock: { AutomationFixtures.now })
+        return (c, fake)
+    }
+
+    func acceptedRecord(_ c: AutomationController, client: FakeRepositoryClient) async throws -> RepositoryRecord {
+        _ = await c.mutate { try await c.store.accept(client.snapshot, acknowledgeUnverified: true, now: AutomationFixtures.now) }
+        return try XCTUnwrap(c.repositories.first)
+    }
+
+    func session() async throws -> (ScriptSession, AutomationController) {
         let (c, _) = try controller()
         await c.load()
         let created = await c.createExample(name: "Example")
@@ -416,7 +433,67 @@ final class AutomationControllerTests: XCTestCase {
         return (ScriptSession(controller: c, revision: r), c)
     }
 
-    func testSaveAsLocalEditCreatesChildRevisionWithoutPublisherTrustOrRunning() async throws {
+    func assertAppLinkedEngineRejectsOversizeBigIntAndRecovers() async throws {
+        let executor = JavaScriptExecutor()
+        let start = ContinuousClock.now
+        do {
+            _ = try await executor.run(source: "function onRequest(){let n=(1n<<1000000n)-1n;return {actions:[]};}",
+                                       hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+            XCTFail("expected the operand cap")
+        } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .memoryOrStack) }
+        XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
+        let recovered = try await executor.run(source: "function onRequest(){return {actions:[]};}",
+                                               hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+        XCTAssertTrue(try ValidatedAction.parse(recovered).isEmpty)
+    }
+
+    func assertAppLinkedEngineInterruptsRepeatedNativeWork() async throws {
+        let executor = JavaScriptExecutor()
+        let start = ContinuousClock.now
+        do {
+            _ = try await executor.run(source: "function onRequest(){let n=(1n<<4000n)-1n;while(true){let x=n*n;let s=x.toString(10)+x.toString(36)}}",
+                                       hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+            XCTFail("expected the deadline")
+        } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .timeout) }
+        XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
+    }
+
+    func assertAppLinkedEngineInterruptsSparseNativeWorkAndRecovers() async throws {
+        let executor = JavaScriptExecutor()
+        for expression in ["new Array(4294967295).indexOf(1)", "Array.prototype.join.call({length:9007199254740991},'')",
+                           "(()=>{let s='x'.repeat(1000000);return new Array(100000).fill(s).sort()})()",
+                           "(()=>{let s='x'.repeat(1000000);let t=s.slice(0,-1)+'y';return new Array(100000).fill(s).indexOf(t)})()"]
+        {
+            let start = ContinuousClock.now
+            do {
+                _ = try await executor.run(source: "function onRequest(){\(expression);return {actions:[]};}",
+                                           hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+                XCTFail("expected sparse native deadline")
+            } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .timeout) }
+            XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
+            let recovered = try await executor.run(source: "const onRequest=()=>({actions:[]});",
+                                                   hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+            XCTAssertTrue(try ValidatedAction.parse(recovered).isEmpty)
+        }
+    }
+
+    func assertAppLinkedEngineInterruptsStringSearchAndRecovers() async throws {
+        let executor = JavaScriptExecutor()
+        for operation in ["indexOf(n)", "lastIndexOf(n)", "includes(n)", "replace(n,'x')", "replaceAll(n,'x')", "split(n)"] {
+            let start = ContinuousClock.now
+            do {
+                _ = try await executor.run(source: "function onRequest(){let n='a'.repeat(1000000)+'b',h='a'.repeat(2000000);h.\(operation);return {actions:[]};}",
+                                           hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+                XCTFail("expected string search deadline: \(operation)")
+            } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .timeout, operation) }
+            XCTAssertLessThan(start.duration(to: .now), .milliseconds(500))
+            let recovered = try await executor.run(source: "function onRequest(){if('abc'.indexOf('b')!==1)throw 1;return {actions:[]};}",
+                                                   hook: .request, eventJSON: Data("{}".utf8), configJSON: Data("{}".utf8))
+            XCTAssertTrue(try ValidatedAction.parse(recovered).isEmpty)
+        }
+    }
+
+    func assertSaveAsLocalEditCreatesChildRevisionWithoutPublisherTrustOrRunning() async throws {
         let (s, c) = try await session()
         let parent = s.revision
         let original = parent.package.manifest
@@ -431,26 +508,26 @@ final class AutomationControllerTests: XCTestCase {
         XCTAssertTrue(runner.runs.isEmpty)
     }
 
-    func testRunShowsValidatedActionsAndEditsInvalidateResult() async throws {
+    func assertRunShowsValidatedActionsAndEditsInvalidateResult() async throws {
         let (s, _) = try await session()
         s.run(); _ = await waitUntil { self.runner.isWaiting }
         XCTAssertTrue(s.isRunning)
         let id = AutomationTemplate.previewEndpointID.uuidString
         runner.finish(.success(Data(#"{"actions":[{"type":"webhook","endpointId":"\#(id)","json":{"a":1}}]}"#.utf8)))
         _ = await waitUntil { !s.isRunning }
-        guard case .finished(let actions) = s.runState else { return XCTFail("\(s.runState)") }
+        guard case let .finished(actions) = s.runState else { return XCTFail("\(s.runState)") }
         XCTAssertEqual(actions.map(\.endpointID), [AutomationTemplate.previewEndpointID])
         XCTAssertEqual(actions.first?.json, #"{"a":1}"#)
         s.eventText = SyntheticFixture.eventJSON(for: .request) + " "
         XCTAssertEqual(s.runState, .idle)
         s.run(); _ = await waitUntil { self.runner.isWaiting }; runner.finish(.success(Data(#"{"actions":[]}"#.utf8)))
         _ = await waitUntil { !s.isRunning }
-        s.hook = .response
+        s.hook = .responseEnter
         XCTAssertEqual(s.runState, .idle)
-        XCTAssertEqual(s.eventText, SyntheticFixture.eventJSON(for: .response))
+        XCTAssertEqual(s.eventText, SyntheticFixture.eventJSON(for: .responseEnter))
     }
 
-    func testInvalidResultAndInvalidInputAreRejected() async throws {
+    func assertInvalidResultAndInvalidInputAreRejected() async throws {
         let (s, _) = try await session()
         s.run(); _ = await waitUntil { self.runner.isWaiting }
         runner.finish(.success(Data(#"{"actions":[{"type":"shell","endpointId":"x","json":1}]}"#.utf8)))
@@ -462,7 +539,7 @@ final class AutomationControllerTests: XCTestCase {
         XCTAssertEqual(runner.runs.count, 1)
     }
 
-    func testCancelAndLeaveCancelRuntimeAndDropLateResult() async throws {
+    func assertCancelAndLeaveCancelRuntimeAndDropLateResult() async throws {
         let (s, _) = try await session()
         s.run(); _ = await waitUntil { self.runner.isWaiting }
         s.cancelRun()
@@ -475,7 +552,7 @@ final class AutomationControllerTests: XCTestCase {
         XCTAssertEqual(s.runState, .idle, "no stale task result after leaving")
     }
 
-    func testCancellationDiscardsLateSuccessfulRuntimeResult() async throws {
+    func assertCancellationDiscardsLateSuccessfulRuntimeResult() async throws {
         let (session, _) = try await session()
         runner.setCancellationIgnored(true)
         session.run()
@@ -485,29 +562,5 @@ final class AutomationControllerTests: XCTestCase {
         runner.finish(.success(Data(#"{"actions":[]}"#.utf8)))
         _ = await waitUntil { !session.isRunning }
         XCTAssertEqual(session.runState, .failed("AUTO_ERR_JS_CANCELLED"))
-    }
-
-    func testActionParserEnforcesShape() throws {
-        let id = UUID().uuidString
-        let three = (0..<3).map { _ in #"{"type":"webhook","endpointId":"\#(id)","json":null}"# }.joined(separator: ",")
-        XCTAssertThrowsError(try ValidatedAction.parse(Data(#"{"actions":[\#(three)]}"#.utf8)))
-        XCTAssertThrowsError(try ValidatedAction.parse(Data(#"{"actions":[],"extra":1}"#.utf8)))
-        XCTAssertThrowsError(try ValidatedAction.parse(Data(#"{"actions":[{"type":"webhook","endpointId":"nope","json":1}]}"#.utf8)))
-        XCTAssertEqual(try ValidatedAction.parse(Data(#"{"actions":[]}"#.utf8)), [])
-    }
-
-    func testTemplateIsMetadataOnlyExampleComAndAtMostOneActionPerHook() throws {
-        let p = try PluginPackage.validate(AutomationTemplate.packageBytes(name: "T"))
-        XCTAssertEqual(p.manifest.read.body, .none)
-        XCTAssertEqual(p.manifest.endpointBindings, ["preview"])
-        XCTAssertTrue(p.source.contains("onRequest") && p.source.contains("onResponse"))
-        XCTAssertLessThanOrEqual(p.bytes.count, Limits.package)
-    }
-
-    func testFingerprintNormalization() {
-        let hex = String(repeating: "ab", count: 32)
-        XCTAssertEqual(FingerprintInput.normalized(" \(hex.uppercased())\n"), hex)
-        XCTAssertNil(FingerprintInput.normalized(String(hex.dropLast())))
-        XCTAssertNil(FingerprintInput.normalized(String(repeating: "g", count: 64)))
     }
 }

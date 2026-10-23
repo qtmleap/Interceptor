@@ -56,6 +56,12 @@ public struct AcceptancePreview: Equatable, Sendable {
     public let isNewRepository: Bool
 }
 
+/// Admission state captured before an asynchronous repository ingestion.
+public enum RepositoryAcceptanceExpectation: Equatable, Sendable {
+    case absent
+    case generation(UUID)
+}
+
 enum TrustPlanner {
     struct Plan { let trust: TrustState; let requiresAck: Bool }
 

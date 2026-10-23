@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "id": "65153731-6449-4BFC-B2F6-3A3350927DB8",
+  "name": "Multi-file hooks",
+  "version": "1.0.0",
+  "author": "Interceptor test fixture",
+  "summary": "SDK-emitted two-file native regression fixture.",
+  "read": {
+    "metadata": [
+      "method",
+      "host",
+      "path",
+      "status"
+    ],
+    "headers": [],
+    "queryKeys": [],
+    "body": {
+      "mode": "json"
+    }
+  },
+  "write": {
+    "requestBody": true,
+    "responseBody": true
+  },
+  "endpointBindings": [],
+  "settings": {}
+}
