@@ -488,6 +488,7 @@ private final class FailingLifecycleCatalog: PackageCatalogStoring {
     func detail(in record: RepositoryRecord, entryID: UUID) throws -> PluginPackagePresentation? { try base.detail(in: record, entryID: entryID) }
     func packageBytes(in record: RepositoryRecord, entry: IndexEntry) throws -> Data? { try base.packageBytes(in: record, entry: entry) }
     func reusableBytes(sha256: String) throws -> Data? { try base.reusableBytes(sha256: sha256) }
+    func icon(sha256: String) async throws -> PluginIcon? { try await base.icon(sha256: sha256) }
     func isComplete(_ snapshot: VerifiedSnapshot) throws -> Bool { try base.isComplete(snapshot) }
 }
 

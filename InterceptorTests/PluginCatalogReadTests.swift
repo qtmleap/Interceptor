@@ -59,6 +59,23 @@ final class PluginCatalogReadTests: XCTestCase {
         return try RepositoryEnvelope.verify(envelope: envelope.data(), url: url, now: AutomationFixtures.now)
     }
 
+    private func withIcon(_ package: PluginPackage, path: String) throws -> PluginPackage {
+        let encoded = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
+        var root = try XCTUnwrap(JSONValue(parsing: package.bytes).objectValue)
+        var manifest = try XCTUnwrap(root["manifest"]?.objectValue)
+        manifest["icon"] = .string(path)
+        root["manifest"] = .object(manifest)
+        root["assets"] = .object([path: .string(encoded)])
+        return try PluginPackage.validate(JSONValue.object(root).data())
+    }
+
+    private func install(_ package: PluginPackage, from record: RepositoryRecord) throws {
+        let state = try coordinator.state()
+        _ = try coordinator.batch([InstallationRequest(package: package, snapshot: XCTUnwrap(record.snapshot),
+            expectedSourceGeneration: record.generation, operation: .add)],
+            expectedSelectionGeneration: state.selectionGeneration, now: AutomationFixtures.now)
+    }
+
     /// This database instance leaves scope before the controller opens the same persistent store.
     private func stageAndAccept(_ packages: [PluginPackage], url: RepositoryURL = AutomationFixtures.url,
                                 sequence: Int64 = 1, receipt: UInt64 = 1) async throws -> RepositoryRecord
@@ -232,6 +249,80 @@ final class PluginCatalogReadTests: XCTestCase {
         assertNoNetwork(client)
     }
 
+    func testInstalledIconTakesPrecedenceOverPublishedUpdate() async throws {
+        let local = try withIcon(AutomationFixtures.multiFilePackage(name: "Selected icon"), path: "selected.png")
+        let original = try await stageAndAccept([local])
+        try install(local, from: original)
+        let published = try withIcon(described(local, version: "2.0.0"), path: "published.png")
+        let refreshed = try await stageAndAccept([published], sequence: 2, receipt: 2)
+        let (controller, browser, client) = try await offlineController(packages: [published], snapshot: XCTUnwrap(refreshed.snapshot))
+        let current = try XCTUnwrap(controller.repositories.first)
+        let entry = try XCTUnwrap(current.snapshot?.index.plugins.first)
+        let family = PluginBrowserFamilyID(repository: current.url, manifestID: local.manifest.id)
+        let source = try XCTUnwrap(browser.iconSource(for: family, entry: entry, record: current))
+        let icon = try await source.load()
+        XCTAssertEqual(icon, try XCTUnwrap(local.icon))
+        XCTAssertNotEqual(icon, try XCTUnwrap(published.icon), "The selected package owns its displayed icon, including its asset path")
+        assertNoNetwork(client)
+    }
+
+    func testInstalledPackageWithoutIconDoesNotBorrowPublishedIcon() async throws {
+        let local = try AutomationFixtures.multiFilePackage(name: "Selected without icon")
+        let original = try await stageAndAccept([local])
+        try install(local, from: original)
+        let published = try withIcon(described(local, version: "2.0.0"), path: "published.png")
+        let refreshed = try await stageAndAccept([published], sequence: 2, receipt: 2)
+        let (controller, browser, client) = try await offlineController(packages: [published], snapshot: XCTUnwrap(refreshed.snapshot))
+        let current = try XCTUnwrap(controller.repositories.first)
+        let entry = try XCTUnwrap(current.snapshot?.index.plugins.first)
+        let family = PluginBrowserFamilyID(repository: current.url, manifestID: local.manifest.id)
+        XCTAssertNotNil(published.icon)
+        XCTAssertNil(local.icon)
+        XCTAssertNil(browser.iconSource(for: family, entry: entry, record: current))
+        assertNoNetwork(client)
+    }
+
+    func testCatalogIconRequiresCurrentEntryAndMatchingFamily() async throws {
+        let originalPackage = try withIcon(AutomationFixtures.multiFilePackage(name: "Catalog icon"), path: "original.png")
+        let original = try await stageAndAccept([originalPackage])
+        let staleEntry = try XCTUnwrap(original.snapshot?.index.plugins.first)
+        let published = try withIcon(described(originalPackage, version: "2.0.0"), path: "published.png")
+        let other = try AutomationFixtures.multiFilePackage(name: "Other accepted package")
+        let refreshed = try await stageAndAccept([published, other], sequence: 2, receipt: 2)
+        let (controller, browser, client) = try await offlineController(packages: [published, other], snapshot: XCTUnwrap(refreshed.snapshot))
+        let current = try XCTUnwrap(controller.repositories.first)
+        let entry = try XCTUnwrap(current.snapshot?.index.plugins.first { $0.id == published.manifest.id })
+        let otherEntry = try XCTUnwrap(current.snapshot?.index.plugins.first { $0.id == other.manifest.id })
+        let family = PluginBrowserFamilyID(repository: current.url, manifestID: published.manifest.id)
+        let source = try XCTUnwrap(browser.iconSource(for: family, entry: entry, record: current))
+        let icon = try await source.load()
+        XCTAssertEqual(icon, try XCTUnwrap(published.icon), "An uninstalled package uses the currently accepted local content")
+        XCTAssertNil(browser.iconSource(for: family, entry: staleEntry, record: original))
+        XCTAssertNil(browser.iconSource(for: family, entry: otherEntry, record: current))
+        let otherSource = PluginBrowserFamilyID(repository: try RepositoryURL(parsing: "https://other.example.com/repository.json"),
+                                               manifestID: published.manifest.id)
+        XCTAssertNil(browser.iconSource(for: otherSource, entry: entry, record: current))
+        XCTAssertNil(browser.iconSource(for: family, entry: nil, record: current))
+        XCTAssertNil(browser.iconSource(for: family, entry: entry, record: nil))
+        assertNoNetwork(client)
+    }
+
+    func testCatalogIconIsUnavailableWithoutDisplayDatabase() async throws {
+        let package = try withIcon(AutomationFixtures.multiFilePackage(name: "Catalog unavailable"), path: "icon.png")
+        let record = try await stageAndAccept([package])
+        let client = FakeRepositoryClient(snapshot: try XCTUnwrap(record.snapshot), packages: [package])
+        let controller = AutomationController(store: AutomationStore(fileURL: catalogURL), client: client,
+            executor: FakeScriptRunner(), clock: { AutomationFixtures.now }, packageCatalog: nil,
+            installationCoordinator: coordinator, hasCaptureConsent: { true }, stopCapture: {})
+        await controller.load()
+        let browser = PluginBrowserModel(controller: controller)
+        let current = try XCTUnwrap(controller.repositories.first)
+        let entry = try XCTUnwrap(current.snapshot?.index.plugins.first)
+        let family = PluginBrowserFamilyID(repository: current.url, manifestID: package.manifest.id)
+        XCTAssertNil(browser.iconSource(for: family, entry: entry, record: current))
+        assertNoNetwork(client)
+    }
+
     func testSameManifestFromTwoSourcesStaysDistinctAndInstalledOrphanRemainsOffline() async throws {
         let first = try described(AutomationFixtures.package(name: "Same identity"), author: "First source", category: "Tools")
         let second = try described(first, author: "Second source")
@@ -291,6 +382,7 @@ private final class CountingReadCatalog: PackageCatalogStoring {
         try base.packageBytes(in: record, entry: entry)
     }
     func reusableBytes(sha256: String) throws -> Data? { try base.reusableBytes(sha256: sha256) }
+    func icon(sha256: String) async throws -> PluginIcon? { try await base.icon(sha256: sha256) }
     func isComplete(_ snapshot: VerifiedSnapshot) throws -> Bool { try base.isComplete(snapshot) }
 }
 

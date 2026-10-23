@@ -45,6 +45,8 @@ protocol PackageCatalogStoring: AnyObject {
     func detail(in record: RepositoryRecord, entryID: UUID) throws -> PluginPackagePresentation?
     func packageBytes(in record: RepositoryRecord, entry: IndexEntry) throws -> Data?
     func reusableBytes(sha256: String) throws -> Data?
+    /// Background-only accepted content read and bounded package validation for display.
+    func icon(sha256: String) async throws -> PluginIcon?
     func isComplete(_ snapshot: VerifiedSnapshot) throws -> Bool
 }
 
@@ -189,6 +191,10 @@ final class PackageCatalogDatabase: PackageCatalogStoring {
         try content(sha256: sha256, size: nil, in: readContext())
     }
 
+    func icon(sha256: String) async throws -> PluginIcon? {
+        try await writer.icon(sha256: sha256)
+    }
+
     func isComplete(_ snapshot: VerifiedSnapshot) throws -> Bool {
         let context = readContext()
         let snapshotKey = PackageCatalogKeys.snapshot(snapshot)
@@ -276,6 +282,13 @@ actor PackageCatalogWriter {
         let context = ModelContext(container)
         context.autosaveEnabled = false
         return context
+    }
+
+    func icon(sha256: String) throws -> PluginIcon? {
+        let context = makeContext()
+        guard let content = try context.fetch(FetchDescriptor<CatalogContentModel>(predicate: #Predicate { $0.sha256 == sha256 })).first,
+              content.bytes.count <= Limits.package, Digest.sha256Hex(content.bytes) == sha256 else { throw PackageCatalogError.contentMismatch }
+        return try PluginPackage.validate(content.bytes).icon
     }
 
     func stage(_ snapshot: VerifiedSnapshot, packages: [PluginPackage], leaseID: UUID) throws {

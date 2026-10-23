@@ -1,4 +1,5 @@
 import SwiftUI
+import AutomationCore
 import UIKit
 
 /// Shared browser colors follow the selected Sileo reference in both appearances.
@@ -16,6 +17,7 @@ struct PluginPackageRow: View {
     let author: String?
     let version: String
     let summary: String
+    var iconSource: PluginIconSource?
     var systemImage = "shippingbox"
     var iconColor = PluginBrowserColor.accent
     var isInstalled = false
@@ -23,7 +25,7 @@ struct PluginPackageRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            PluginBrowserIcon(systemImage: systemImage, color: iconColor, isInstalled: isInstalled)
+            PluginBrowserIcon(systemImage: systemImage, color: iconColor, isInstalled: isInstalled, source: iconSource)
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: name)
                     .font(.body.weight(.semibold))
@@ -104,6 +106,7 @@ struct PluginPackageModifyActions {
 struct PluginPackageHero: View {
     let name: String
     let targetHosts: [String]
+    var iconSource: PluginIconSource?
     var systemImage = "shippingbox"
     var iconColor = PluginBrowserColor.accent
     var actionTitle: LocalizedStringKey?
@@ -123,6 +126,7 @@ struct PluginPackageHero: View {
                     systemImage: systemImage,
                     color: iconColor,
                     size: horizontalSizeClass == .compact ? 56 : 60,
+                    source: iconSource,
                 )
                 VStack(alignment: .leading, spacing: 4) {
                     Text(verbatim: name)
@@ -234,6 +238,7 @@ struct PluginInstallQueueDisplayEntry: Identifiable {
     let version: String
     var detail: LocalizedStringKey = "AUTO_BROWSER_QUEUE_WAITING"
     var isValid = true
+    var iconSource: PluginIconSource?
     var systemImage = "shippingbox"
     var iconColor = PluginBrowserColor.accent
 }
@@ -317,7 +322,7 @@ struct PluginInstallSheetContent: View {
             .disabled(isBusy)
             .accessibilityLabel(Text("AUTO_BROWSER_QUEUE_REMOVE \(entry.name)"))
             .accessibilityIdentifier("plugins.queue.remove." + entry.id)
-            PluginBrowserIcon(systemImage: entry.systemImage, color: entry.iconColor)
+            PluginBrowserIcon(systemImage: entry.systemImage, color: entry.iconColor, source: entry.iconSource)
             VStack(alignment: .leading, spacing: 3) {
                 Text(verbatim: entry.name).font(.body.weight(.semibold))
                 (Text(verbatim: entry.version) + Text(" · ") + Text(isBusy ? LocalizedStringKey("AUTO_BROWSER_INSTALLING") : entry.detail))
@@ -382,23 +387,46 @@ private struct PluginBrowserIcon: View {
     let color: Color
     var size: CGFloat = 40
     var isInstalled = false
+    var source: PluginIconSource?
+    @State private var decoded: DecodedPluginIcon?
+    @State private var loadedKey: String?
 
     var body: some View {
-        Image(systemName: systemImage)
-            .font(.system(size: size * 0.58, weight: .regular))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(color, in: RoundedRectangle(cornerRadius: size * 0.225))
-            .overlay(alignment: .bottomTrailing) {
-                if isInstalled {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 9, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .frame(width: 14, height: 14)
-                        .background(AutomationStatusColor.ok, in: Circle())
-                        .offset(x: 4, y: 4)
-                }
+        Group {
+            if loadedKey == source?.cacheKey, let decoded {
+                Image(uiImage: decoded.image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Image(systemName: systemImage)
+                    .font(.system(size: size * 0.58, weight: .regular))
+                    .foregroundStyle(.white)
             }
-            .accessibilityHidden(true)
+        }
+        .frame(width: size, height: size)
+        .background(color, in: RoundedRectangle(cornerRadius: size * 0.225))
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.225))
+        .overlay(alignment: .bottomTrailing) {
+            if isInstalled {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 14, height: 14)
+                    .background(AutomationStatusColor.ok, in: Circle())
+                    .offset(x: 4, y: 4)
+            }
+        }
+        .task(id: source?.id) {
+            if loadedKey != source?.cacheKey {
+                decoded = nil
+                loadedKey = nil
+            }
+            guard let source else { return }
+            let image = await PluginIconLoader.shared.image(for: source)
+            guard !Task.isCancelled else { return }
+            decoded = image
+            loadedKey = source.cacheKey
+        }
+        .accessibilityHidden(true)
     }
 }
