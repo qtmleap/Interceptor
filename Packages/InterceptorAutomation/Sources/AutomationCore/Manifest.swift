@@ -49,7 +49,7 @@ public struct PluginManifest: Equatable, Sendable {
     public let matches: [PluginMatch]
     public let writeRequestBody: Bool
     public let writeResponseBody: Bool
-    /// Schema 2 optional `write.files` (strict boolean, default false) gating `Interceptor.saveJSON`. Always false for schema 1.
+    /// Schema 2 optional `write.files` (strict boolean, default false) gating `Interceptor.createFile`. Always false for schema 1.
     public let writeFiles: Bool
 
     static let metadataNames: Set<String> = ["method", "host", "status", "path"]

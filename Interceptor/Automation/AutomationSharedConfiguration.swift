@@ -23,4 +23,8 @@ enum AutomationSharedConfiguration {
     static func pluginFilesURL() -> URL? {
         sharedBaseURL()?.appending(path: "Library/Application Support/Interceptor/PluginFiles", directoryHint: .isDirectory)
     }
+
+    static func pluginFileRecordsURL() -> URL? {
+        sharedBaseURL()?.appending(path: "Library/Application Support/Interceptor/PluginFileRecords", directoryHint: .isDirectory)
+    }
 }

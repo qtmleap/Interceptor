@@ -96,28 +96,35 @@ QJSResult qjs_run_v2_fetch(QJSCancelToken *token, const QJSLimits *limits,
                            const uint8_t *event_json, size_t event_len,
                            const uint8_t *config_json, size_t config_len);
 
-/// `Interceptor.saveJSON(key, jsonText)` host contract. `key` is 1...1024 valid UTF-8 bytes without NUL; `text` is
-/// 1...1 MiB of valid UTF-8 accepted by the strict native JSON scanner (depth <= 64, no duplicate keys). Both pointers
-/// are borrowed raw bytes (the original text, not re-encoded), valid only during the call. The callback is trusted, runs
-/// on the calling thread, may block, must honor `timeout_ms` and the cancel token, and must finish all its I/O before
-/// returning. Result: 0 saved, 1 rejected/failed (script sees a generic rejection), 2 abort/cancel/revoked.
-typedef int32_t (*QJSSaveJSONCallback)(void *opaque, const uint8_t *key, size_t key_len,
-                                       const uint8_t *text, size_t text_len, uint32_t timeout_ms);
+/// `Interceptor.createFile({storage, atPath, contents})` host contract. `storage` is exactly "local" or "icloud";
+/// `path` is structurally valid UTF-8 (1...1024 bytes, 1...8 components of 1...255 bytes, no absolute, empty, dot-led,
+/// backslash, colon or control component; Unicode normalization and case aliasing are the host's). `contents` is 0...1 MiB
+/// of raw bytes (string UTF-8 without lone surrogates, or an exact Uint8Array view), never parsed; it may contain NUL and
+/// may be empty (then the pointer is non-NULL but must not be dereferenced). All pointers are borrowed, length-delimited,
+/// not NUL-terminated and valid only during the call. The callback is trusted, runs on the calling thread, may block,
+/// must honor `timeout_ms` and the cancel token, and must finish all its I/O before returning.
+/// Result: 0 created, 1 rejected/failed (script sees a generic rejection), 2 abort/cancel/revoked.
+typedef int32_t (*QJSCreateFileCallback)(void *opaque, const uint8_t *storage, size_t storage_len,
+                                         const uint8_t *path, size_t path_len,
+                                         const uint8_t *contents, size_t contents_len, uint32_t timeout_ms);
 
-/// Same as `qjs_run_v2_fetch` plus `Interceptor.saveJSON` (response.onLeave only). Saving needs the manifest's schema 2
-/// `write.files` grant and a non-NULL `save_callback`; otherwise calls reject without host I/O. Budgets are separate from
-/// fetch: 64 saves / 16 MiB of submitted text. Wall time stays 120 s. C caps cumulative CPU at 1000 ms only with
-/// both the files grant and trusted save callback; other fetch runs stay at 250 ms. Host callback wait is excluded.
-QJSResult qjs_run_v2_fetch_save(QJSCancelToken *token, const QJSLimits *limits,
-                                QJSFetchCallback callback, void *opaque,
-                                QJSSaveJSONCallback save_callback, void *save_opaque,
-                                const uint8_t *package_json, size_t package_len,
-                                const char *hook,
-                                const uint8_t *event_json, size_t event_len,
-                                const uint8_t *config_json, size_t config_len);
+/// Same as `qjs_run_v2_fetch` plus `Interceptor.createFile` (response.onLeave only; Uint8Array/ArrayBuffer exist in this mode
+/// and the probe, SharedArrayBuffer and Atomics never). The immutable `Interceptor.Storage` Enum is readable in all
+/// schema-2 modes. Creating needs the manifest's schema 2
+/// `write.files` grant and a non-NULL `create_callback`; otherwise calls reject without host I/O. Budgets are separate from
+/// fetch: 64 submitted writes / 16 MiB of submitted contents, counted before the callback runs whatever it answers. Wall time
+/// stays 120 s. C caps cumulative CPU at 1000 ms only with both the files grant and trusted callback; other fetch runs stay
+/// at 250 ms. Host callback wait is excluded.
+QJSResult qjs_run_v2_fetch_files(QJSCancelToken *token, const QJSLimits *limits,
+                                 QJSFetchCallback callback, void *opaque,
+                                 QJSCreateFileCallback create_callback, void *create_opaque,
+                                 const uint8_t *package_json, size_t package_len,
+                                 const char *hook,
+                                 const uint8_t *event_json, size_t event_len,
+                                 const uint8_t *config_json, size_t config_len);
 
 /// Read-only response.onLeave scheduling probe. Runs sync hooks unchanged, but performs no network or file I/O.
-/// A fetch or saveJSON attempt, or a returned Promise, gives QJS_ASYNC_REQUIRED, discarding all recorded intents.
+/// A fetch or createFile attempt, or a returned Promise, gives QJS_ASYNC_REQUIRED, discarding all recorded intents.
 QJSResult qjs_run_v2_probe(QJSCancelToken *token, const QJSLimits *limits,
                           const uint8_t *package_json, size_t package_len, const char *hook,
                           const uint8_t *event_json, size_t event_len,

@@ -17,7 +17,7 @@ final class HTTPPluginProcessor: HTTPPluginProcessing, Sendable {
     private let outboundTransport: any HTTPPluginOutboundTransport
     private let fetchExecutor = JavaScriptFetchExecutor()
     private let fetchDispatcher: HTTPPluginFetchDispatcher
-    private let fileStore: PluginJSONFileStore?
+    private let fileStore: PluginFileStore?
     private static let bodyLimit = 24 * 1024
 
     private struct PhaseResult {
@@ -40,14 +40,14 @@ final class HTTPPluginProcessor: HTTPPluginProcessing, Sendable {
          hasCaptureConsent: @escaping @Sendable () -> Bool = { CaptureAuthorization.isGranted },
          outboundTransport: any HTTPPluginOutboundTransport = HTTPPluginDirectTransport(),
          outboundObserver: HTTPPluginOutboundDispatcher.Observer? = nil,
-         fileStore: PluginJSONFileStore? = nil,
+         fileStore: PluginFileStore? = nil,
          fetchObserver: HTTPPluginFetchDispatcher.Observer? = nil)
     {
         self.store = store
         self.snapshot = snapshot
         self.hasCaptureConsent = hasCaptureConsent
         self.outboundTransport = outboundTransport
-        self.fileStore = fileStore ?? AutomationSharedConfiguration.pluginFilesURL().map { PluginJSONFileStore(directoryURL: $0) }
+        self.fileStore = fileStore ?? AutomationSharedConfiguration.pluginFileRecordsURL().map { PluginFileStore(directoryURL: $0) }
         outbound = HTTPPluginOutboundDispatcher(transport: outboundTransport, observer: outboundObserver)
         fetchDispatcher = HTTPPluginFetchDispatcher(observer: fetchObserver)
     }
@@ -101,8 +101,8 @@ final class HTTPPluginProcessor: HTTPPluginProcessing, Sendable {
                 }
                 let output = try await withTaskCancellationHandler {
                     try await executor.runV2(packageJSON: run.packageBytes, hook: run.hook, eventJSON: run.event,
-                                             configJSON: run.config, saveJSON: { [self] key, text in
-                        try await saveJSON(key: key, text: text, run: run)
+                                             configJSON: run.config, createFile: { [self] destination, contents in
+                        try await createFile(destination: destination, contents: contents, run: run)
                     })
                     { request in
                         try await Self.fetch(request, via: transport, isAuthorized: authorization)
@@ -121,12 +121,12 @@ final class HTTPPluginProcessor: HTTPPluginProcessing, Sendable {
     }
 
     /// Prepare outside the activation lock; only final publication holds the exact grant fence.
-    private func saveJSON(key: String, text: String, run: DeferredRun) async throws {
+    private func createFile(destination: PluginFileDestination, contents: Data, run: DeferredRun) async throws {
         try Task.checkCancellation()
         guard let fileStore, run.manifest.writeFiles, await isAuthorized(),
               let approved = snapshot.revisions.first(where: { $0.revisionID == run.revisionID }),
               approved.package.bytes == run.packageBytes else { throw Failure.revoked }
-        let prepared = try fileStore.prepare(revisionID: run.revisionID, package: approved.package, key: key, jsonText: text)
+        let prepared = try fileStore.prepare(revisionID: run.revisionID, package: approved.package, destination: destination, contents: contents)
         try Task.checkCancellation()
         try await store.withCurrentActivation(admitted: snapshot, revisionID: run.revisionID) { [self] current in
             guard current.package.bytes == run.packageBytes else { throw Failure.revoked }

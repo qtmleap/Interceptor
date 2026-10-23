@@ -60,7 +60,7 @@ final class HTTPPluginFetchProcessorTests: XCTestCase, @unchecked Sendable {
         }
         let completions = Completions()
         let processor = HTTPPluginProcessor(store: store, snapshot: snapshot, hasCaptureConsent: { true }, outboundTransport: transport,
-                                            fileStore: PluginJSONFileStore(directoryURL: directory.appendingPathComponent("saved")),
+                                            fileStore: PluginFileStore(directoryURL: directory.appendingPathComponent("saved")),
                                             fetchObserver: { completions.append($0) })
         return Harness(processor: processor, store: store, completions: completions)
     }
@@ -86,17 +86,15 @@ final class HTTPPluginFetchProcessorTests: XCTestCase, @unchecked Sendable {
     }
 
     private func savedResponseBytes() throws -> [Data] {
-        let root = directory.appendingPathComponent("saved")
-        guard FileManager.default.fileExists(atPath: root.path) else { return [] }
-        let enumerator = try XCTUnwrap(FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
-        return try enumerator.compactMap { $0 as? URL }.filter { $0.pathExtension == "json" }.map { try Data(contentsOf: $0) }
+        let records = PluginFileStore(directoryURL: directory.appendingPathComponent("saved"))
+        return try records.recordIdentifiers().map { try records.readRecord($0).contents }
     }
 
     func testFetchResponseIsSavedUnchangedUnderTheAdmittedRevision() async throws {
         let raw = Data(" {\n \"data\": {\"results\": [1,2]}, \"label\": \"サーモン\"\n} ".utf8)
         let transport = FetchStubTransport { _ in .response(status: 200, body: raw) }
         // Bind the fetched Response explicitly; the captured response is deliberately different.
-        let scriptHarness = try await self.harness(leave: "return (async()=>{const fetched=await fetch('\(fetchURL)');await Interceptor.saveJSON('history',await fetched.text());})();", files: true, transport: transport)
+        let scriptHarness = try await self.harness(leave: "return (async()=>{const fetched=await fetch('\(fetchURL)');await Interceptor.createFile({storage:Interceptor.Storage.iCloudDrive,atPath:'Salmon Run/history.json',contents:await fetched.text()});})();", files: true, transport: transport)
         defer { scriptHarness.processor.shutdown() }
         _ = try await scriptHarness.processor.process(.responseLeave, request: request, response: response)
         await awaitCompletion(scriptHarness, .completed)
@@ -105,7 +103,7 @@ final class HTTPPluginFetchProcessorTests: XCTestCase, @unchecked Sendable {
 
     func testRevocationAfterFetchPreventsJSONPublication() async throws {
         let transport = FetchStubTransport()
-        let harness = try await harness(leave: "return (async()=>{const fetched=await fetch('\(fetchURL)');await Interceptor.saveJSON('history',await fetched.text());})();", files: true, transport: transport)
+        let harness = try await harness(leave: "return (async()=>{const fetched=await fetch('\(fetchURL)');await Interceptor.createFile({storage:Interceptor.Storage.iCloudDrive,atPath:'Salmon Run/history.json',contents:await fetched.text()});})();", files: true, transport: transport)
         defer { harness.processor.shutdown() }
         let store = harness.store
         transport.setHandler { _ in
@@ -119,7 +117,7 @@ final class HTTPPluginFetchProcessorTests: XCTestCase, @unchecked Sendable {
 
     func testCommittedJSONSurvivesLaterFailure() async throws {
         let transport = FetchStubTransport { _ in .response(status: 200, body: Data("{}".utf8)) }
-        let harness = try await harness(leave: "return (async()=>{await Interceptor.saveJSON('first','{\"ok\":true}');throw Error('later failure');})();", files: true, transport: transport)
+        let harness = try await harness(leave: "return (async()=>{await Interceptor.createFile({storage:Interceptor.Storage.iCloudDrive,atPath:'Salmon Run/first.json',contents:'{\"ok\":true}'});throw Error('later failure');})();", files: true, transport: transport)
         defer { harness.processor.shutdown() }
         _ = try await harness.processor.process(.responseLeave, request: request, response: response)
         await awaitCompletion(harness, .failed)

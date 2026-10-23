@@ -369,7 +369,7 @@ final class HTTPHooksRuntimeTests: XCTestCase, @unchecked Sendable {
         let r = try await run(src, .requestEnter)
         let json = try XCTUnwrap(((r["actions"] as? [[String: Any]])?.first)?["json"] as? [String: Any])
         for name in names { XCTAssertEqual(json[name] as? String, "undefined", name) }
-        XCTAssertEqual(json["keys"] as? String, "attach,send")
+        XCTAssertEqual(json["keys"] as? String, "attach,send,Storage")
     }
 
     func testHostCapturedIntrinsicsSurviveUserTampering() async throws {
