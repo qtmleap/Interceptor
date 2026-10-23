@@ -209,6 +209,7 @@ public final class JavaScriptFetchExecutor: @unchecked Sendable {
     private static let globalSlots = 2
     private static let stackBytes = 2 * 1024 * 1024
     static let cpuDeadlineMilliseconds = 250
+    static let saveCpuDeadlineMilliseconds = 1000
 
     private let lock = NSLock()
     private var current: FetchJob?
@@ -299,7 +300,7 @@ public final class JavaScriptFetchExecutor: @unchecked Sendable {
                   case .object = try JSONValue(parsing: config) else { throw JavaScriptExecutionError.invalidInput }
         } catch { throw JavaScriptExecutionError.invalidInput }
         var limits = QJSLimits(
-            deadline_ms: cpuDeadlineMilliseconds,
+            deadline_ms: saveJSON == nil ? cpuDeadlineMilliseconds : saveCpuDeadlineMilliseconds,
             heap_bytes: JavaScriptLimits.heapBytes,
             stack_bytes: JavaScriptLimits.stackBytes,
             max_source_bytes: JavaScriptLimits.maxSourceBytes,

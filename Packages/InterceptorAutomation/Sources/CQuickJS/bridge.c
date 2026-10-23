@@ -2218,9 +2218,11 @@ static int v2_safe_integer_tokens(const uint8_t *text, size_t len) {
 //
 // One synchronous trusted host callback per request. fetch() validates natively, blocks in the callback
 // (the wait extends the CPU deadline but never the wall deadline) and returns an already-settled
-// Promise. Promise jobs are drained only while a registered callback is active.
+// Promise. Promise jobs are drained only while a registered callback is active. Fetch-only CPU is 250 ms;
+// the validated files grant plus trusted save callback permits a bounded 1000 ms batch, enforced in C.
 
 #define FETCH_CPU_MS 250u
+#define FETCH_SAVE_CPU_MS 1000u
 #define FETCH_WALL_MS 120000ull
 #define FETCH_MAX_REQUESTS 64u
 #define FETCH_MAX_JSON_BYTES 8192u
@@ -2746,10 +2748,11 @@ static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
     memset(&id, 0, sizeof(id));
     for (int i = 0; i < MAX_REGS; i++) st.regs[i].cb = JS_UNDEFINED;
     st.token = token;
+    uint64_t cpu_start_ns = now_ns();
     {
         size_t cpu_ms = limits ? limits->deadline_ms : 0;
         if (fetch_cb && cpu_ms > FETCH_CPU_MS) cpu_ms = FETCH_CPU_MS;
-        st.deadline_ns = now_ns() + (uint64_t)cpu_ms * 1000000ull;
+        st.deadline_ns = cpu_start_ns + (uint64_t)cpu_ms * 1000000ull;
     }
     st.save_cb = save_callback_in;
     st.save_opaque = save_opaque_in;
@@ -2823,6 +2826,12 @@ static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
     if (JS_IsException(cfgv)) { status = classify_exception(ctx, &st, QJS_INVALID_INPUT); goto cleanup; }
 
     if (!load_package(&st, ctx, manv, &write_request, &write_response)) { status = v2_setup_failure(&st); goto cleanup; }
+    // Only the validated files grant plus a trusted save callback admits the larger batch budget.
+    // Keep the original start: manifest/setup time counts, and no host callback has run yet.
+    if (fetch_cb && st.save_cb && st.write_files) {
+        size_t cpu_ms = limits->deadline_ms < FETCH_SAVE_CPU_MS ? limits->deadline_ms : FETCH_SAVE_CPU_MS;
+        st.deadline_ns = cpu_start_ns + (uint64_t)cpu_ms * 1000000ull;
+    }
     st.body_writable = kind == 0 && (leg == 0 ? write_request : write_response);
     if (!freeze_tree(&st, ctx, cfgv, 1, 0)) { status = v2_setup_failure(&st); goto cleanup; }
     have_id = 1;   // ident_free tolerates a partially filled identity

@@ -61,6 +61,19 @@ final class JavaScriptSaveJSONTests: XCTestCase, @unchecked Sendable {
 
     // MARK: exact interface and bytes
 
+    func testGrantedSaveBatchCanUseMoreThanFetchOnlyCpuBudget() async throws {
+        let saves = Saves()
+        _ = try await run("async () => { const start = Date.now(); while (Date.now() - start < 350) {} await Interceptor.saveJSON('batch', '{}'); }", saves: saves)
+        let count = await saves.items.count
+        XCTAssertEqual(count, 1)
+    }
+
+    func testMissingFilesGrantKeepsShortCpuBudget() async {
+        for files in [false, nil] as [Bool?] {
+            await expectError(.timeout, "async () => { const start = Date.now(); while (Date.now() - start < 350) {} }", files: files)
+        }
+    }
+
     func testSaveJSONDeliversExactKeyAndOriginalText() async throws {
         let saves = Saves()
         _ = try await run("async () => { await Interceptor.saveJSON('history', '{\"a\":1}'); }", saves: saves)
@@ -381,7 +394,7 @@ final class JavaScriptSaveJSONTests: XCTestCase, @unchecked Sendable {
 
     /// ~1 MiB object whose 16384 distinct keys all share one FNV-1a 32-bit hash (Joux multicollision), so the native
     /// duplicate-key scan degrades to quadratic probing: valid JSON within every size/depth cap, yet far slower than
-    /// the 250 ms CPU budget. Built from the public FNV-1a definition, independent of the C implementation.
+    /// the one-second save batch CPU budget. Built from the public FNV-1a definition, independent of the C implementation.
     private static let collidingKeysDocument: String = {
         func step(_ h: UInt32, _ bytes: [UInt8]) -> UInt32 {
             bytes.reduce(h) { ($0 ^ UInt32($1)) &* 16777619 }
@@ -428,14 +441,14 @@ final class JavaScriptSaveJSONTests: XCTestCase, @unchecked Sendable {
         let real = Saves()
         let begin = clock.now
         do {
-            _ = try await run("async () => { const t = await (await fetch('\(url)')).text(); await Interceptor.saveJSON('big', t); }",
+            _ = try await run("async () => { const start = Date.now(); while (Date.now() - start < 900) {} const t = await (await fetch('\(url)')).text(); await Interceptor.saveJSON('big', t); }",
                               saves: real, transport: slowScanTransport())
             XCTFail("expected timeout")
         } catch { XCTAssertEqual(error as? JavaScriptExecutionError, .timeout) }
         let elapsed = begin.duration(to: clock.now)
         let n = await real.items.count
         XCTAssertEqual(n, 0, "host callback must not run after the scanner exhausted the CPU budget")
-        XCTAssertLessThan(elapsed, .milliseconds(900), "scanner must stop at the deadline instead of finishing the quadratic scan")
+        XCTAssertLessThan(elapsed, .milliseconds(1500), "scanner must stop at the deadline instead of finishing the quadratic scan")
     }
 
     func testScannerStopsPromptlyOnCancelAndNeverCallsHost() async throws {

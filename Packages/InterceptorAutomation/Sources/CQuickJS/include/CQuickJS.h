@@ -106,7 +106,8 @@ typedef int32_t (*QJSSaveJSONCallback)(void *opaque, const uint8_t *key, size_t 
 
 /// Same as `qjs_run_v2_fetch` plus `Interceptor.saveJSON` (response.onLeave only). Saving needs the manifest's schema 2
 /// `write.files` grant and a non-NULL `save_callback`; otherwise calls reject without host I/O. Budgets are separate from
-/// fetch: 64 saves / 16 MiB of submitted text. The 120 s wall and 250 ms CPU limits are shared, CPU excluding callback waits.
+/// fetch: 64 saves / 16 MiB of submitted text. Wall time stays 120 s. C caps cumulative CPU at 1000 ms only with
+/// both the files grant and trusted save callback; other fetch runs stay at 250 ms. Host callback wait is excluded.
 QJSResult qjs_run_v2_fetch_save(QJSCancelToken *token, const QJSLimits *limits,
                                 QJSFetchCallback callback, void *opaque,
                                 QJSSaveJSONCallback save_callback, void *save_opaque,

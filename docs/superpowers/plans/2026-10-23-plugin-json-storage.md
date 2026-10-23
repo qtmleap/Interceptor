@@ -13,7 +13,7 @@
 - Latest user update supersedes the spec's initial empty-history test assumption: real nonempty history and details are now available and must be verified.
 - Logical keys are 1–1024 UTF-8 bytes, no NUL (increased from draft's 512 so a 512-byte result ID plus prefix fits). JSON <= 1 MiB, depth <= 64; preserve original bytes.
 - Schema 2 optional write.files defaults false; no schema 1 permission. Existing fetch ABI stays compatible.
-- Per invocation: 64 saves / 16 MiB submitted, separate fetch budget, same 120s wall/250ms CPU excluding callbacks. Namespace: 64 MiB / 2048 files.
+- Per invocation: 64 saves / 16 MiB submitted, separate fetch budget, same 120s wall; cumulative CPU1000ms for a files grant plus trusted save callback, otherwise250ms, excluding callbacks. Namespace: 64 MiB / 2048 files.
 - Activation lock precedes storage lock. Recheck cancellation/consent before atomic publication; already published files survive cancellation/revocation.
 - No new screens. Only existing activation permission row/footer and Files exposure.
 - Workers own disjoint files, make no commits, and do not capture screens. Codex runs tools on the verified Mac and owns integration/device evidence.
