@@ -38,6 +38,8 @@ public struct PluginManifest: Equatable, Sendable {
     public let summary: String?
     /// Optional display-only grouping label (1...80 Unicode scalars, <=256 UTF-8 bytes), preserved verbatim. Not a trust claim.
     public let category: String?
+    /// Schema 2 only: path of the bundled static PNG/WebP asset. Display only.
+    public let icon: String?
     /// Optional publisher-declared static release date (`yyyy-MM-ddTHH:mm:ssZ`, UTC whole seconds). Display only; not a
     /// trust, ordering or freshness claim. Covered by the package bytes/revision hash.
     public let publishedAt: Date?
@@ -61,7 +63,7 @@ public struct PluginManifest: Equatable, Sendable {
         let f = try JSONFields(v, required: isV2
                                ? ["schemaVersion", "id", "name", "version", "matches", "read", "write", "endpointBindings", "settings"]
                                : ["schemaVersion", "id", "name", "version", "subscriptions", "read", "endpointBindings", "settings"],
-                               optional: isV2 ? ["author", "summary", "category", "publishedAt", "outbound"]
+                               optional: isV2 ? ["author", "summary", "category", "publishedAt", "outbound", "icon"]
                                               : ["author", "summary", "category", "publishedAt"], error: bad)
         let name = try f.string("name"), version = try f.string("version")
         guard Text.isDisplayName(name) else { throw bad }
@@ -120,12 +122,20 @@ public struct PluginManifest: Equatable, Sendable {
             publishedAt = d
         }
 
+        var icon: String?
+        if f.has("icon") {
+            let path = try f.string("icon")
+            guard PluginIcon.isPath(path) else { throw bad }
+            icon = path
+        }
+
         id = try f.uuid("id")
         self.publishedAt = publishedAt
         self.outbound = outbound
         self.author = author
         self.summary = summary
         self.category = category
+        self.icon = icon
         self.name = name
         self.version = version
         subscriptions = subs

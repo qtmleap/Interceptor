@@ -4,6 +4,7 @@ public struct PluginPackage: Equatable, Sendable {
     public let manifest: PluginManifest
     public let source: String?
     public let sourceFiles: [String: String]
+    public let icon: PluginIcon?
     public let bytes: Data
     /// Revision = SHA-256 of exact package bytes.
     public var revision: String { Digest.sha256Hex(bytes) }
@@ -21,9 +22,9 @@ public struct PluginPackage: Equatable, Sendable {
             let f = try JSONFields(value, required: ["manifest", "source"], error: .invalidManifest)
             let source = try f.string("source")
             guard source.utf8.count <= Limits.source else { throw AutomationError.limitExceeded }
-            return PluginPackage(manifest: manifest, source: source, sourceFiles: [:], bytes: bytes)
+            return PluginPackage(manifest: manifest, source: source, sourceFiles: [:], icon: nil, bytes: bytes)
         }
-        let f = try JSONFields(value, required: ["manifest", "sourceFiles"], error: .invalidManifest)
+        let f = try JSONFields(value, required: ["manifest", "sourceFiles"], optional: ["assets"], error: .invalidManifest)
         guard try manifest.json.data().count <= 32 * 1024 else { throw AutomationError.limitExceeded }
         guard case .object(let rawFiles) = try f.value("sourceFiles"), (1...64).contains(rawFiles.count) else { throw AutomationError.invalidManifest }
         var files: [String: String] = [:]
@@ -36,7 +37,18 @@ public struct PluginPackage: Equatable, Sendable {
         }
         let referenced = Set(manifest.matches.flatMap { $0.hooks.values })
         guard referenced == Set(files.keys) else { throw AutomationError.invalidManifest }
-        return PluginPackage(manifest: manifest, source: nil, sourceFiles: files, bytes: bytes)
+        let icon: PluginIcon?
+        if let path = manifest.icon {
+            guard files[path] == nil, case .object(let assets) = try f.value("assets"),
+                  assets.count == 1, case .string(let text)? = assets[path],
+                  text.utf8.count <= 87_384, let data = Data(base64Encoded: text),
+                  data.base64EncodedString() == text else { throw AutomationError.invalidManifest }
+            icon = try PluginIcon.validate(data: data, path: path)
+        } else {
+            guard !f.has("assets") else { throw AutomationError.invalidManifest }
+            icon = nil
+        }
+        return PluginPackage(manifest: manifest, source: nil, sourceFiles: files, icon: icon, bytes: bytes)
     }
 
     static func isSourcePath(_ path: String) -> Bool {
@@ -81,7 +93,9 @@ public struct PluginPackage: Equatable, Sendable {
     /// Atomically replaces the exact set of routed source files without changing the manifest.
     public func replacingSources(_ files: [String: String]) throws -> PluginPackage {
         guard manifest.schemaVersion == 2, Set(files.keys) == Set(sourceFiles.keys) else { throw AutomationError.invalidManifest }
-        let bytes = try JSONValue.object(["manifest": manifest.json, "sourceFiles": .object(files.mapValues(JSONValue.string))]).data()
+        var object: [String: JSONValue] = ["manifest": manifest.json, "sourceFiles": .object(files.mapValues(JSONValue.string))]
+        if let icon { object["assets"] = .object([icon.path: .string(icon.data.base64EncodedString())]) }
+        let bytes = try JSONValue.object(object).data()
         return try PluginPackage.validate(bytes)
     }
 

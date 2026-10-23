@@ -83,7 +83,7 @@ struct PluginBrowserView: View {
                     PluginInstallQueueDisplayEntry(
                         id: queueID(entry.id), name: entry.package.manifest.name, version: entry.package.manifest.version,
                         detail: queueEntryIsValid(entry) ? queueDetail(entry) : "AUTO_BROWSER_QUEUE_ITEM_CHANGED",
-                        isValid: queueEntryIsValid(entry), systemImage: "shippingbox",
+                        isValid: queueEntryIsValid(entry), iconSource: .bundled(entry.package), systemImage: "shippingbox",
                     )
                 },
                 isBusy: model.isProcessing, canConfirm: !model.queue.isEmpty && model.queue.allSatisfy(queueEntryIsValid),
@@ -200,6 +200,17 @@ struct PluginSourcesView: View {
     @State private var addedURL: RepositoryURL?
     @State private var pendingAddedURL: RepositoryURL?
     @State private var pendingRemoval: RepositoryRecord?
+    @State private var editMode: EditMode = .inactive
+
+    private var isEditing: Bool { editMode.isEditing }
+    private var canModifySources: Bool {
+        isEditing && !model.isProcessing && model.controller.storeError == nil
+    }
+
+    private var editButtonRole: ButtonRole? {
+        if #available(iOS 26.0, *), isEditing { return .confirm }
+        return nil
+    }
 
     var body: some View {
         List {
@@ -226,10 +237,17 @@ struct PluginSourcesView: View {
                     }
                     .accessibilityIdentifier("plugins.repo." + record.displayName)
                     .swipeActions {
-                        Button("AUTO_BROWSER_DELETE", role: .destructive) { pendingRemoval = record }
+                        if !model.isProcessing {
+                            Button("AUTO_BROWSER_DELETE", role: .destructive) {
+                                guard !model.isProcessing else { return }
+                                pendingRemoval = record
+                            }
+                        }
                     }
+                    .deleteDisabled(model.isProcessing)
                 }
                 .onDelete { offsets in
+                    guard !model.isProcessing else { return }
                     if let index = offsets.first, model.controller.repositories.indices.contains(index) {
                         pendingRemoval = model.controller.repositories[index]
                     }
@@ -251,20 +269,42 @@ struct PluginSourcesView: View {
         .refreshable { await model.refreshSources() }
         .accessibilityAction(named: Text("AUTO_BROWSER_REFRESH")) { Task { await model.refreshSources() } }
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                EditButton().disabled(model.isProcessing)
-                Menu {
-                    Button("AUTO_ADD_REPOSITORY") { showAdd = true }.accessibilityIdentifier("plugins.addRepository")
-                    Button("AUTO_IMPORT_FILE") { showImporter = true }.accessibilityIdentifier("plugins.importFile")
-                } label: { Label("AUTO_BROWSER_ADD", systemImage: "plus") }
-                    .disabled(model.isProcessing || model.controller.storeError != nil)
+            if isEditing {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button("AUTO_ADD_REPOSITORY") {
+                            guard canModifySources else { return }
+                            showAdd = true
+                        }.accessibilityIdentifier("plugins.addRepository")
+                        Button("AUTO_IMPORT_FILE") {
+                            guard canModifySources else { return }
+                            showImporter = true
+                        }.accessibilityIdentifier("plugins.importFile")
+                    } label: { Label("AUTO_BROWSER_ADD", systemImage: "plus") }
+                    .disabled(!canModifySources)
                     .accessibilityIdentifier("plugins.add")
+                }
+            }
+            // Keep one trailing Edit/Done button while Add appears or disappears.
+            ToolbarItem(placement: .primaryAction) {
+                Button(role: editButtonRole) {
+                    editMode = isEditing ? .inactive : .active
+                } label: {
+                    if #available(iOS 26.0, *), isEditing {
+                        Label("SSL_LIST_DONE", systemImage: "checkmark")
+                    } else {
+                        Text(isEditing ? "SSL_LIST_DONE" : "SSL_LIST_EDIT")
+                    }
+                }
+                .disabled(model.isProcessing)
+                .accessibilityIdentifier("plugins.sources.edit")
             }
         }
         .sheet(isPresented: $showAdd, onDismiss: {
             addedURL = pendingAddedURL; pendingAddedURL = nil
         }) {
             AddRepositorySheet(controller: model.controller) { pendingAddedURL = $0 }
+                .environment(\.editMode, .constant(.inactive))
         }
         .navigationDestination(isPresented: Binding(get: { addedURL != nil }, set: {
             if !$0 {
@@ -276,7 +316,8 @@ struct PluginSourcesView: View {
             }
         }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
-            guard case let .success(url) = result else { return }
+            guard !model.isProcessing, model.controller.storeError == nil,
+                  case let .success(url) = result else { return }
             let scoped = url.startAccessingSecurityScopedResource()
             Task {
                 _ = await model.controller.importFile(at: url)
@@ -292,11 +333,16 @@ struct PluginSourcesView: View {
         })) {
             Button("AUTO_BROWSER_CANCEL", role: .cancel) { pendingRemoval = nil }
             Button("AUTO_BROWSER_DELETE", role: .destructive) {
-                guard let record = pendingRemoval else { return }
+                guard !model.isProcessing, let record = pendingRemoval else {
+                    pendingRemoval = nil
+                    return
+                }
                 pendingRemoval = nil
                 Task { await model.controller.deleteRepository(record.url) }
             }
         } message: { Text("AUTO_BROWSER_REMOVE_SOURCE_FOOTER") }
+        .environment(\.editMode, $editMode)
+        .onDisappear { editMode = .inactive }
     }
 
     private var localPackages: [InstalledRevision] {
@@ -392,7 +438,8 @@ struct PluginCatalogPackageLink: View {
             PluginPackageDetailView(model: model, family: item.id, sourceURL: item.record?.url)
         } label: {
             PluginPackageRow(name: item.name, author: item.author, version: item.version,
-                             summary: item.summary ?? "", isInstalled: item.installed != nil)
+                             summary: item.summary ?? "", iconSource: model.iconSource(for: item.id, entry: item.entry, record: item.record),
+                             isInstalled: item.installed != nil)
                 .accessibilityHint(Text(verbatim: item.record?.displayName ?? item.id.source))
         }
         .accessibilityIdentifier(identifier)
@@ -489,7 +536,7 @@ struct PluginInstalledPackagesView: View {
                 } label: {
                     let manifest = revision.package.manifest
                     PluginPackageRow(name: manifest.name, author: manifest.author, version: manifest.version,
-                                     summary: manifest.summary ?? "", isInstalled: true)
+                                     summary: manifest.summary ?? "", iconSource: .bundled(revision.package), isInstalled: true)
                 }
                 .accessibilityIdentifier("plugins.package." + revision.package.manifest.id.uuidString)
                 .swipeActions {

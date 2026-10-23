@@ -81,6 +81,31 @@ final class PackageCatalogDatabaseTests: XCTestCase {
 
     // MARK: Persistence and offline
 
+    func testIconReadDistinguishesMissingContentFromValidNoIconAfterRestart() async throws {
+        let raw = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==")!
+        let fixture = try AutomationFixtures.multiFilePackage(name: "Icon")
+        var root = try StrictJSON.parse(fixture.bytes).objectValue!
+        var manifest = root["manifest"]!.objectValue!
+        manifest["icon"] = .string("icon.png")
+        root["manifest"] = .object(manifest)
+        root["assets"] = .object(["icon.png": .string(raw.base64EncodedString())])
+        let withIcon = try PluginPackage.validate(JSONValue.object(root).data()), plain = try package("Plain")
+        let snap = try snapshot(packages: [withIcon, plain]), url = directory()
+        do {
+            let db = try PackageCatalogDatabase(url: url)
+            try await staged(db, snap, [withIcon, plain])
+        }
+        let reopened = try PackageCatalogDatabase(url: url)
+        let icon = try await reopened.icon(sha256: withIcon.revision)
+        XCTAssertEqual(icon?.data, raw)
+        let noIcon = try await reopened.icon(sha256: plain.revision)
+        XCTAssertNil(noIcon)
+        do {
+            _ = try await reopened.icon(sha256: String(repeating: "0", count: 64))
+            XCTFail("Missing content must be retryable rather than a cached no-icon result")
+        } catch { XCTAssertEqual(error as? PackageCatalogError, .contentMismatch) }
+    }
+
     func testCompletedCatalogSurvivesRestartAndServesDetailOffline() async throws {
         let dir = directory().appendingPathComponent("db")
         let a = try package("Alpha", author: "Ann", summary: "First", category: "Tools")

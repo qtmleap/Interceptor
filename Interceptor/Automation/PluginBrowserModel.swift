@@ -98,6 +98,19 @@ final class PluginBrowserModel {
 
     init(controller: AutomationController) { self.controller = controller }
 
+    /// Selected installed content takes precedence over an advertised repository update.
+    func iconSource(for family: PluginBrowserFamilyID, entry: IndexEntry?, record: RepositoryRecord?) -> PluginIconSource? {
+        if let selected = selectedRevision(for: family) { return .bundled(selected.package) }
+        guard let entry, let record, entry.id == family.manifestID, record.url.canonical == family.source,
+              let current = currentRecord(record), current.repositoryID == record.repositoryID,
+              current.snapshot?.index.plugins.contains(entry) == true,
+              let database = controller.packageCatalog else { return nil }
+        let sha = entry.sha256
+        return PluginIconSource(id: sha + ":" + String(controller.packageCatalogRevision), cacheKey: sha) {
+            try await database.icon(sha256: sha)
+        }
+    }
+
     var canDismissQueue: Bool { !isProcessing }
 
     var hasSourceRefreshFailures: Bool {

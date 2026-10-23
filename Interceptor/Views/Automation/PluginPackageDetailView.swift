@@ -90,6 +90,7 @@ struct PluginPackageDetailView: View {
     private func ready(_ package: PluginPackagePresentation) -> some View {
         List {
             PluginPackageHero(name: package.manifest.name, targetHosts: package.manifest.targetHosts,
+                              iconSource: model.iconSource(for: family, entry: entry, record: record),
                               actionTitle: selected != nil ? "AUTO_BROWSER_MODIFY" : queued ? "AUTO_BROWSER_QUEUED" : "AUTO_BROWSER_GET",
                               isActionEnabled: !busy && package.isComplete && (selected != nil || record != nil), isWorking: busy,
                               modifyActions: selected.map { _ in

@@ -282,6 +282,37 @@ final class AutomationUITests: XCTestCase {
     }
 
     @MainActor
+    func testSourcesAddMenuAppearsOnlyWhileEditing() {
+        let app = launch(japanese: false, suite: "Interceptor.UITests.\(UUID().uuidString)")
+        defer { app.terminate() }
+        openPlugins(app, japanese: false)
+
+        let edit = app.buttons.matching(identifier: "plugins.sources.edit").firstMatch
+        let add = app.buttons.matching(identifier: "plugins.add").firstMatch
+        XCTAssertTrue(add.waitForNonExistence(timeout: 2), "Sources starts in viewing mode")
+        XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        XCTAssertEqual(edit.label, "Edit")
+        attach("Sources viewing en")
+
+        enterSourcesEditMode(app)
+        XCTAssertEqual(edit.label, "Done")
+        attach("Sources editing en")
+        XCTAssertLessThan(add.frame.midX, edit.frame.midX, "Done stays at the trailing edge after Add appears")
+        edit.tap()
+        XCTAssertTrue(add.waitForNonExistence(timeout: 5), "Done returns Sources to viewing mode")
+        XCTAssertEqual(edit.label, "Edit")
+
+        openAddRepository(app)
+        app.buttons.matching(identifier: "repo.cancel").firstMatch.tap()
+        XCTAssertTrue(app.textFields["repo.url"].waitForNonExistence(timeout: 5))
+        enterSourcesEditMode(app)
+        selectTab("packages", app: app)
+        selectTab("sources", app: app)
+        XCTAssertTrue(add.waitForNonExistence(timeout: 5), "Returning to Sources resets edit mode")
+        XCTAssertEqual(edit.label, "Edit")
+    }
+
+    @MainActor
     func testAddRepositorySheetRequiresExplicitPreviewAndCancelsCleanly() async {
         guard let repositoryURL = await requiredRepositoryURL() else { return }
         let app = launch(japanese: false, suite: "Interceptor.UITests.\(UUID().uuidString)")
@@ -642,8 +673,21 @@ private extension AutomationUITests {
     }
 
     @MainActor
+    func enterSourcesEditMode(_ app: XCUIApplication) {
+        let add = app.buttons.matching(identifier: "plugins.add").firstMatch
+        if !add.exists {
+            let edit = app.buttons.matching(identifier: "plugins.sources.edit").firstMatch
+            XCTAssertTrue(edit.waitForExistence(timeout: 5))
+            edit.tap()
+        }
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func openAddRepository(_ app: XCUIApplication) {
+        enterSourcesEditMode(app)
         app.buttons.matching(identifier: "plugins.add").firstMatch.tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "plugins.importFile").firstMatch.waitForExistence(timeout: 5))
         app.buttons.matching(identifier: "plugins.addRepository").firstMatch.tap()
         XCTAssertTrue(app.textFields["repo.url"].waitForExistence(timeout: 5))
     }
