@@ -573,40 +573,109 @@ struct PluginScriptFilesView: View {
     let model: PluginBrowserModel
     var package: PluginPackagePresentation?
     var body: some View {
-        List {
-            if let package {
-                files(package)
-            } else {
-                PluginBrowserErrors(controller: model.controller, queryError: model.catalogReadError)
-                if !model.controller.isLoaded {
+        if let package {
+            PluginScriptDirectoryView(package: package, directory: [])
+        } else {
+            let controller = model.controller
+            let hasError = (controller.storeError ?? controller.installationError ?? controller.packageCatalogError
+                ?? controller.actionError ?? model.catalogReadError) != nil
+            let installed = model.installedPackages()
+            let duplicateNames = Set(Dictionary(grouping: installed, by: { $0.package.manifest.name }).filter { $0.value.count > 1 }.keys)
+            List {
+                PluginBrowserErrors(controller: controller, queryError: model.catalogReadError)
+                if !controller.isLoaded {
                     ProgressView("AUTO_BROWSER_LOADING").accessibilityIdentifier("plugins.loading")
                 }
-                ForEach(model.installedPackages(), id: \.id) { revision in
-                    Section(revision.package.manifest.name) { files(model.presentation(of: revision)) }
+                ForEach(installed, id: \.id) { revision in
+                    let manifest = revision.package.manifest
+                    let source = PluginBrowserFamilyID(revision).source
+                    let summary = duplicateNames.contains(manifest.name)
+                        ? (source == "local" ? String(localized: "AUTO_BROWSER_LOCAL") : source) : (manifest.summary ?? "")
+                    NavigationLink {
+                        PluginScriptDirectoryView(package: model.presentation(of: revision), directory: [])
+                    } label: {
+                        PluginPackageRow(name: manifest.name, author: manifest.author, version: manifest.version,
+                                         summary: summary, iconSource: .bundled(revision.package), isInstalled: true)
+                    }
+                    .accessibilityIdentifier("plugins.scriptPackage." + manifest.id.uuidString + "." + revision.id)
+                }
+                if installed.isEmpty && controller.isLoaded && !hasError {
+                    ContentUnavailableView {
+                        Label("AUTO_BROWSER_NO_SCRIPTS", systemImage: "doc.text")
+                    } description: {
+                        Text("AUTO_BROWSER_ADD_TO_SEE_SCRIPTS")
+                    }
+                    .listRowSeparator(.hidden)
+                }
+            }
+            .listStyle(.plain)
+            .navigationTitle("AUTO_BROWSER_SCRIPTS")
+            .navigationBarTitleDisplayMode(.large)
+            .accessibilityIdentifier("plugins.scripts")
+        }
+    }
+}
+
+/// One directory level of a package's source tree; folders recurse into the same view.
+struct PluginScriptDirectoryView: View {
+    let package: PluginPackagePresentation
+    let directory: [String]
+    @State private var openedFile: OpenedFile?
+    @State private var selection: String?
+
+    private struct OpenedFile: Identifiable {
+        let path: String
+        var id: String { path }
+    }
+
+    private func source(of file: String) -> String {
+        package.manifest.schemaVersion == 2 ? package.sourceFiles[file] ?? "" : package.source ?? ""
+    }
+
+    var body: some View {
+        let scope = package.manifest.id.uuidString
+        let entries = PluginScriptTree.entries(in: package.sourceFileNames, at: directory)
+        List {
+            if entries.isEmpty {
+                ContentUnavailableView("AUTO_BROWSER_NO_SCRIPTS", systemImage: "doc.text")
+                    .listRowSeparator(.hidden)
+            }
+            Section {
+                ForEach(entries) { entry in
+                    switch entry.kind {
+                        case .directory:
+                            NavigationLink {
+                                PluginScriptDirectoryView(package: package, directory: directory + [entry.name])
+                            } label: {
+                                Label {
+                                    Text(verbatim: entry.name)
+                                } icon: { Image(systemName: "folder").foregroundStyle(PluginBrowserColor.accent) }
+                            }
+                            .accessibilityIdentifier("plugins.scriptFolder." + scope + "." + entry.path)
+                        case .file:
+                            Button { openedFile = OpenedFile(path: entry.path) } label: {
+                                Label {
+                                    Text(verbatim: entry.name).foregroundStyle(.primary)
+                                } icon: { Image(systemName: "doc.text").foregroundStyle(PluginBrowserColor.accent) }
+                            }
+                            .accessibilityIdentifier("plugins.file." + scope + "." + entry.path)
+                    }
+                }
+            } header: {
+                if !directory.isEmpty {
+                    Text(verbatim: package.manifest.name + "\n" + directory.joined(separator: "/")).textCase(nil)
                 }
             }
         }
         .listStyle(.plain)
-        .navigationTitle("AUTO_BROWSER_SCRIPTS")
-        .navigationBarTitleDisplayMode(package == nil ? .large : .inline)
-        .accessibilityIdentifier("plugins.scripts")
-    }
-
-    private func files(_ package: PluginPackagePresentation) -> some View {
-        ForEach(package.sourceFileNames, id: \.self) { file in
-            NavigationLink {
-                PluginFileDetailView(package: package, file: file)
-            } label: {
-                Label {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(verbatim: (file as NSString).lastPathComponent)
-                        if file.contains("/") {
-                            Text(verbatim: file).font(.footnote).foregroundStyle(.secondary)
-                        }
-                    }
-                } icon: { Image(systemName: "doc.text").foregroundStyle(PluginBrowserColor.accent) }
-            }
-            .accessibilityIdentifier("plugins.file." + package.manifest.id.uuidString + "." + file)
+        .navigationTitle(Text(verbatim: directory.last ?? package.manifest.name))
+        .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier("plugins.scriptDirectory." + scope + "." + directory.joined(separator: "/"))
+        .fullScreenCover(item: $openedFile) { file in
+            PluginSourceReader(fileNames: [], selection: $selection, source: { _ in source(of: file.path) },
+                               sourceIdentifier: "plugins.file.source", pickerIdentifier: "plugins.file.sourcePicker",
+                               closeIdentifier: "plugins.file.closeSource", title: (file.path as NSString).lastPathComponent,
+                               accentColor: PluginBrowserColor.accent) { openedFile = nil }
         }
     }
 }

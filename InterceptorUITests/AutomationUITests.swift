@@ -164,36 +164,37 @@ final class AutomationUITests: XCTestCase {
             let app = launch(japanese: japanese, suite: suite)
             defer { app.terminate() }
             installMulti(repositoryURL, app: app, japanese: japanese)
+            XCTAssertFalse(app.buttons.matching(identifier: "plugins.package.test").firstMatch.exists)
             selectTab("scripts", app: app)
             if !japanese { attach("Installed script files en") }
-            for (file, source, path, excluded) in [
-                (PluginRepositorySources.primaryFile, PluginRepositorySources.primarySource, "/synthetic", "/other"),
-                (PluginRepositorySources.secondaryFile, PluginRepositorySources.secondarySource, "/other", "/synthetic"),
+            for (file, source) in [
+                (PluginRepositorySources.primaryFile, PluginRepositorySources.primarySource),
+                (PluginRepositorySources.secondaryFile, PluginRepositorySources.secondarySource),
             ] {
+                XCTAssertGreaterThan(file.split(separator: "/").count, 1, "fixture exercises folder navigation")
                 openFile(file, packageID: Self.multiID, app: app)
-                let detail = scrollContainer(app, "plugins.file.detail")
-                XCTAssertTrue(text(path, in: detail).exists)
-                XCTAssertFalse(text(excluded, in: detail).exists, "file metadata contains only this file's rules")
-                XCTAssertFalse(app.scrollViews["plugins.file.source"].exists, "source requires an explicit action")
-                if !japanese && file == PluginRepositorySources.primaryFile { attach("File target metadata en") }
-                let reader = openFileSource(app)
+                let parent = file.split(separator: "/").dropLast().joined(separator: "/")
+                let directory = scrollContainer(app, "plugins.scriptDirectory." + Self.multiID + "." + parent)
+                XCTAssertFalse(app.scrollViews["plugins.file.source"].exists, "source opens only after the file is tapped")
+                let reader = openFileSource(file, packageID: Self.multiID, app: app)
                 assertSource(reader, equals: source)
                 assertReadOnly(reader, app: app)
                 if japanese && file == PluginRepositorySources.secondaryFile { attach("Full screen exact file source ja") }
                 app.buttons.matching(identifier: "plugins.file.closeSource").firstMatch.tap()
-                XCTAssertTrue(detail.waitForExistence(timeout: 5))
-                XCTAssertTrue(text(path, in: detail).exists, "Done returns to the same file metadata")
-                let reopened = openFileSource(app)
+                XCTAssertTrue(directory.waitForExistence(timeout: 5), "Done returns to the file's parent directory")
+                let reopened = openFileSource(file, packageID: Self.multiID, app: app)
                 assertSource(reopened, equals: source)
                 app.buttons.matching(identifier: "plugins.file.closeSource").firstMatch.tap()
-                goBack(app, from: (file as NSString).lastPathComponent)
+                XCTAssertTrue(directory.waitForExistence(timeout: 5))
+                goBackFromScriptDirectories(app, file: file, packageName: "Multi-file hooks")
+                XCTAssertTrue(scrollContainer(app, "plugins.scripts").waitForExistence(timeout: 5))
             }
             app.terminate()
             let reopened = launch(japanese: japanese, suite: suite)
             openPlugins(reopened, japanese: japanese)
             selectTab("scripts", app: reopened)
             openFile(PluginRepositorySources.secondaryFile, packageID: Self.multiID, app: reopened)
-            assertSource(openFileSource(reopened), equals: PluginRepositorySources.secondarySource)
+            assertSource(openFileSource(PluginRepositorySources.secondaryFile, packageID: Self.multiID, app: reopened), equals: PluginRepositorySources.secondarySource)
             reopened.buttons.matching(identifier: "plugins.file.closeSource").firstMatch.tap()
             reopened.terminate()
         }
@@ -326,13 +327,12 @@ final class AutomationUITests: XCTestCase {
             XCTAssertFalse(app.scrollViews["plugins.file.source"].exists)
             if japanese { attach("Package aggregate target hosts before GET ja") }
             reach(app.buttons.matching(identifier: "plugins.package.scripts").firstMatch, in: scrollContainer(app, "plugins.package.detail")).tap()
-            openFile(PluginRepositorySources.primaryFile, packageID: Self.targetsID, app: app)
-            let fileDetail = scrollContainer(app, "plugins.file.detail")
-            XCTAssertTrue(text("api.example.com", in: fileDetail).exists)
-            XCTAssertFalse(text("example.com", in: fileDetail).exists, "a file shows only its matching rules")
-            if !japanese { attach("Grouped file target conditions en") }
-            goBack(app, from: "POST.js")
-            goBack(app, from: "Scripts")
+            openFile(PluginRepositorySources.primaryFile, packageID: Self.targetsID, app: app, fromScriptsRoot: false)
+            assertSource(openFileSource(PluginRepositorySources.primaryFile, packageID: Self.targetsID, app: app), equals: PluginRepositorySources.primarySource)
+            if !japanese { attach("Direct file source en") }
+            app.buttons.matching(identifier: "plugins.file.closeSource").firstMatch.tap()
+            goBackFromScriptDirectories(app, file: PluginRepositorySources.primaryFile, packageName: "Target hosts example")
+            XCTAssertTrue(scrollContainer(app, "plugins.package.detail").waitForExistence(timeout: 5))
             enqueueGet(app)
             openQueue(app)
             confirmQueue(app)
@@ -488,8 +488,8 @@ final class AutomationUITests: XCTestCase {
         attach("Persisted manifest JSON")
         app.buttons["plugins.manifest.close"].tap()
         reach(app.buttons.matching(identifier: "plugins.package.scripts").firstMatch, in: detail).tap()
-        openFile(PluginRepositorySources.secondaryFile, packageID: Self.targetsID, app: app)
-        assertSource(openFileSource(app), equals: PluginRepositorySources.secondarySource)
+        openFile(PluginRepositorySources.secondaryFile, packageID: Self.targetsID, app: app, fromScriptsRoot: false)
+        assertSource(openFileSource(PluginRepositorySources.secondaryFile, packageID: Self.targetsID, app: app), equals: PluginRepositorySources.secondarySource)
         app.buttons["plugins.file.closeSource"].tap()
         app.terminate()
 
@@ -820,15 +820,42 @@ private extension AutomationUITests {
         XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed, file: file, line: line)
     }
 
+    /// Navigates to a file's parent directory by entering its package (unless already at the package's source root) and then each folder.
     @MainActor
-    func openFile(_ file: String, packageID: String, app: XCUIApplication) {
-        reach(app.buttons.matching(identifier: "plugins.file." + packageID + "." + file).firstMatch, in: scrollContainer(app, "plugins.scripts")).tap()
-        XCTAssertTrue(scrollContainer(app, "plugins.file.detail").waitForExistence(timeout: 5))
+    func openFile(_ file: String, packageID: String, app: XCUIApplication, fromScriptsRoot: Bool = true) {
+        if fromScriptsRoot {
+            let package = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "plugins.scriptPackage." + packageID + ".")).firstMatch
+            reach(package, in: scrollContainer(app, "plugins.scripts")).tap()
+        }
+        let components = file.split(separator: "/").map(String.init)
+        XCTAssertTrue(scrollContainer(app, "plugins.scriptDirectory." + packageID + ".").waitForExistence(timeout: 5))
+        for count in 1 ..< max(components.count, 1) {
+            let parent = components[..<(count - 1)].joined(separator: "/")
+            let folder = components[..<count].joined(separator: "/")
+            reach(app.buttons.matching(identifier: "plugins.scriptFolder." + packageID + "." + folder).firstMatch,
+                  in: scrollContainer(app, "plugins.scriptDirectory." + packageID + "." + parent)).tap()
+            XCTAssertTrue(scrollContainer(app, "plugins.scriptDirectory." + packageID + "." + folder).waitForExistence(timeout: 5))
+            XCTAssertTrue(app.navigationBars[components[count - 1]].waitForExistence(timeout: 5))
+            if count == 1 || count == components.count - 1 { attach("Scripts directory " + folder) }
+        }
+        let parent = components.dropLast().joined(separator: "/")
+        XCTAssertTrue(scrollContainer(app, "plugins.scriptDirectory." + packageID + "." + parent).waitForExistence(timeout: 5))
+    }
+
+    /// The full relative path gives every expected parent, so each Back is tied to its visible title.
+    @MainActor
+    func goBackFromScriptDirectories(_ app: XCUIApplication, file: String, packageName: String) {
+        for folder in file.split(separator: "/").dropLast().reversed() {
+            goBack(app, from: String(folder))
+        }
+        goBack(app, from: packageName)
     }
 
     @MainActor
-    func openFileSource(_ app: XCUIApplication) -> XCUIElement {
-        reach(app.buttons.matching(identifier: "plugins.file.openSource").firstMatch, in: scrollContainer(app, "plugins.file.detail")).tap()
+    func openFileSource(_ file: String, packageID: String, app: XCUIApplication) -> XCUIElement {
+        let parent = file.split(separator: "/").dropLast().joined(separator: "/")
+        reach(app.buttons.matching(identifier: "plugins.file." + packageID + "." + file).firstMatch,
+              in: scrollContainer(app, "plugins.scriptDirectory." + packageID + "." + parent)).tap()
         XCTAssertTrue(app.buttons.matching(identifier: "plugins.file.closeSource").firstMatch.waitForExistence(timeout: 5))
         let sourceScrollView = app.scrollViews["plugins.file.source"]
         XCTAssertTrue(sourceScrollView.waitForExistence(timeout: 5))
@@ -1109,7 +1136,7 @@ extension AutomationUITests {
         for destination in ["sources", "scripts"] {
             selectTab(destination, app: app)
             if destination == "scripts" {
-                XCTAssertFalse(scrollContainer(app, "plugins.scripts").staticTexts.allElementsBoundByIndex.contains(where: \.isHittable), "empty Scripts has no placeholder copy")
+                XCTAssertTrue(scrollContainer(app, "plugins.scripts").staticTexts[japanese ? "スクリプトはありません" : "No Scripts"].waitForExistence(timeout: 5))
             }
             guard openSearchTab(app) else { return false }
             XCTAssertEqual(searchText(app), "Browser fixture author", "Search query retained through \(destination)")
