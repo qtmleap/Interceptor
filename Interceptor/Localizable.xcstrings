@@ -1,6 +1,57 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "AUTO_APPROVAL_FILES" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File saving"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルの保存"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_FILES_ALLOWED" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allowed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "許可"
+          }
+        }
+      }
+    },
+    "AUTO_APPROVAL_FILES_FOOTER" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Plugin can save files locally or to the iCloud Drive folder you allow. Files are exported while Interceptor is open and remain after disabling or deleting the Plugin. iCloud files sync through your Apple Account."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pluginは端末内、または許可したiCloud Driveのフォルダにファイルを保存できます。Interceptorを開いている間に書き出し、Pluginの無効化・削除後も残ります。iCloudのファイルはApple Accountを通じて同期されます。"
+          }
+        }
+      }
+    },
     "SSL_LIST_EDIT" : {
       "localizations" : {
         "en" : {
@@ -6051,6 +6102,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld件"
+          }
+        }
+      }
+    },
+    "AUTO_FILES_SELECT_ICLOUD_FOLDER %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose %@ in iCloud Drive"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud Driveの%@を選択"
+          }
+        }
+      }
+    },
+    "AUTO_FILES_SELECT_ICLOUD_ROOT" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose iCloud Drive"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud Driveを選択"
+          }
+        }
+      }
+    },
+    "AUTO_FILES_EXPORT_FAILED" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could Not Export Files"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルを書き出せませんでした"
+          }
+        }
+      }
+    },
+    "AUTO_FILES_EXPORT_FAILED_DETAILS" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved data remains in Interceptor. Check the selected iCloud Drive folder and available space. Existing files from another source are not replaced."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存したデータはInterceptor内に保持しています。iCloud Driveの選択先と空き容量を確認してください。他のアプリやユーザーが作成した同名ファイルは上書きしません。"
           }
         }
       }

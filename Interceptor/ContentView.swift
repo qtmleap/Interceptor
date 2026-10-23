@@ -17,6 +17,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab = 0
     @StateObject private var tabNavigationAlignment = TabNavigationAlignment()
+    @StateObject private var fileDestinations = PluginFileDestinationController()
     @AppStorage(CaptureAuthorization.key, store: CaptureAuthorization.defaults) private var consentVersion = 0
 
     private var requiresConsent: Bool {
@@ -33,9 +34,26 @@ struct ContentView: View {
                 mainTabs
             }
         }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            fileDestinations.becameActive()
+            while !Task.isCancelled {
+                await PluginFilesExporter.shared.synchronize()
+                await fileDestinations.synchronize()
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+            }
+        }
+        .sheet(item: $fileDestinations.folderRequest, onDismiss: { fileDestinations.folderSheetDismissed() }) { request in
+            PluginStorageFolderPicker(prefix: request.prefix, onSelect: { fileDestinations.selectedFolder($0, for: request) },
+                                      onCancel: { fileDestinations.cancelFolderSelection() })
+        }
+        .alert("AUTO_FILES_EXPORT_FAILED", isPresented: $fileDestinations.showError) {
+            Button("OK", role: .cancel) {}
+        } message: { Text("AUTO_FILES_EXPORT_FAILED_DETAILS") }
         .onAppear { stopCaptureIfUnauthorized() }
         .onChange(of: consentVersion) { stopCaptureIfUnauthorized() }
         .onChange(of: scenePhase) {
+            if scenePhase != .active { fileDestinations.becameInactive() }
             if scenePhase == .active {
                 consentVersion = CaptureAuthorization.defaults.integer(forKey: CaptureAuthorization.key)
                 stopCaptureIfUnauthorized()

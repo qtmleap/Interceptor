@@ -123,6 +123,14 @@ typedef struct RunState {
     uint64_t wall_deadline_ns;   // 0 when not in fetch mode
     unsigned nrequests;
     size_t response_total;
+    // createFile (qjs_run_v2_fetch_files and the scheduling probe): schema 2 `write.files` grant, separate budgets.
+    int write_files;
+    int files_exposed;           // Interceptor.createFile is installed; Storage is present for all schema-2 sources
+    QJSCreateFileCallback create_cb;
+    void *create_opaque;
+    unsigned nwrites;
+    size_t write_total;
+    JSClassID cls_u8, cls_abuf;  // pristine Uint8Array / ArrayBuffer classes (files-exposed runs only)
     int nout;
     OutDecl out[MAX_OUT];
     Intent *intents;
@@ -270,21 +278,40 @@ typedef struct {
     uint8_t *arena;    // decoded keys; decoded length never exceeds raw length, so input_len suffices
     size_t arena_used;
     int max_depth;
+    RunState *st;      // optional: polled for cancel/CPU/wall budget; NULL = unbudgeted
+    unsigned tick;
+    int aborted;       // sticky: budget exhausted mid-scan (st->stop says why)
 } Scan;
 
-static uint32_t fnv1a(const uint8_t *p, size_t n) {
+// Cheap periodic budget poll for per-byte/per-probe loops. Returns 1 once the budget is exhausted (sticky).
+#define SCAN_POLL_MASK 255u
+static int scan_tick(Scan *s) {
+    if (s->aborted) return 1;
+    if (s->st && (++s->tick & SCAN_POLL_MASK) == 0 && budget_exceeded(s->st)) s->aborted = 1;
+    return s->aborted;
+}
+
+static uint32_t fnv1a(Scan *s, const uint8_t *p, size_t n) {
     uint32_t h = 2166136261u;
-    for (size_t i = 0; i < n; i++) { h ^= p[i]; h *= 16777619u; }
+    for (size_t i = 0; i < n; i++) {
+        if (scan_tick(s)) break;
+        h ^= p[i]; h *= 16777619u;
+    }
     return h;
 }
 
-static int keyset_grow_slots(KeySet *ks) {
+// 1 = ok, 0 = out of memory, -2 = budget exhausted
+static int keyset_grow_slots(Scan *sc, KeySet *ks) {
     size_t cap = ks->slot_cap ? ks->slot_cap * 2 : 16;
     uint32_t *slots = calloc(cap, sizeof(uint32_t));
     if (!slots) return 0;
     for (size_t i = 0; i < ks->n; i++) {
+        if (scan_tick(sc)) { free(slots); return -2; }
         size_t j = ks->recs[i].hash & (cap - 1);
-        while (slots[j]) j = (j + 1) & (cap - 1);
+        while (slots[j]) {
+            if (scan_tick(sc)) { free(slots); return -2; }
+            j = (j + 1) & (cap - 1);
+        }
         slots[j] = (uint32_t)(i + 1);
     }
     free(ks->slots);
@@ -293,12 +320,17 @@ static int keyset_grow_slots(KeySet *ks) {
     return 1;
 }
 
-// 1 = added, 0 = duplicate, -1 = out of memory
+// 1 = added, 0 = duplicate, -1 = out of memory, -2 = budget exhausted
 static int keyset_add(Scan *s, KeySet *ks, uint32_t off, uint32_t len) {
-    uint32_t h = fnv1a(s->arena + off, len);
-    if ((ks->n + 1) * 2 > ks->slot_cap && !keyset_grow_slots(ks)) return -1;
+    uint32_t h = fnv1a(s, s->arena + off, len);
+    if (s->aborted) return -2;
+    if ((ks->n + 1) * 2 > ks->slot_cap) {
+        int g = keyset_grow_slots(s, ks);
+        if (g != 1) return g == -2 ? -2 : -1;
+    }
     size_t j = h & (ks->slot_cap - 1);
     while (ks->slots[j]) {
+        if (scan_tick(s)) return -2;
         KeyRec *r = &ks->recs[ks->slots[j] - 1];
         if (r->hash == h && r->len == len && memcmp(s->arena + r->off, s->arena + off, len) == 0) return 0;
         j = (j + 1) & (ks->slot_cap - 1);
@@ -323,7 +355,10 @@ static void keyset_free(KeySet *ks) {
 }
 
 static void skip_ws(Scan *s) {
-    while (s->p < s->end && (*s->p == ' ' || *s->p == '\t' || *s->p == '\n' || *s->p == '\r')) s->p++;
+    while (s->p < s->end && (*s->p == ' ' || *s->p == '\t' || *s->p == '\n' || *s->p == '\r')) {
+        if (scan_tick(s)) return;
+        s->p++;
+    }
 }
 
 static int hexval(int c) {
@@ -364,7 +399,7 @@ static int scan_string(Scan *s, int want_key, uint32_t *off, uint32_t *len) {
     size_t start = s->arena_used;
     s->p++;
     for (;;) {
-        if (s->p >= s->end) return 0;
+        if (s->p >= s->end || scan_tick(s)) return 0;
         uint8_t c = *s->p;
         if (c == '"') { s->p++; break; }
         if (c < 0x20) return 0;
@@ -419,18 +454,18 @@ static int scan_number(Scan *s) {
     if (*q == '-') q++;
     if (q >= s->end) return 0;
     if (*q == '0') q++;
-    else if (*q >= '1' && *q <= '9') { while (is_digit(q, s->end)) q++; }
+    else if (*q >= '1' && *q <= '9') { while (is_digit(q, s->end)) { if (scan_tick(s)) return 0; q++; } }
     else return 0;
     if (q < s->end && *q == '.') {
         q++;
         if (!is_digit(q, s->end)) return 0;
-        while (is_digit(q, s->end)) q++;
+        while (is_digit(q, s->end)) { if (scan_tick(s)) return 0; q++; }
     }
     if (q < s->end && (*q == 'e' || *q == 'E')) {
         q++;
         if (q < s->end && (*q == '+' || *q == '-')) q++;
         if (!is_digit(q, s->end)) return 0;
-        while (is_digit(q, s->end)) q++;
+        while (is_digit(q, s->end)) { if (scan_tick(s)) return 0; q++; }
     }
     if (isinf(strtod((const char *)s->p, NULL))) return 0;
     s->p = q;
@@ -446,7 +481,7 @@ static int scan_literal(Scan *s, const char *lit) {
 
 static int scan_value(Scan *s, int depth) {
     skip_ws(s);
-    if (s->p >= s->end) return 0;
+    if (s->p >= s->end || s->aborted) return 0;
     switch (*s->p) {
         case '{': {
             if (depth + 1 > s->max_depth) return 0;
@@ -497,19 +532,29 @@ static int scan_value(Scan *s, int depth) {
     }
 }
 
-// `z` must be NUL-terminated at z[len].
-static int json_check(const uint8_t *z, size_t len, int max_depth) {
+// `z` must be NUL-terminated at z[len]. With `st`, the scan polls the run's cancel/CPU/wall budget and fails
+// (leaving st->stop set) once it is exhausted; a final check also covers the tail between polls.
+static int json_check_budgeted(const uint8_t *z, size_t len, int max_depth, RunState *st) {
     Scan s;
     s.p = z;
     s.end = z + len;
     s.arena = malloc(len + 1);
     s.arena_used = 0;
     s.max_depth = max_depth;
+    s.st = st;
+    s.tick = 0;
+    s.aborted = 0;
     if (!s.arena) return 0;
     int ok = scan_value(&s, 0);
     if (ok) { skip_ws(&s); ok = (s.p == s.end); }
     free(s.arena);
+    if (s.aborted) ok = 0;
+    if (ok && st && budget_exceeded(st)) ok = 0;
     return ok;
+}
+
+static int json_check(const uint8_t *z, size_t len, int max_depth) {
+    return json_check_budgeted(z, len, max_depth, NULL);
 }
 
 static uint8_t *copy_z(const uint8_t *p, size_t n) {
@@ -1813,12 +1858,12 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
     static const char *const mk[] = {"schemaVersion", "id", "name", "version", "matches", "read", "write",
                                      "endpointBindings", "settings", "author", "summary", "category",
                                      "publishedAt", "outbound"};
-    static const char *const wk[] = {"requestBody", "responseBody"};
-    JSValue f[14], w[2];
+    static const char *const wk[] = {"requestBody", "responseBody", "files"};
+    JSValue f[14], w[3];
     Str s = {NULL, 0}, *bind = NULL;
     size_t nbind = 0;
     int ok = 0;
-    w[0] = w[1] = JS_UNDEFINED;
+    w[0] = w[1] = w[2] = JS_UNDEFINED;
     if (!read_obj(st, ctx, root, mk, 14, 0x1FFu, f)) return 0;
     if (JS_VALUE_GET_TAG(f[0]) != JS_TAG_INT || JS_VALUE_GET_INT(f[0]) != 2) goto done;
     if (!get_str(ctx, f[1], &s, 36) || !uuid_ok(&s)) goto done;
@@ -1862,8 +1907,12 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
         }
     }
     if (!load_read(st, ctx, f[5])) goto done;
-    if (!read_obj(st, ctx, f[6], wk, 2, 3u, w)) goto done;
+    if (!read_obj(st, ctx, f[6], wk, 3, 3u, w)) goto done;
     if (JS_VALUE_GET_TAG(w[0]) != JS_TAG_BOOL || JS_VALUE_GET_TAG(w[1]) != JS_TAG_BOOL) goto done;
+    if (!JS_IsUndefined(w[2])) {
+        if (JS_VALUE_GET_TAG(w[2]) != JS_TAG_BOOL) goto done;
+        st->write_files = JS_VALUE_GET_BOOL(w[2]);
+    }
     *write_request = JS_VALUE_GET_BOOL(w[0]);
     *write_response = JS_VALUE_GET_BOOL(w[1]);
     if (!get_list(st, ctx, f[7], 0, 4, &bind, &nbind)) goto done;
@@ -1882,6 +1931,7 @@ done:
     for (int i = 0; i < 14; i++) JS_FreeValue(ctx, f[i]);
     JS_FreeValue(ctx, w[0]);
     JS_FreeValue(ctx, w[1]);
+    JS_FreeValue(ctx, w[2]);
     return ok;
 }
 
@@ -2169,9 +2219,11 @@ static int v2_safe_integer_tokens(const uint8_t *text, size_t len) {
 //
 // One synchronous trusted host callback per request. fetch() validates natively, blocks in the callback
 // (the wait extends the CPU deadline but never the wall deadline) and returns an already-settled
-// Promise. Promise jobs are drained only while a registered callback is active.
+// Promise. Promise jobs are drained only while a registered callback is active. Fetch-only CPU is 250 ms;
+// the validated files grant plus trusted createFile callback permits a bounded 1000 ms batch, enforced in C.
 
 #define FETCH_CPU_MS 250u
+#define FETCH_FILES_CPU_MS 1000u
 #define FETCH_WALL_MS 120000ull
 #define FETCH_MAX_REQUESTS 64u
 #define FETCH_MAX_JSON_BYTES 8192u
@@ -2260,7 +2312,11 @@ static JSValue js_resp_json(JSContext *ctx, JSValueConst this_val, int argc, JSV
     size_t n;
     const char *c = JS_ToCStringLen2(ctx, &n, data[0], 0);
     if (!c) return JS_EXCEPTION;
-    int ok = json_check((const uint8_t *)c, n, 64) && v2_safe_integer_tokens((const uint8_t *)c, n);
+    int ok = json_check_budgeted((const uint8_t *)c, n, 64, st) && v2_safe_integer_tokens((const uint8_t *)c, n);
+    if (st && budget_exceeded(st)) {
+        JS_FreeCString(ctx, c);
+        return JS_ThrowTypeError(ctx, "response JSON stopped");
+    }
     JSValue parsed = JS_UNDEFINED;
     if (ok) parsed = JS_ParseJSON(ctx, c, n, "<response>");
     JS_FreeCString(ctx, c);
@@ -2534,6 +2590,249 @@ static int install_fetch(JSContext *ctx, int probe) {
     return ok;
 }
 
+// MARK: Interceptor.createFile / Interceptor.Storage (response.onLeave: fetch-files mode and the read-only scheduling probe)
+//
+// createFile({storage, atPath, contents}) validates structurally and natively: exactly three own enumerable data
+// properties of a plain object (no accessors, Proxy or extras; read without running user code); storage is one of
+// the Enum values; atPath is 1...1024 UTF-8 bytes in 1...8 components of 1...255 bytes without absolute, empty,
+// dot-led, backslash, colon or control components; contents is a string (valid UTF-8, no lone surrogate; NUL and
+// empty allowed) or an exact unshared, attached Uint8Array view of 0...1 MiB. Unicode normalization and case aliasing
+// belong to the host. The contents are never parsed. After validation the call blocks in one trusted host callback with
+// borrowed raw bytes (no JavaScript runs between acquiring the pointers and the callback) and returns an
+// already-settled Promise<undefined>. Attempts rejected before the callback do not consume the write budgets;
+// attempts submitted to the host do, whatever the host answers.
+
+#define CREATE_MAX_PATH 1024u
+#define CREATE_MAX_COMPONENT 255u
+#define CREATE_MAX_DEPTH 8u
+#define CREATE_MAX_CONTENTS (1024u * 1024u)
+#define CREATE_MAX_COUNT 64u
+#define CREATE_MAX_TOTAL (16u * 1024u * 1024u)
+#define CREATE_REQUEST_MS 10000u
+
+// Structural path check on valid UTF-8 bytes. Controls: C0, DEL and C1 (U+0080...U+009F).
+static int create_path_ok(const uint8_t *p, size_t n) {
+    if (n < 1 || n > CREATE_MAX_PATH) return 0;
+    size_t start = 0, depth = 0;
+    for (size_t i = 0; i <= n; i++) {
+        if (i < n && p[i] != '/') {
+            uint8_t c = p[i];
+            if (c < 0x20 || c == 0x7F || c == '\\' || c == ':') return 0;
+            if (c == 0xC2 && i + 1 < n && p[i + 1] >= 0x80 && p[i + 1] <= 0x9F) return 0;
+            continue;
+        }
+        size_t len = i - start;
+        if (len < 1 || len > CREATE_MAX_COMPONENT || p[start] == '.') return 0;
+        if (++depth > CREATE_MAX_DEPTH) return 0;
+        start = i + 1;
+    }
+    return 1;
+}
+
+// Exact Uint8Array view over an attached, unshared ArrayBuffer. Returns 1 with `*data`/`*len` borrowed (valid only
+// until JavaScript runs again) or 0 (no exception left pending). Pristine class ids captured before user code reject
+// Proxy, other TypedArrays, DataView and shared backing stores; detached or out-of-bounds views are invalid.
+static int create_bytes_view(RunState *st, JSContext *ctx, JSValueConst v, const uint8_t **data, size_t *len) {
+    *data = NULL;
+    *len = 0;
+    if (JS_GetClassID(v) != st->cls_u8) return 0;
+    size_t off = 0, blen = 0, bpe = 0;
+    JSValue buf = JS_GetTypedArrayBuffer(ctx, v, &off, &blen, &bpe);
+    if (JS_IsException(buf)) { JS_FreeValue(ctx, JS_GetException(ctx)); return 0; }
+    int ok = 0;
+    if (bpe == 1 && JS_GetClassID(buf) == st->cls_abuf && blen <= CREATE_MAX_CONTENTS) {
+        size_t size = 0;
+        uint8_t *base = JS_GetArrayBuffer(ctx, &size, buf);
+        if (!base && JS_HasException(ctx)) {
+            JS_FreeValue(ctx, JS_GetException(ctx));   // detached
+        } else if (off <= size && blen <= size - off) {
+            *data = base ? base + off : (const uint8_t *)"";
+            *len = blen;
+            ok = 1;
+        }
+    }
+    JS_FreeValue(ctx, buf);
+    return ok;
+}
+
+// Only ordinary DTO objects (including null-prototype DTOs) are options. Check the class before asking for
+// its prototype so a Proxy never gets a getPrototypeOf trap. Fresh native objects use the realm's pristine
+// Object prototype without reading a user-replaced global Object constructor.
+static int create_options_plain(RunState *st, JSContext *ctx, JSValueConst object) {
+    if (JS_GetClassID(object) != st->cls_object) return 0;
+    JSValue prototype = JS_GetPrototype(ctx, object);
+    if (JS_IsException(prototype)) return 0;
+    if (JS_IsNull(prototype)) { JS_FreeValue(ctx, prototype); return 1; }
+    JSValue pristine = JS_NewObject(ctx);
+    if (JS_IsException(pristine)) { JS_FreeValue(ctx, prototype); return 0; }
+    JSValue expected = JS_GetPrototype(ctx, pristine);
+    int ok = JS_IsObject(prototype) && JS_IsObject(expected) && JS_VALUE_GET_PTR(prototype) == JS_VALUE_GET_PTR(expected);
+    JS_FreeValue(ctx, expected);
+    JS_FreeValue(ctx, pristine);
+    JS_FreeValue(ctx, prototype);
+    return ok;
+}
+
+static JSValue js_create_file(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    static const char *const keys[] = {"storage", "atPath", "contents"};
+    (void)this_val;
+    RunState *st = JS_GetContextOpaque(ctx);
+    const char *storage = NULL, *path = NULL, *text_c = NULL;
+    const uint8_t *bytes = NULL;
+    size_t storage_len = 0, path_len = 0, bytes_len = 0;
+    JSValue f[3] = {JS_UNDEFINED, JS_UNDEFINED, JS_UNDEFINED};
+    JSValue out = JS_UNDEFINED;
+    if (!st || !st->files_exposed || !st->in_callback) {
+        if (st) st->attach_failed = 1;
+        return JS_ThrowTypeError(ctx, "invalid createFile");
+    }
+    if (budget_exceeded(st)) return JS_ThrowTypeError(ctx, "createFile stopped");
+    if (argc != 1) return reject_error(ctx, 0, "invalid createFile arguments");
+    // Grant, callback and count are checked before any conversion.
+    if (!st->write_files || !st->create_cb || st->nwrites >= CREATE_MAX_COUNT) return reject_error(ctx, 0, "createFile rejected");
+    if (!create_options_plain(st, ctx, argv[0]) || !read_obj_fields(st, ctx, argv[0], keys, 3, 7u, f, NULL))
+        return reject_error(ctx, 0, "invalid createFile options");
+
+    int valid = JS_IsString(f[0]) && JS_IsString(f[1]);
+    if (valid) {
+        storage = JS_ToCStringLen2(ctx, &storage_len, f[0], 0);
+        if (!storage) { out = JS_EXCEPTION; goto done; }
+        valid = (storage_len == 5 && !memcmp(storage, "local", 5)) || (storage_len == 6 && !memcmp(storage, "icloud", 6));
+    }
+    if (valid) {
+        path = JS_ToCStringLen2(ctx, &path_len, f[1], 0);
+        if (!path) { out = JS_EXCEPTION; goto done; }
+        valid = utf8_valid((const uint8_t *)path, path_len) && create_path_ok((const uint8_t *)path, path_len);
+    }
+    if (valid) {
+        if (JS_IsString(f[2])) {
+            text_c = JS_ToCStringLen2(ctx, &bytes_len, f[2], 0);
+            if (!text_c) { out = JS_EXCEPTION; goto done; }
+            bytes = (const uint8_t *)text_c;
+            valid = bytes_len <= CREATE_MAX_CONTENTS && utf8_valid(bytes, bytes_len);
+        } else if (JS_IsObject(f[2])) {
+            // Acquired last: no JavaScript (conversion, rejection, getter, finalizer) runs between here and the
+            // host callback, so the view cannot be detached or resized while the pointer is borrowed.
+            valid = create_bytes_view(st, ctx, f[2], &bytes, &bytes_len);
+        } else valid = 0;
+    }
+    if (valid && bytes_len > CREATE_MAX_TOTAL - st->write_total) valid = 0;
+    if (!valid) {
+        bytes = NULL;   // rejection builds an Error and settles a Promise: the borrowed bytes end here
+        out = budget_exceeded(st) ? JS_ThrowTypeError(ctx, "createFile stopped") : reject_error(ctx, 0, "createFile rejected");
+        goto done;
+    }
+    if (budget_exceeded(st)) { out = JS_ThrowTypeError(ctx, "createFile stopped"); goto done; }
+
+    uint64_t t0 = now_ns();
+    uint64_t left_ms = st->wall_deadline_ns > t0 ? (st->wall_deadline_ns - t0) / 1000000ull : 0;
+    if (left_ms == 0) {
+        st->stop = QJS_TIMEOUT;
+        out = JS_ThrowTypeError(ctx, "createFile stopped");
+        goto done;
+    }
+    uint32_t timeout_ms = left_ms < CREATE_REQUEST_MS ? (uint32_t)left_ms : CREATE_REQUEST_MS;
+    st->nwrites++;
+    st->write_total += bytes_len;
+    int32_t rc = st->create_cb(st->create_opaque, (const uint8_t *)storage, storage_len, (const uint8_t *)path, path_len,
+                               bytes ? bytes : (const uint8_t *)"", bytes_len, timeout_ms);
+    bytes = NULL;
+    // Host wait is excluded from the cumulative CPU budget only; the wall deadline keeps running.
+    st->deadline_ns += now_ns() - t0;
+    if (rc == 2) {
+        st->stop = QJS_CANCELLED;
+        out = JS_ThrowTypeError(ctx, "createFile aborted");
+    } else if (budget_exceeded(st)) {
+        out = JS_ThrowTypeError(ctx, "createFile stopped");
+    } else if (rc != 0) {
+        out = reject_error(ctx, 0, "createFile failed");
+    } else {
+        out = settled_promise(ctx, JS_UNDEFINED, 0);
+    }
+done:
+    if (storage) JS_FreeCString(ctx, storage);
+    if (path) JS_FreeCString(ctx, path);
+    if (text_c) JS_FreeCString(ctx, text_c);
+    for (int i = 0; i < 3; i++) JS_FreeValue(ctx, f[i]);
+    return out;
+}
+
+// Read-only scheduling probe: recognition only. Any call, even a swallowed one, requires the asynchronous path;
+// nothing is validated, written or called back.
+static JSValue js_probe_create_file(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    RunState *st = JS_GetContextOpaque(ctx);
+    if (!st || !st->in_callback) {
+        if (st) st->attach_failed = 1;
+        return JS_ThrowTypeError(ctx, "createFile outside callback");
+    }
+    st->requires_async = 1;
+    return JS_ThrowTypeError(ctx, "asynchronous hook required");
+}
+
+// Storage constants are safe to read while any schema-2 source is evaluated, including sources shared by
+// request and response phases. Only the createFile operation itself needs the deferred response.leave mode.
+static int install_storage_enum(JSContext *ctx) {
+    JSValue global = JS_GetGlobalObject(ctx);
+    JSValue ns = JS_GetPropertyStr(ctx, global, "Interceptor");
+    JSValue en = JS_NewObject(ctx);
+    int ok = !JS_IsException(ns) && !JS_IsException(en);
+    // JS_DefinePropertyValueStr consumes the value on success and failure.
+    if (ok) ok = JS_DefinePropertyValueStr(ctx, en, "local", JS_NewString(ctx, "local"), JS_PROP_ENUMERABLE) > 0;
+    if (ok) ok = JS_DefinePropertyValueStr(ctx, en, "iCloudDrive", JS_NewString(ctx, "icloud"), JS_PROP_ENUMERABLE) > 0;
+    if (ok) ok = JS_PreventExtensions(ctx, en) > 0;
+    if (ok) ok = JS_DefinePropertyValueStr(ctx, ns, "Storage", en, JS_PROP_ENUMERABLE) > 0;
+    else JS_FreeValue(ctx, en);
+    JS_FreeValue(ctx, ns);
+    JS_FreeValue(ctx, global);
+    return ok;
+}
+
+static int install_create_file(JSContext *ctx, int probe) {
+    JSValue global = JS_GetGlobalObject(ctx);
+    JSValue ns = JS_GetPropertyStr(ctx, global, "Interceptor");
+    JSValue fn = JS_NewCFunction(ctx, probe ? js_probe_create_file : js_create_file, "createFile", 1);
+    int ok = !JS_IsException(ns) && !JS_IsException(fn);
+    if (ok) ok = JS_DefinePropertyValueStr(ctx, ns, "createFile", fn, JS_PROP_ENUMERABLE) > 0;
+    else JS_FreeValue(ctx, fn);
+    JS_FreeValue(ctx, ns);
+    JS_FreeValue(ctx, global);
+    return ok;
+}
+
+// Files-exposed runs get only the Uint8Array/ArrayBuffer machinery createFile needs. JS_AddIntrinsicTypedArrays also
+// installs SharedArrayBuffer and Atomics: those globals are removed before any user code, and pristine class ids are
+// captured so shared or foreign buffers can never pass as exact bytes. Other v2 runs and v1 stay without any of it.
+static int setup_binary_contents(JSContext *ctx, RunState *st) {
+    if (JS_AddIntrinsicTypedArrays(ctx)) return 0;
+    static const char *const removed[] = {"SharedArrayBuffer", "Atomics"};
+    JSValue global = JS_GetGlobalObject(ctx);
+    int ok = 1;
+    for (int i = 0; i < 2 && ok; i++) {
+        JSAtom a = JS_NewAtom(ctx, removed[i]);
+        ok = a != JS_ATOM_NULL && JS_DeleteProperty(ctx, global, a, 0) >= 0;
+        if (a != JS_ATOM_NULL) JS_FreeAtom(ctx, a);
+        if (ok) {   // deleted must mean absent
+            JSValue v = JS_GetPropertyStr(ctx, global, removed[i]);
+            ok = !JS_IsException(v) && JS_IsUndefined(v);
+            JS_FreeValue(ctx, v);
+        }
+    }
+    JS_FreeValue(ctx, global);
+    if (!ok) return 0;
+    JSValue buf = JS_NewArrayBufferCopy(ctx, (const uint8_t *)"", 0);
+    if (JS_IsException(buf)) return 0;
+    JSValueConst args[1] = {buf};
+    JSValue u8 = JS_NewTypedArray(ctx, 1, args, JS_TYPED_ARRAY_UINT8);
+    if (!JS_IsException(u8)) {
+        st->cls_abuf = JS_GetClassID(buf);
+        st->cls_u8 = JS_GetClassID(u8);
+    }
+    JS_FreeValue(ctx, u8);
+    JS_FreeValue(ctx, buf);
+    return st->cls_abuf && st->cls_u8 && st->cls_abuf != st->cls_u8;
+}
+
 // Drains promise jobs until none remain, then resolves a returned Promise in place (*ret is replaced by its
 // fulfilment value). Pending after the drain means no job can ever settle it: a script error.
 static int settle_callback(RunState *st, JSContext *ctx, JSRuntime *rt, JSValue *ret) {
@@ -2562,6 +2861,7 @@ static int v2_setup_failure(const RunState *st) {
 
 static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
                             QJSFetchCallback fetch_cb, void *fetch_opaque, int probe_fetch,
+                            int expose_files, QJSCreateFileCallback create_callback_in, void *create_opaque_in,
                             const uint8_t *package_json, size_t package_len,
                             const char *hook,
                             const uint8_t *event_json, size_t event_len,
@@ -2582,11 +2882,15 @@ static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
     memset(&id, 0, sizeof(id));
     for (int i = 0; i < MAX_REGS; i++) st.regs[i].cb = JS_UNDEFINED;
     st.token = token;
+    uint64_t cpu_start_ns = now_ns();
     {
         size_t cpu_ms = limits ? limits->deadline_ms : 0;
         if (fetch_cb && cpu_ms > FETCH_CPU_MS) cpu_ms = FETCH_CPU_MS;
-        st.deadline_ns = now_ns() + (uint64_t)cpu_ms * 1000000ull;
+        st.deadline_ns = cpu_start_ns + (uint64_t)cpu_ms * 1000000ull;
     }
+    st.create_cb = create_callback_in;
+    st.create_opaque = create_opaque_in;
+    st.files_exposed = expose_files || probe_fetch;
     if (fetch_cb) {
         st.fetch_cb = fetch_cb;
         st.fetch_opaque = fetch_opaque;
@@ -2645,6 +2949,10 @@ static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
         JS_FreeValue(ctx, a);
         if (!st.cls_object || !st.cls_array || st.cls_object == st.cls_array) goto cleanup;
     }
+    if (st.files_exposed && !setup_binary_contents(ctx, &st)) {
+        status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL;
+        goto cleanup;
+    }
     JS_SetContextOpaque(ctx, &st);
 
     // Manifest, event and config are parsed and validated natively before user code exists.
@@ -2656,6 +2964,12 @@ static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
     if (JS_IsException(cfgv)) { status = classify_exception(ctx, &st, QJS_INVALID_INPUT); goto cleanup; }
 
     if (!load_package(&st, ctx, manv, &write_request, &write_response)) { status = v2_setup_failure(&st); goto cleanup; }
+    // Only the validated files grant plus a trusted createFile callback admits the larger batch budget.
+    // Keep the original start: manifest/setup time counts, and no host callback has run yet.
+    if (fetch_cb && st.create_cb && st.write_files) {
+        size_t cpu_ms = limits->deadline_ms < FETCH_FILES_CPU_MS ? limits->deadline_ms : FETCH_FILES_CPU_MS;
+        st.deadline_ns = cpu_start_ns + (uint64_t)cpu_ms * 1000000ull;
+    }
     st.body_writable = kind == 0 && (leg == 0 ? write_request : write_response);
     if (!freeze_tree(&st, ctx, cfgv, 1, 0)) { status = v2_setup_failure(&st); goto cleanup; }
     have_id = 1;   // ident_free tolerates a partially filled identity
@@ -2702,7 +3016,8 @@ static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
         }
     }
 
-    if (!install_interceptor(ctx) || ((fetch_cb || probe_fetch) && !install_fetch(ctx, probe_fetch))) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
+    if (!install_interceptor(ctx) || !install_storage_enum(ctx) || ((fetch_cb || probe_fetch) && !install_fetch(ctx, probe_fetch)) ||
+        (st.files_exposed && !install_create_file(ctx, probe_fetch))) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
 
     {
         JSValue completion = JS_Eval(ctx, (const char *)src, source_len, "<plugin>", JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_STRICT);
@@ -2847,7 +3162,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
                      const char *hook,
                      const uint8_t *event_json, size_t event_len,
                      const uint8_t *config_json, size_t config_len) {
-    return run_v2_impl(token, limits, NULL, NULL, 0, package_json, package_len, hook, event_json, event_len,
+    return run_v2_impl(token, limits, NULL, NULL, 0, 0, NULL, NULL, package_json, package_len, hook, event_json, event_len,
                        config_json, config_len);
 }
 
@@ -2861,7 +3176,7 @@ QJSResult qjs_run_v2_fetch(QJSCancelToken *token, const QJSLimits *limits,
         QJSResult res = {QJS_INVALID_INPUT, NULL, 0};
         return res;
     }
-    return run_v2_impl(token, limits, callback, opaque, 0, package_json, package_len, hook, event_json, event_len,
+    return run_v2_impl(token, limits, callback, opaque, 0, 0, NULL, NULL, package_json, package_len, hook, event_json, event_len,
                        config_json, config_len);
 }
 
@@ -2873,6 +3188,21 @@ QJSResult qjs_run_v2_probe(QJSCancelToken *token, const QJSLimits *limits,
         QJSResult res = {QJS_INVALID_INPUT, NULL, 0};
         return res;
     }
-    return run_v2_impl(token, limits, NULL, NULL, 1, package_json, package_len, hook,
+    return run_v2_impl(token, limits, NULL, NULL, 1, 0, NULL, NULL, package_json, package_len, hook,
                        event_json, event_len, config_json, config_len);
+}
+
+QJSResult qjs_run_v2_fetch_files(QJSCancelToken *token, const QJSLimits *limits,
+                                QJSFetchCallback callback, void *opaque,
+                                QJSCreateFileCallback create_callback, void *create_opaque,
+                                const uint8_t *package_json, size_t package_len,
+                                const char *hook,
+                                const uint8_t *event_json, size_t event_len,
+                                const uint8_t *config_json, size_t config_len) {
+    if (!callback) {
+        QJSResult res = {QJS_INVALID_INPUT, NULL, 0};
+        return res;
+    }
+    return run_v2_impl(token, limits, callback, opaque, 0, 1, create_callback, create_opaque, package_json, package_len,
+                       hook, event_json, event_len, config_json, config_len);
 }

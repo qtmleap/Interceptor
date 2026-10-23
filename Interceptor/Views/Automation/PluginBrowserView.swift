@@ -575,6 +575,7 @@ struct PluginPackagesEmpty: View {
                 Text("AUTO_BROWSER_ADD_FROM_SOURCES")
             }
         }
+        .listRowSeparator(.hidden)
     }
 }
 

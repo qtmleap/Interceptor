@@ -40,9 +40,17 @@ struct PluginPackageApprovalView: View {
                     LabeledContent("AUTO_APPROVAL_RESPONSE_JSON") {
                         Text(LocalizedStringKey(package.manifest.writeResponseBody ? "AUTO_APPROVAL_CAN_CHANGE" : "AUTO_APPROVAL_CANNOT_CHANGE"))
                     }
+                    if package.manifest.writeFiles {
+                        LabeledContent("AUTO_APPROVAL_FILES") { Text("AUTO_APPROVAL_FILES_ALLOWED") }
+                    }
                 } footer: {
-                    if package.manifest.outbound.isEmpty {
-                        Text("AUTO_ALERT_WEBHOOK")
+                    VStack(alignment: .leading) {
+                        if package.manifest.writeFiles {
+                            Text("AUTO_APPROVAL_FILES_FOOTER")
+                        }
+                        if package.manifest.outbound.isEmpty {
+                            Text("AUTO_ALERT_WEBHOOK")
+                        }
                     }
                 }
                 Section {

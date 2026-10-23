@@ -49,6 +49,8 @@ public struct PluginManifest: Equatable, Sendable {
     public let matches: [PluginMatch]
     public let writeRequestBody: Bool
     public let writeResponseBody: Bool
+    /// Schema 2 optional `write.files` (strict boolean, default false) gating `Interceptor.createFile`. Always false for schema 1.
+    public let writeFiles: Bool
 
     static let metadataNames: Set<String> = ["method", "host", "status", "path"]
 
@@ -67,16 +69,17 @@ public struct PluginManifest: Equatable, Sendable {
 
         var subs: [PluginSubscription] = []
         var matches: [PluginMatch] = []
-        var writeRequest = false, writeResponse = false
+        var writeRequest = false, writeResponse = false, writeFiles = false
         let read: PluginReadDeclaration
         if isV2 {
             let rawMatches = try f.array("matches")
             guard (1...16).contains(rawMatches.count) else { throw bad }
             matches = try rawMatches.map { try PluginMatch(validating: $0) }
             read = try PluginManifest.readDeclaration(try f.value("read"), allowJSON: true)
-            let w = try JSONFields(try f.value("write"), required: ["requestBody", "responseBody"], error: bad)
+            let w = try JSONFields(try f.value("write"), required: ["requestBody", "responseBody"], optional: ["files"], error: bad)
             writeRequest = try w.bool("requestBody")
             writeResponse = try w.bool("responseBody")
+            writeFiles = try w.has("files") ? w.bool("files") : false
         } else {
             let subsRaw = try f.array("subscriptions")
             guard (1...8).contains(subsRaw.count) else { throw bad }
@@ -130,6 +133,7 @@ public struct PluginManifest: Equatable, Sendable {
         self.matches = matches
         writeRequestBody = writeRequest
         writeResponseBody = writeResponse
+        self.writeFiles = writeFiles
         self.read = read
         endpointBindings = bindings
         self.settings = settings

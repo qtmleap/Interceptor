@@ -140,7 +140,7 @@ final class OutboundRuntimeTests: XCTestCase, @unchecked Sendable {
         let actions = try await run("return {actions:[{type:'webhook',endpointId:'\(endpoint)',json:{f:typeof fetch,k:Object.keys(Interceptor).join(','),n:Interceptor.send.length}}]};")
         let json = try XCTUnwrap(actions[0]["json"] as? [String: Any])
         XCTAssertEqual(json["f"] as? String, "undefined")
-        XCTAssertEqual(json["k"] as? String, "attach,send")
+        XCTAssertEqual(json["k"] as? String, "attach,send,Storage")
     }
 
     // MARK: manifest outbound grammar
