@@ -31,45 +31,45 @@
 Files: AutomationCore/Manifest.swift; CQuickJS/bridge.c and include/CQuickJS.h; AutomationRuntime/JavaScriptFetchExecutor.swift; associated package tests.
 Interfaces: `public typealias SaveJSON = @Sendable (String, String) async throws -> Void`; `runV2(... configJSON: Data, saveJSON: SaveJSON? = nil, transport: @escaping Transport)`.
 C: add qjs_run_v2_fetch_save (old fetch arguments plus QJSSaveJSONCallback and save opaque before package). Callback receives raw key/text pointers, lengths, timeout_ms; status 0/1/2 means success/reject/cancel. Preserve old qjs_run_v2_fetch wrapper.
-- [ ] Write tests first: optional/denied files permission, old fetch, exact text/UTF8 callback, invalid key/JSON, limits, phase/probe/no IO, cancellation and Promise errors.
-- [ ] Codex runs focused tests and records expected failure, then worker implements the contract.
-- [ ] Run affected Swift tests and shared C validation on resulting content; expect zero failures.
+- [x] Write tests first: optional/denied files permission, old fetch, exact text/UTF8 callback, invalid key/JSON, limits, phase/probe/no IO, cancellation and Promise errors.
+- [x] Codex runs focused tests and records expected failure, then worker implements the contract.
+- [x] Run affected Swift tests and shared C validation on resulting content; expect zero failures.
 
 ### Task 2: Durable storage and activation fence
 
 Files: new AutomationCore/PluginJSONFileStore.swift; PluginActivationStore.swift; core tests.
 Interfaces: `public struct PluginJSONFileStore: Sendable { init(directoryURL: URL); func save(revisionID: String, package: PluginPackage, key: String, jsonText: String, checkAuthorization: @Sendable () throws -> Void = {}) throws; func export(to directoryURL: URL) throws }`.
 Fence: `PluginActivationStore.withCurrentActivation(admitted: PluginActivationSnapshot, revisionID: String, _ operation: @Sendable (ActivatedPlugin) throws -> Void) throws`, holds existing activation lock across operation, verifies snapshot and exact granted revision. Store validates revision/package and permission, derives namespace with trusted InstallationIdentity family + digest, file SHA256(key).json.
-- [ ] Write tests first for exact bytes, invalid/large/deep JSON/key, no permission, namespace isolation, atomic replace/noop, quotas, symlinks/special files, IO errors, cancellation before publication, stale activation, export behavior.
-- [ ] Codex runs tests red; worker implements descriptor-relative no-follow storage, 0600 atomic temp/rename/fsync, bounded quotas, source-only export.
-- [ ] Run relevant core tests; expect zero failures.
+- [x] Write tests first for exact bytes, invalid/large/deep JSON/key, no permission, namespace isolation, atomic replace/noop, quotas, symlinks/special files, IO errors, cancellation before publication, stale activation, export behavior.
+- [x] Codex runs tests red; worker implements descriptor-relative no-follow storage, 0600 atomic temp/rename/fsync, bounded quotas, source-only export.
+- [x] Run relevant core tests; expect zero failures.
 
 ### Task 3: SDK and Salmon Run integration
 
 Files: types/interceptor.d.ts; tools/compile.mjs and repository_config.py; Plugin metadata/hook; authoring/compiler/hook tests; canonical API docs/templates where applicable. Native bridge simulator copy is coordinated by Codex after Task 1.
-- [ ] Add tests first for saveJSON types, direct-call placement in response.onLeave, aliases/shadowing, optional boolean files permission, original history/detail text and no token persistence.
-- [ ] Run tests red, then implement SDK contract and Plugin 1.1.0 with write.files true. Fetch text once; validate parsed history/detail before saving original text; retain IDs only. Stop on save errors.
-- [ ] Run affected tests, check script and manifest from `bun run build`, then required repository check; verify generated package hashes and permission.
+- [x] Add tests first for saveJSON types, direct-call placement in response.onLeave, aliases/shadowing, optional boolean files permission, original history/detail text and no token persistence.
+- [x] Run tests red, then implement SDK contract and Plugin 1.1.0 with write.files true. Fetch text once; validate parsed history/detail before saving original text; retain IDs only. Stop on save errors.
+- [x] Run affected tests, check script and manifest from `bun run build`, then required repository check; verify generated package hashes and permission.
 
 ### Task 4: App integration and Files
 
 Files: HTTPPluginProcessor.swift; AutomationSharedConfiguration.swift; ContentView.swift; new foreground exporter helper; Info.plist; PluginPackageApprovalView.swift; Localizable.xcstrings; integration tests.
-- [ ] Add processor tests for admitted revision binding, save callback authority and no write after revocation; observe failure before integration.
-- [ ] Inject trusted store URL into processor, retain revisionID in deferred run, bind SaveJSON closure to admitted activation fence and consent/cancellation checks. Export on launch/foreground with cancellable ~5s loop away from main actor.
-- [ ] Enable UIFileSharingEnabled and LSSupportsOpeningDocumentsInPlace. Add only conditional files permission in existing approval section/footer, localized Japanese/English.
-- [ ] Run affected tests and required format/check gates. Build device app against immutable recorded source using existing owned DerivedData/SourcePackages.
+- [x] Add processor tests for admitted revision binding, save callback authority and no write after revocation; observe failure before integration.
+- [x] Inject trusted store URL into processor, retain revisionID in deferred run, bind SaveJSON closure to admitted activation fence and consent/cancellation checks. Export on launch/foreground with cancellable ~5s loop away from main actor.
+- [x] Enable UIFileSharingEnabled and LSSupportsOpeningDocumentsInPlace. Add only conditional files permission in existing approval section/footer, localized Japanese/English.
+- [x] Run affected tests and required format/check gates. Build device app against immutable recorded source using existing owned DerivedData/SourcePackages.
 
 ### Task 5: Independent review and M3 verification
 
-- [ ] Fresh read-only Claude review of exact diff/files. LocalGPT actual-files review for native storage risk, using its verified studio LocalMCP access. Resolve material findings with affected tests.
-- [ ] Install app preserving data, import/enable canonical 1.1.0 package, trigger Nintendo Switch App's actual BulletToken request with live history.
-- [ ] Read back app-group saved JSON and exported Documents JSON; verify nonempty history/detail, exact response bytes/hashes, package and source fingerprints, and Files visibility. Never print credentials/raw player data.
-- [ ] UI comparisons use Mock Diff when matching adopted state is available. Captures immediately become lossless exact WebP with RGBA/profile/dimension/scale/hash verification; retain required originals only.
-- [ ] Clean owned streams/windows/test devices and superseded disposable artifacts. Preserve private real-data evidence and pending/unknown reviewer jobs; archive completed managed LocalGPT chats only after results saved and no continuation remains.
+- [x] Fresh read-only Claude review of exact diff/files. LocalGPT actual-files review for native storage risk, using its verified studio LocalMCP access. Resolve material findings with affected tests.
+- [x] Install app preserving data, import/enable canonical 1.1.0 package, trigger Nintendo Switch App's actual BulletToken request with live history.
+- [x] Read back app-group saved JSON and exported Documents JSON; verify nonempty history/detail, exact response bytes/hashes, package and source fingerprints, and Files visibility. Never print credentials/raw player data.
+- [x] UI comparisons use Mock Diff when matching adopted state is available. Captures immediately become lossless exact WebP with RGBA/profile/dimension/scale/hash verification; retain required originals only.
+- [x] Clean owned streams/windows/test devices and superseded disposable artifacts. Preserve private real-data evidence and pending/unknown reviewer jobs; archive completed managed LocalGPT chats only after results saved and no continuation remains.
 
 ## Review resolutions / execution ledger
 
-LocalGPT Pro actual-files plan review completed (studio connection, original spec hash verified), plus independent Claude native and SDK feasibility reviews. Additional Claude Opus plan review is pending; no implementation yet.
+LocalGPT Pro actual-files plan review completed (studio connection, original spec hash verified), plus independent Claude native and SDK feasibility reviews. The additional Claude Opus plan review completed before implementation. Later checkpoints below are retained as execution history; the final accepted evidence is recorded at the end.
 
 - Commit boundary: authorization must hold when a publication is admitted at its final synchronous check. A cancellation after that boundary may leave the committed file. Shutdown's drain acknowledgement must wait until every admitted publication has finished. No claim of retroactive rollback or atomic UserDefaults/rename across processes is made.
 - Keep activation lock work bounded: validate JSON before entering the fence; storage lock must be nonblocking when called under activation, reject contention so caller can retry on a later capture. No Documents export under activation lock. For the bounded 1MiB synchronous write, check cancellation during chunked writes and before publication; don't detach I/O that can outlive callback drain. This intentionally favors rejecting a contended save over holding up revocation.
@@ -86,7 +86,7 @@ LocalGPT Pro actual-files plan review completed (studio connection, original spe
 - Native store accounting uses stat sizes and chunked comparisons, not loading the whole retained store. Sweep only abandoned owned temporary files, never an active publisher's temp; lock/temp ownership must be explicit. Same-key concurrent publishers remain atomic.
 - QuickJS heap stays8MiB. One-MiB text is the API byte maximum, not a promise that any caller's parsed object graph fits. Dense tiny-value JSON may exhaust the existing bounded VM; fail without host writes instead of raising heap. Test near-limit Unicode/escaped text success and dense parsed input controlled failure, plus realistic multi-detail cumulative batch >8MiB.
 - Save JSON syntax validation must avoid constructing another complete JS object tree; native streaming/bounded parser validates raw UTF8. Preserve original text even when number spelling differs from canonical representation. Reject invalid text/depth/duplicate keys consistently with native parser.
-- Update spec to reflect final1024 key cap, staging and actual nonempty-history M3 test. Live pass requires history count>0, validated IDs/principal, at least one real detail (multiple when present), each persisted copy hash equal to original response. If history unexpectedly unavailable, report the failed live criterion; synthetic evidence cannot replace it.
+- Update spec to reflect final1024 key cap, staging and actual nonempty-history M3 test. Live pass requires history count>0, validated result IDs and required player fields, at least one real detail (multiple when present), each persisted copy hash equal to original response. If history unexpectedly unavailable, report the failed live criterion; synthetic evidence cannot replace it.
 
 ### Execution evidence and review fix pass
 
@@ -96,3 +96,16 @@ LocalGPT Pro actual-files plan review completed (studio connection, original spe
 - Native review completed independently by Claude; LocalGPT actual-files review remains pending on original source. Original changed-source files/hashes retained under private review-original for delta comparison. Current fixes will require an actual-files delta review.
 - RED confirmed for backup exclusion repair on identical saves/exports, partial export with a blocked first file, nonfinite numeric parity, and rejected first publication consuming a namespace. Fix worker owns Core store/parser/tests; Codex owns foreground retry/cache and preserving the existing webhook footer. No new product screens.
 - Test fixture corrections: supplied raw old/new strings were invalid JSON and now correctly quoted; invalid JSON never creates a namespace. A local helper merely named saveJSON is not a host API alias. The first valid detail establishes principal; the mismatch test now checks a second detail. These corrections preserve production contracts.
+
+
+### Final accepted evidence (2026-10-24 JST)
+
+- Native runtime/source commit: `5bfe74965c29a7d452ae3053ad036f172314ee91`; paired Mudmouth `72710a0910121889c76167396d4827d819bb27ef`. CI and TestFlight dependency pins use that Mudmouth revision.
+- M3, iPadOS27.0.1: the installed 1.1.0 package SHA256 is `63654ef608720a3e567b6f2a5a8ae040f43f8b162831227b52eb6bddd8249c5e`. A real Nintendo Switch App BulletToken POST triggered the installed plugin automatically. History contains50 distinct IDs, all50 detail responses were saved;51 raw JSON files total2029593bytes. Every saved detail ID matches the history set, no GraphQL errors, no custom wrapper.
+- Read-back private files and Documents/Plugins exports are byte-identical for all51 files. Physical metadata confirms0600 files and backup-exclusion attributes; the save path also passed physical file-protection verification before publication. Private raw data and hashes remain local under `.codex/json-storage`; no tokens or result bodies are published.
+- Live fixes: gzip responses were previously ineligible. Mudmouth now strictly decodes one bounded gzip member for response.onLeave, preserving wire bytes and bypassing mutation.109 transport tests and signed iOS build passed. Opaque per-result player IDs are no longer compared as account IDs; exact result-ID checks, required player fields and one Bearer per chain remain.
+- A temporary enum-only diagnostic established that the old250ms VM budget stopped acquisition at32 details. It was removed. Validated files-granted fetch/save batches now have1000ms cumulative CPU; other fetch runs stay250ms, with the same8MiB heap,120s wall and callback/count/byte/cancellation bounds. A350ms workload was RED before the fix and GREEN after it; denied/absent grants still time out.43 save tests and21 fetch tests passed, including bounded scanner and cancellation cases.
+-44 native file-store tests and10 signed app integration tests passed on unchanged storage/integration content. Existing signed simulator result retained; both owned test simulators were deleted. Latest signed device build succeeded and is installed on M3.
+- Independent Claude actual-files reviews completed for native storage, gzip transport, player-ID correction and CPU budget. LocalGPT Pro actual-files review findings were resolved; its final storage delta attempt was rate-limited, so the completed Claude delta review and actual tests were used. LocalGPT later completed the gzip plan review with verified studio file access. No final Pro delta review is claimed.
+- Mock Diff was inspected. It has no adopted baseline for the added files permission at M3's exact27.0.1 state; no quantitative comparison pass is claimed. Existing rows/footers were reused, with no new screen. Captures were verified as lossless WebP and kept out of chat.
+- PRs: Interceptor35, Interceptor-Plugins11, Mudmouth9. Build outputs, canonical generated package and private real-data evidence are retained for review/recovery; active PR worktrees remain in use.
