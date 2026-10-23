@@ -74,7 +74,7 @@ private final class FetchJob: @unchecked Sendable {
         lock.unlock()
     }
 
-    /// Call only after `qjs_run_v2_fetch` has returned.
+    /// Call only after `qjs_run_v2_fetch_save` has returned.
     func finish() {
         lock.lock()
         if let token {
@@ -88,9 +88,11 @@ private final class FetchJob: @unchecked Sendable {
 private final class FetchContext: @unchecked Sendable {
     let job: FetchJob
     let transport: JavaScriptFetchExecutor.Transport
-    init(job: FetchJob, transport: @escaping JavaScriptFetchExecutor.Transport) {
+    let saveJSON: JavaScriptFetchExecutor.SaveJSON?
+    init(job: FetchJob, transport: @escaping JavaScriptFetchExecutor.Transport, saveJSON: JavaScriptFetchExecutor.SaveJSON?) {
         self.job = job
         self.transport = transport
+        self.saveJSON = saveJSON
     }
 }
 
@@ -145,6 +147,46 @@ private let fetchCallback: QJSFetchCallback = { opaque, json, length, timeoutMs,
     }
 }
 
+/// C callback for `Interceptor.saveJSON`. The native layer already validated the key and JSON text; both arrive as the
+/// original UTF-8 bytes. Like fetch, it drives the async host closure on this owned thread and always awaits the task
+/// (cancelling it on timeout) before returning, so no host I/O outlives the callback. A cancellation after the host
+/// committed may leave the saved file; the script is still stopped.
+private let saveJSONCallback: QJSSaveJSONCallback = { opaque, key, keyLength, text, textLength, timeoutMs in
+    guard let opaque, let key, let text else { return 1 }
+    let context = Unmanaged<FetchContext>.fromOpaque(opaque).takeUnretainedValue()
+    guard let save = context.saveJSON else { return 1 }
+    let job = context.job
+    if job.isCancelled {
+        return 2
+    }
+    let keyString = String(decoding: UnsafeBufferPointer(start: key, count: keyLength), as: UTF8.self)
+    let textString = String(decoding: UnsafeBufferPointer(start: text, count: textLength), as: UTF8.self)
+
+    let done = DispatchSemaphore(value: 0)
+    let box = SaveBox()
+    let task = Task<Void, Never> {
+        do { try await save(keyString, textString) } catch { box.error = error }
+        done.signal()
+    }
+    job.install(task)
+    var timedOut = false
+    if done.wait(timeout: .now() + .milliseconds(Int(timeoutMs) + 250)) == .timedOut {
+        timedOut = true
+        task.cancel()
+        done.wait()
+    }
+    job.clearTask()
+    if job.isCancelled {
+        return 2
+    }
+    guard let error = box.error else { return 0 }
+    return error is CancellationError && !timedOut ? 2 : 1
+}
+
+private final class SaveBox: @unchecked Sendable {
+    var error: Error? // written before the semaphore signal
+}
+
 private final class ResultBox: @unchecked Sendable {
     var value: Result<JavaScriptFetchResponse, Error>? // written before the semaphore signal
 }
@@ -155,6 +197,9 @@ public final class JavaScriptFetchExecutor: @unchecked Sendable {
     /// Trusted host transport: honor the request deadline and Task cancellation, and finish owned
     /// I/O before returning. The callback waits for completion so no socket outlives the invocation.
     public typealias Transport = @Sendable (JavaScriptFetchRequest) async throws -> JavaScriptFetchResponse
+    /// Trusted host save for `Interceptor.saveJSON(key, jsonText)`; key and original JSON text were validated natively.
+    /// Honor Task cancellation and finish all owned I/O before returning; a thrown error rejects the script's promise.
+    public typealias SaveJSON = @Sendable (String, String) async throws -> Void
 
     private static let globalLock = NSLock()
     private nonisolated(unsafe) static var globalActive = 0
@@ -168,7 +213,7 @@ public final class JavaScriptFetchExecutor: @unchecked Sendable {
     public init() {}
 
     public func runV2(packageJSON: Data, hook: JavaScriptHook, eventJSON: Data, configJSON: Data,
-                      transport: @escaping Transport) async throws -> Data
+                      saveJSON: SaveJSON? = nil, transport: @escaping Transport) async throws -> Data
     {
         guard hook == .responseLeave, !packageJSON.isEmpty,
               packageJSON.count <= JavaScriptLimits.maxPackageBytes,
@@ -191,7 +236,7 @@ public final class JavaScriptFetchExecutor: @unchecked Sendable {
                 let thread = Thread {
                     let outcome = Result {
                         try Self.execute(job: job, package: packageJSON, hook: hookName, event: eventJSON,
-                                         config: configJSON, transport: transport)
+                                         config: configJSON, saveJSON: saveJSON, transport: transport)
                     }
                     // Release admission (instance and global) before resuming the caller.
                     self.release(job)
@@ -244,7 +289,7 @@ public final class JavaScriptFetchExecutor: @unchecked Sendable {
     }
 
     private static func execute(job: FetchJob, package: Data, hook: String, event: Data, config: Data,
-                                transport: @escaping Transport) throws -> Data
+                                saveJSON: SaveJSON?, transport: @escaping Transport) throws -> Data
     {
         do {
             guard case .object = try JSONValue(parsing: event),
@@ -261,14 +306,14 @@ public final class JavaScriptFetchExecutor: @unchecked Sendable {
             max_result_depth: JavaScriptLimits.maxResultDepth,
             max_actions: JavaScriptLimits.maxActions,
         )
-        let context = FetchContext(job: job, transport: transport)
+        let context = FetchContext(job: job, transport: transport, saveJSON: saveJSON)
         let token = job.nativeToken
         var result = withExtendedLifetime(context) {
             let opaque = Unmanaged.passUnretained(context).toOpaque()
             return package.withUnsafeBytes { pkg in
                 event.withUnsafeBytes { ev in
                     config.withUnsafeBytes { cfg in
-                        qjs_run_v2_fetch(token, &limits, fetchCallback, opaque,
+                        qjs_run_v2_fetch_save(token, &limits, fetchCallback, opaque, context.saveJSON == nil ? nil : saveJSONCallback, opaque,
                                          pkg.baseAddress?.assumingMemoryBound(to: UInt8.self), pkg.count, hook,
                                          ev.baseAddress?.assumingMemoryBound(to: UInt8.self), ev.count,
                                          cfg.baseAddress?.assumingMemoryBound(to: UInt8.self), cfg.count)

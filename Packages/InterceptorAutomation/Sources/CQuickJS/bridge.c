@@ -123,6 +123,13 @@ typedef struct RunState {
     uint64_t wall_deadline_ns;   // 0 when not in fetch mode
     unsigned nrequests;
     size_t response_total;
+    // saveJSON (qjs_run_v2_fetch_save and the scheduling probe): schema 2 `write.files` grant, separate budgets.
+    int write_files;
+    int save_exposed;            // Interceptor.saveJSON is installed
+    QJSSaveJSONCallback save_cb;
+    void *save_opaque;
+    unsigned nsaves;
+    size_t save_total;
     int nout;
     OutDecl out[MAX_OUT];
     Intent *intents;
@@ -1813,12 +1820,12 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
     static const char *const mk[] = {"schemaVersion", "id", "name", "version", "matches", "read", "write",
                                      "endpointBindings", "settings", "author", "summary", "category",
                                      "publishedAt", "outbound"};
-    static const char *const wk[] = {"requestBody", "responseBody"};
-    JSValue f[14], w[2];
+    static const char *const wk[] = {"requestBody", "responseBody", "files"};
+    JSValue f[14], w[3];
     Str s = {NULL, 0}, *bind = NULL;
     size_t nbind = 0;
     int ok = 0;
-    w[0] = w[1] = JS_UNDEFINED;
+    w[0] = w[1] = w[2] = JS_UNDEFINED;
     if (!read_obj(st, ctx, root, mk, 14, 0x1FFu, f)) return 0;
     if (JS_VALUE_GET_TAG(f[0]) != JS_TAG_INT || JS_VALUE_GET_INT(f[0]) != 2) goto done;
     if (!get_str(ctx, f[1], &s, 36) || !uuid_ok(&s)) goto done;
@@ -1862,8 +1869,12 @@ static int load_manifest(RunState *st, JSContext *ctx, JSValueConst root, int *w
         }
     }
     if (!load_read(st, ctx, f[5])) goto done;
-    if (!read_obj(st, ctx, f[6], wk, 2, 3u, w)) goto done;
+    if (!read_obj(st, ctx, f[6], wk, 3, 3u, w)) goto done;
     if (JS_VALUE_GET_TAG(w[0]) != JS_TAG_BOOL || JS_VALUE_GET_TAG(w[1]) != JS_TAG_BOOL) goto done;
+    if (!JS_IsUndefined(w[2])) {
+        if (JS_VALUE_GET_TAG(w[2]) != JS_TAG_BOOL) goto done;
+        st->write_files = JS_VALUE_GET_BOOL(w[2]);
+    }
     *write_request = JS_VALUE_GET_BOOL(w[0]);
     *write_response = JS_VALUE_GET_BOOL(w[1]);
     if (!get_list(st, ctx, f[7], 0, 4, &bind, &nbind)) goto done;
@@ -1882,6 +1893,7 @@ done:
     for (int i = 0; i < 14; i++) JS_FreeValue(ctx, f[i]);
     JS_FreeValue(ctx, w[0]);
     JS_FreeValue(ctx, w[1]);
+    JS_FreeValue(ctx, w[2]);
     return ok;
 }
 
@@ -2534,6 +2546,107 @@ static int install_fetch(JSContext *ctx, int probe) {
     return ok;
 }
 
+// MARK: Interceptor.saveJSON (response.onLeave: fetch-save mode and the read-only scheduling probe)
+//
+// saveJSON(key, jsonText) validates natively: key 1...1024 UTF-8 bytes (no NUL, no lone surrogate), text 1...1 MiB of
+// UTF-8 that the raw strict scanner accepts (depth <= 64, no duplicate keys). No second JS value tree is built. It
+// then blocks in one trusted host callback with the original bytes and returns an already-settled Promise. Rejected
+// attempts never reach the host and do not consume the save budgets.
+
+#define SAVE_MAX_KEY 1024u
+#define SAVE_MAX_JSON (1024u * 1024u)
+#define SAVE_MAX_COUNT 64u
+#define SAVE_MAX_TOTAL (16u * 1024u * 1024u)
+#define SAVE_REQUEST_MS 10000u
+
+// Borrowed UTF-8 view of a string argument. Returns 1 valid, 0 invalid, -1 conversion failure (exception pending).
+// `*c` is NULL unless a view was obtained and must then be released with JS_FreeCString.
+static int save_arg(JSContext *ctx, JSValueConst v, size_t max, const char **c, size_t *n) {
+    *c = NULL;
+    *n = 0;
+    if (!JS_IsString(v)) return 0;
+    *c = JS_ToCStringLen2(ctx, n, v, 0);
+    if (!*c) return -1;
+    return *n >= 1 && *n <= max && memchr(*c, 0, *n) == NULL && utf8_valid((const uint8_t *)*c, *n);
+}
+
+static JSValue js_save_json(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    RunState *st = JS_GetContextOpaque(ctx);
+    const char *key = NULL, *text = NULL;
+    size_t key_len = 0, text_len = 0;
+    if (!st || !st->save_exposed || !st->in_callback) {
+        if (st) st->attach_failed = 1;
+        return JS_ThrowTypeError(ctx, "invalid saveJSON");
+    }
+    if (budget_exceeded(st)) return JS_ThrowTypeError(ctx, "saveJSON stopped");
+    if (argc != 2) return reject_error(ctx, 0, "invalid saveJSON arguments");
+    int valid = save_arg(ctx, argv[0], SAVE_MAX_KEY, &key, &key_len);
+    if (valid < 0) return JS_EXCEPTION;
+    if (valid) {
+        valid = save_arg(ctx, argv[1], SAVE_MAX_JSON, &text, &text_len);
+        if (valid < 0) { JS_FreeCString(ctx, key); return JS_EXCEPTION; }
+    }
+    // The converted text is NUL-terminated, as json_check requires.
+    if (valid) valid = json_check((const uint8_t *)text, text_len, 64);
+    if (!valid || !st->write_files || !st->save_cb || st->nsaves >= SAVE_MAX_COUNT ||
+        text_len > SAVE_MAX_TOTAL - st->save_total) {
+        JS_FreeCString(ctx, key);
+        JS_FreeCString(ctx, text);
+        return reject_error(ctx, 0, "saveJSON rejected");
+    }
+    st->nsaves++;
+    st->save_total += text_len;
+
+    uint64_t t0 = now_ns();
+    uint64_t left_ms = st->wall_deadline_ns > t0 ? (st->wall_deadline_ns - t0) / 1000000ull : 0;
+    if (left_ms == 0) {
+        JS_FreeCString(ctx, key);
+        JS_FreeCString(ctx, text);
+        st->stop = QJS_TIMEOUT;
+        return JS_ThrowTypeError(ctx, "saveJSON stopped");
+    }
+    uint32_t timeout_ms = left_ms < SAVE_REQUEST_MS ? (uint32_t)left_ms : SAVE_REQUEST_MS;
+    int32_t rc = st->save_cb(st->save_opaque, (const uint8_t *)key, key_len, (const uint8_t *)text, text_len, timeout_ms);
+    JS_FreeCString(ctx, key);
+    JS_FreeCString(ctx, text);
+    // Host wait is excluded from the cumulative CPU budget only; the wall deadline keeps running.
+    st->deadline_ns += now_ns() - t0;
+    if (rc == 2) {
+        st->stop = QJS_CANCELLED;
+        return JS_ThrowTypeError(ctx, "saveJSON aborted");
+    }
+    if (budget_exceeded(st)) return JS_ThrowTypeError(ctx, "saveJSON stopped");
+    if (rc != 0) return reject_error(ctx, 0, "saveJSON failed");
+    return settled_promise(ctx, JS_UNDEFINED, 0);
+}
+
+// Read-only scheduling probe: recognition only. Any call, even a swallowed one, requires the asynchronous path;
+// nothing is validated, saved or called back.
+static JSValue js_probe_save_json(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    RunState *st = JS_GetContextOpaque(ctx);
+    if (!st || !st->in_callback) {
+        if (st) st->attach_failed = 1;
+        return JS_ThrowTypeError(ctx, "saveJSON outside callback");
+    }
+    st->requires_async = 1;
+    return JS_ThrowTypeError(ctx, "asynchronous hook required");
+}
+
+static int install_save_json(JSContext *ctx, int probe) {
+    JSValue global = JS_GetGlobalObject(ctx);
+    JSValue ns = JS_GetPropertyStr(ctx, global, "Interceptor");
+    JSValue fn = JS_NewCFunction(ctx, probe ? js_probe_save_json : js_save_json, "saveJSON", 2);
+    int ok = !JS_IsException(ns) && !JS_IsException(fn);
+    // JS_DefinePropertyValueStr consumes `fn` on success and failure.
+    if (ok) ok = JS_DefinePropertyValueStr(ctx, ns, "saveJSON", fn, JS_PROP_ENUMERABLE) > 0;
+    else JS_FreeValue(ctx, fn);
+    JS_FreeValue(ctx, ns);
+    JS_FreeValue(ctx, global);
+    return ok;
+}
+
 // Drains promise jobs until none remain, then resolves a returned Promise in place (*ret is replaced by its
 // fulfilment value). Pending after the drain means no job can ever settle it: a script error.
 static int settle_callback(RunState *st, JSContext *ctx, JSRuntime *rt, JSValue *ret) {
@@ -2562,6 +2675,7 @@ static int v2_setup_failure(const RunState *st) {
 
 static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
                             QJSFetchCallback fetch_cb, void *fetch_opaque, int probe_fetch,
+                            int expose_save, QJSSaveJSONCallback save_callback_in, void *save_opaque_in,
                             const uint8_t *package_json, size_t package_len,
                             const char *hook,
                             const uint8_t *event_json, size_t event_len,
@@ -2587,6 +2701,9 @@ static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
         if (fetch_cb && cpu_ms > FETCH_CPU_MS) cpu_ms = FETCH_CPU_MS;
         st.deadline_ns = now_ns() + (uint64_t)cpu_ms * 1000000ull;
     }
+    st.save_cb = save_callback_in;
+    st.save_opaque = save_opaque_in;
+    st.save_exposed = expose_save || probe_fetch;
     if (fetch_cb) {
         st.fetch_cb = fetch_cb;
         st.fetch_opaque = fetch_opaque;
@@ -2702,7 +2819,8 @@ static QJSResult run_v2_impl(QJSCancelToken *token, const QJSLimits *limits,
         }
     }
 
-    if (!install_interceptor(ctx) || ((fetch_cb || probe_fetch) && !install_fetch(ctx, probe_fetch))) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
+    if (!install_interceptor(ctx) || ((fetch_cb || probe_fetch) && !install_fetch(ctx, probe_fetch)) ||
+        (st.save_exposed && !install_save_json(ctx, probe_fetch))) { status = st.oom ? QJS_MEMORY_OR_STACK : QJS_INTERNAL; goto cleanup; }
 
     {
         JSValue completion = JS_Eval(ctx, (const char *)src, source_len, "<plugin>", JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_STRICT);
@@ -2847,7 +2965,7 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
                      const char *hook,
                      const uint8_t *event_json, size_t event_len,
                      const uint8_t *config_json, size_t config_len) {
-    return run_v2_impl(token, limits, NULL, NULL, 0, package_json, package_len, hook, event_json, event_len,
+    return run_v2_impl(token, limits, NULL, NULL, 0, 0, NULL, NULL, package_json, package_len, hook, event_json, event_len,
                        config_json, config_len);
 }
 
@@ -2861,7 +2979,7 @@ QJSResult qjs_run_v2_fetch(QJSCancelToken *token, const QJSLimits *limits,
         QJSResult res = {QJS_INVALID_INPUT, NULL, 0};
         return res;
     }
-    return run_v2_impl(token, limits, callback, opaque, 0, package_json, package_len, hook, event_json, event_len,
+    return run_v2_impl(token, limits, callback, opaque, 0, 0, NULL, NULL, package_json, package_len, hook, event_json, event_len,
                        config_json, config_len);
 }
 
@@ -2873,6 +2991,21 @@ QJSResult qjs_run_v2_probe(QJSCancelToken *token, const QJSLimits *limits,
         QJSResult res = {QJS_INVALID_INPUT, NULL, 0};
         return res;
     }
-    return run_v2_impl(token, limits, NULL, NULL, 1, package_json, package_len, hook,
+    return run_v2_impl(token, limits, NULL, NULL, 1, 0, NULL, NULL, package_json, package_len, hook,
                        event_json, event_len, config_json, config_len);
+}
+
+QJSResult qjs_run_v2_fetch_save(QJSCancelToken *token, const QJSLimits *limits,
+                                QJSFetchCallback callback, void *opaque,
+                                QJSSaveJSONCallback save_callback, void *save_opaque,
+                                const uint8_t *package_json, size_t package_len,
+                                const char *hook,
+                                const uint8_t *event_json, size_t event_len,
+                                const uint8_t *config_json, size_t config_len) {
+    if (!callback) {
+        QJSResult res = {QJS_INVALID_INPUT, NULL, 0};
+        return res;
+    }
+    return run_v2_impl(token, limits, callback, opaque, 0, 1, save_callback, save_opaque, package_json, package_len,
+                       hook, event_json, event_len, config_json, config_len);
 }

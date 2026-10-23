@@ -96,8 +96,27 @@ QJSResult qjs_run_v2_fetch(QJSCancelToken *token, const QJSLimits *limits,
                            const uint8_t *event_json, size_t event_len,
                            const uint8_t *config_json, size_t config_len);
 
-/// Read-only response.onLeave scheduling probe. Runs sync hooks unchanged, but performs no network.
-/// A fetch attempt or returned Promise gives QJS_ASYNC_REQUIRED, discarding all recorded intents.
+/// `Interceptor.saveJSON(key, jsonText)` host contract. `key` is 1...1024 valid UTF-8 bytes without NUL; `text` is
+/// 1...1 MiB of valid UTF-8 accepted by the strict native JSON scanner (depth <= 64, no duplicate keys). Both pointers
+/// are borrowed raw bytes (the original text, not re-encoded), valid only during the call. The callback is trusted, runs
+/// on the calling thread, may block, must honor `timeout_ms` and the cancel token, and must finish all its I/O before
+/// returning. Result: 0 saved, 1 rejected/failed (script sees a generic rejection), 2 abort/cancel/revoked.
+typedef int32_t (*QJSSaveJSONCallback)(void *opaque, const uint8_t *key, size_t key_len,
+                                       const uint8_t *text, size_t text_len, uint32_t timeout_ms);
+
+/// Same as `qjs_run_v2_fetch` plus `Interceptor.saveJSON` (response.onLeave only). Saving needs the manifest's schema 2
+/// `write.files` grant and a non-NULL `save_callback`; otherwise calls reject without host I/O. Budgets are separate from
+/// fetch: 64 saves / 16 MiB of submitted text. The 120 s wall and 250 ms CPU limits are shared, CPU excluding callback waits.
+QJSResult qjs_run_v2_fetch_save(QJSCancelToken *token, const QJSLimits *limits,
+                                QJSFetchCallback callback, void *opaque,
+                                QJSSaveJSONCallback save_callback, void *save_opaque,
+                                const uint8_t *package_json, size_t package_len,
+                                const char *hook,
+                                const uint8_t *event_json, size_t event_len,
+                                const uint8_t *config_json, size_t config_len);
+
+/// Read-only response.onLeave scheduling probe. Runs sync hooks unchanged, but performs no network or file I/O.
+/// A fetch or saveJSON attempt, or a returned Promise, gives QJS_ASYNC_REQUIRED, discarding all recorded intents.
 QJSResult qjs_run_v2_probe(QJSCancelToken *token, const QJSLimits *limits,
                           const uint8_t *package_json, size_t package_len, const char *hook,
                           const uint8_t *event_json, size_t event_len,
