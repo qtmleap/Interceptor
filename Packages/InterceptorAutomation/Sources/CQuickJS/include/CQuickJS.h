@@ -24,7 +24,8 @@ enum {
     QJS_INVALID_INPUT = 4,
     QJS_INVALID_RESULT = 5,
     QJS_SCRIPT_ERROR = 6,
-    QJS_INTERNAL = 7
+    QJS_INTERNAL = 7,
+    QJS_ASYNC_REQUIRED = 8
 };
 
 typedef struct QJSLimits {
@@ -73,6 +74,34 @@ QJSResult qjs_run_v2(QJSCancelToken *token, const QJSLimits *limits,
                      const char *hook,
                      const uint8_t *event_json, size_t event_len,
                      const uint8_t *config_json, size_t config_len);
+
+/// Standard global `fetch` host contract (response.onLeave only). The callback is trusted, runs on the
+/// calling thread and may block; it must honor `timeout_ms` and the cancel token. `request_json` is a
+/// validated {url,method,headers,body?} (lowercase header names; body is a JSON text <= 8192 bytes).
+typedef struct QJSFetchReply QJSFetchReply;
+
+/// Copies a bounded response (status 100...599, body <= 1 MiB UTF-8). Returns 0 on success.
+int32_t qjs_fetch_reply_set(QJSFetchReply *reply, int32_t status, const uint8_t *body, size_t len);
+
+/// Callback result: 0 success (reply set), 1 network error, 2 abort/cancel/revoked.
+typedef int32_t (*QJSFetchCallback)(void *opaque, const uint8_t *request_json, size_t len,
+                                    uint32_t timeout_ms, QJSFetchReply *reply);
+
+/// Same as `qjs_run_v2` plus a global `fetch` (64 requests, 120 s wall, 250 ms CPU excluding callback wait,
+/// 1 MiB per / 16 MiB total response). Only valid for `response.onLeave`; NULL callback is invalid input.
+QJSResult qjs_run_v2_fetch(QJSCancelToken *token, const QJSLimits *limits,
+                           QJSFetchCallback callback, void *opaque,
+                           const uint8_t *package_json, size_t package_len,
+                           const char *hook,
+                           const uint8_t *event_json, size_t event_len,
+                           const uint8_t *config_json, size_t config_len);
+
+/// Read-only response.onLeave scheduling probe. Runs sync hooks unchanged, but performs no network.
+/// A fetch attempt or returned Promise gives QJS_ASYNC_REQUIRED, discarding all recorded intents.
+QJSResult qjs_run_v2_probe(QJSCancelToken *token, const QJSLimits *limits,
+                          const uint8_t *package_json, size_t package_len, const char *hook,
+                          const uint8_t *event_json, size_t event_len,
+                          const uint8_t *config_json, size_t config_len);
 
 void qjs_result_free(QJSResult *result);
 

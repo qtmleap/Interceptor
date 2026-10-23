@@ -53,9 +53,63 @@ enum HTTPPluginOutboundOutcome: Sendable, Equatable {
     case tooLarge
 }
 
+/// Standard-fetch result: only status and the strictly framed, identity-encoded, UTF-8 body.
+enum HTTPPluginFetchOutcome: Sendable, Equatable {
+    case response(status: Int, body: Data)
+    case rejected
+    case failed
+    case cancelled
+    case timedOut
+    case tooLarge
+}
+
 protocol HTTPPluginOutboundTransport: Sendable {
     func perform(_ request: HTTPPluginOutboundRequest,
                  isAuthorized: @escaping @Sendable () async -> Bool) async -> HTTPPluginOutboundOutcome
+    /// Retains the response body (<= `maxResponseBytes`) within `min(timeoutMilliseconds, 5000)`.
+    func fetch(_ request: HTTPPluginOutboundRequest, timeoutMilliseconds: Int, maxResponseBytes: Int,
+               isAuthorized: @escaping @Sendable () async -> Bool) async -> HTTPPluginFetchOutcome
+}
+
+extension HTTPPluginOutboundTransport {
+    /// Existing test doubles and transports do not support fetch.
+    func fetch(_ request: HTTPPluginOutboundRequest, timeoutMilliseconds: Int, maxResponseBytes: Int,
+               isAuthorized: @escaping @Sendable () async -> Bool) async -> HTTPPluginFetchOutcome
+    {
+        .rejected
+    }
+}
+
+/// Per-exchange response policy. The legacy preset keeps the original 64 KiB wire cap and discards bodies.
+struct HTTPPluginExchangeLimits: Sendable {
+    static let legacy = HTTPPluginExchangeLimits(wireBytes: 65_536, bodyBytes: nil, deadlineNanoseconds: 3_000_000_000)
+    static let maxFetchDeadlineMilliseconds = 5000
+    static let maxFetchResponseBytes = 1_048_576
+
+    let wireBytes: Int
+    /// Non-nil collects the body (fetch mode): identity encoding is forced and compressed replies are rejected.
+    let bodyBytes: Int?
+    let deadlineNanoseconds: UInt64
+
+    var isFetch: Bool {
+        bodyBytes != nil
+    }
+
+    static func fetch(timeoutMilliseconds: Int, maxResponseBytes: Int) -> HTTPPluginExchangeLimits? {
+        guard timeoutMilliseconds > 0, maxResponseBytes > 0 else { return nil }
+        let cap = min(maxResponseBytes, maxFetchResponseBytes)
+        return HTTPPluginExchangeLimits(wireBytes: cap, bodyBytes: cap,
+                                        deadlineNanoseconds: UInt64(min(timeoutMilliseconds, maxFetchDeadlineMilliseconds)) * 1_000_000)
+    }
+}
+
+private struct HTTPPluginExchangeResult: Sendable {
+    let outcome: HTTPPluginOutboundOutcome
+    let body: Data
+    init(_ outcome: HTTPPluginOutboundOutcome, body: Data = Data()) {
+        self.outcome = outcome
+        self.body = body
+    }
 }
 
 /// Numeric-IP sockets never consult CFNetwork's PAC/cookie/credential/cache machinery.
@@ -92,44 +146,67 @@ struct HTTPPluginDirectTransport: HTTPPluginOutboundTransport {
     func perform(_ request: HTTPPluginOutboundRequest,
                  isAuthorized: @escaping @Sendable () async -> Bool) async -> HTTPPluginOutboundOutcome
     {
-        guard request.isValid else { return .rejected }
-        guard !Task.isCancelled else { return .cancelled }
+        await execute(request, limits: .legacy, isAuthorized: isAuthorized).outcome
+    }
+
+    func fetch(_ request: HTTPPluginOutboundRequest, timeoutMilliseconds: Int, maxResponseBytes: Int,
+               isAuthorized: @escaping @Sendable () async -> Bool) async -> HTTPPluginFetchOutcome
+    {
+        guard let limits = HTTPPluginExchangeLimits.fetch(timeoutMilliseconds: timeoutMilliseconds,
+                                                          maxResponseBytes: maxResponseBytes) else { return .rejected }
+        let result = await execute(request, limits: limits, isAuthorized: isAuthorized)
+        switch result.outcome {
+            case let .response(status): return .response(status: status, body: result.body)
+            case .rejected: return .rejected
+            case .failed: return .failed
+            case .cancelled: return .cancelled
+            case .timedOut: return .timedOut
+            case .tooLarge: return .tooLarge
+        }
+    }
+
+    private func execute(_ request: HTTPPluginOutboundRequest, limits: HTTPPluginExchangeLimits,
+                         isAuthorized: @escaping @Sendable () async -> Bool) async -> HTTPPluginExchangeResult
+    {
+        guard request.isValid else { return .init(.rejected) }
+        guard !Task.isCancelled else { return .init(.cancelled) }
         // The deadline includes authorization, DNS, TCP, TLS and the entire response.
-        return await withTaskGroup(of: HTTPPluginOutboundOutcome.self) { tasks in
-            tasks.addTask { await run(request, isAuthorized: isAuthorized) }
+        return await withTaskGroup(of: HTTPPluginExchangeResult.self) { tasks in
+            tasks.addTask { await run(request, limits: limits, isAuthorized: isAuthorized) }
             tasks.addTask {
                 do {
-                    try await Task.sleep(nanoseconds: 3_000_000_000)
-                    return .timedOut
+                    try await Task.sleep(nanoseconds: limits.deadlineNanoseconds)
+                    return .init(.timedOut)
                 } catch {
-                    return .cancelled
+                    return .init(.cancelled)
                 }
             }
-            let result = await tasks.next() ?? .failed
+            let result = await tasks.next() ?? .init(.failed)
             tasks.cancelAll()
             return result
         }
     }
 
-    private func run(_ request: HTTPPluginOutboundRequest,
-                     isAuthorized: @escaping @Sendable () async -> Bool) async -> HTTPPluginOutboundOutcome
+    private func run(_ request: HTTPPluginOutboundRequest, limits: HTTPPluginExchangeLimits,
+                     isAuthorized: @escaping @Sendable () async -> Bool) async -> HTTPPluginExchangeResult
     {
-        guard await isAuthorized() else { return .rejected }
-        guard !Task.isCancelled else { return .cancelled }
-        guard let tlsContext else { return .failed }
+        guard await isAuthorized() else { return .init(.rejected) }
+        guard !Task.isCancelled else { return .init(.cancelled) }
+        guard let tlsContext else { return .init(.failed) }
         do {
             let address = try await resolver(request.host)
-            guard !Task.isCancelled else { return .cancelled }
+            guard !Task.isCancelled else { return .init(.cancelled) }
             guard permitsTestAddress || (address.port == 443 && address.ipAddress.map(HTTPPluginPublicAddress.isAllowed) == true)
-            else { return .rejected }
-            guard await isAuthorized() else { return .rejected }
-            guard !Task.isCancelled else { return .cancelled }
-            let exchange = HTTPPluginOutboundExchange(loop: Self.group.next(), request: request, isAuthorized: isAuthorized)
+            else { return .init(.rejected) }
+            guard await isAuthorized() else { return .init(.rejected) }
+            guard !Task.isCancelled else { return .init(.cancelled) }
+            let exchange = HTTPPluginOutboundExchange(loop: Self.group.next(), request: request, limits: limits,
+                                                      isAuthorized: isAuthorized)
             return await exchange.perform(address: address, tlsContext: tlsContext)
         } catch is CancellationError {
-            return .cancelled
+            return .init(.cancelled)
         } catch {
-            return Task.isCancelled ? .cancelled : .failed
+            return .init(Task.isCancelled ? .cancelled : .failed)
         }
     }
 }
@@ -263,21 +340,27 @@ private final class HTTPPluginDNSLookup: @unchecked Sendable {
 private final class HTTPPluginOutboundExchange: @unchecked Sendable {
     let loop: EventLoop
     private let request: HTTPPluginOutboundRequest
+    let limits: HTTPPluginExchangeLimits
     private let isAuthorized: @Sendable () async -> Bool
     private let promise: EventLoopPromise<HTTPPluginOutboundOutcome>
+    /// Mutated on the event loop only; read after the promise (completed from the loop) resolves.
+    private var collected = Data()
     private var channel: Channel?
     private var finished = false
     private var authorizationTask: Task<Void, Never>?
 
-    init(loop: EventLoop, request: HTTPPluginOutboundRequest, isAuthorized: @escaping @Sendable () async -> Bool) {
+    init(loop: EventLoop, request: HTTPPluginOutboundRequest, limits: HTTPPluginExchangeLimits,
+         isAuthorized: @escaping @Sendable () async -> Bool)
+    {
         self.loop = loop
         self.request = request
+        self.limits = limits
         self.isAuthorized = isAuthorized
         promise = loop.makePromise(of: HTTPPluginOutboundOutcome.self)
     }
 
-    func perform(address: SocketAddress, tlsContext: NIOSSLContext) async -> HTTPPluginOutboundOutcome {
-        await withTaskCancellationHandler {
+    func perform(address: SocketAddress, tlsContext: NIOSSLContext) async -> HTTPPluginExchangeResult {
+        let outcome: HTTPPluginOutboundOutcome = await withTaskCancellationHandler {
             loop.execute {
                 guard !self.finished else { return }
                 ClientBootstrap(group: self.loop)
@@ -289,6 +372,23 @@ private final class HTTPPluginOutboundExchange: @unchecked Sendable {
         } onCancel: {
             self.loop.execute { self.finish(.cancelled) }
         }
+        // `finish` runs on the loop before the promise succeeds, so `collected` is final here.
+        if case .response = outcome, limits.isFetch {
+            return HTTPPluginExchangeResult(outcome, body: collected)
+        }
+        return HTTPPluginExchangeResult(outcome)
+    }
+
+    /// Event-loop only. Returns false once the retained body would exceed the cap.
+    func append(_ buffer: ByteBuffer) -> Bool {
+        guard let cap = limits.bodyBytes, buffer.readableBytes <= cap - collected.count else { return false }
+        collected.append(contentsOf: buffer.readableBytesView)
+        return true
+    }
+
+    /// Event-loop only. Fetch bodies must be valid UTF-8 for `Response.text()/json()`.
+    var collectedIsUTF8: Bool {
+        String(data: collected, encoding: .utf8) != nil
     }
 
     private func configure(channel: Channel, tlsContext: NIOSSLContext) -> EventLoopFuture<Void> {
@@ -315,20 +415,32 @@ private final class HTTPPluginOutboundExchange: @unchecked Sendable {
                 var headers = HTTPHeaders()
                 headers.add(name: "host", value: self.request.host)
                 headers.add(name: "connection", value: "close")
+                if self.limits.isFetch {
+                    headers.add(name: "accept-encoding", value: "identity")
+                }
                 let method: HTTPMethod = self.request.method == "POST" ? .POST : self.request.method == "PUT" ? .PUT : .GET
                 let body = self.request.jsonBody
                 // Single framing builder: host owns Host/Content-Length/Content-Type; GET stays byte-identical.
                 if method != .GET {
                     headers.add(name: "content-length", value: String(body?.count ?? 0))
-                    if body != nil { headers.add(name: "content-type", value: "application/json") }
+                    if body != nil {
+                        headers.add(name: "content-type", value: "application/json")
+                    }
                 }
                 for (name, value) in self.request.headers.sorted(by: { $0.key < $1.key }) {
-                    if body != nil, name == "content-type" { continue }
+                    if body != nil, name == "content-type" {
+                        continue
+                    }
+                    if self.limits.isFetch, name == "accept-encoding" {
+                        continue
+                    }
                     headers.add(name: name, value: value)
                 }
                 let head = HTTPRequestHead(version: .http1_1, method: method, uri: self.request.path, headers: headers)
                 channel.write(HTTPClientRequestPart.head(head), promise: nil)
-                if let body { channel.write(HTTPClientRequestPart.body(.byteBuffer(ByteBuffer(bytes: body))), promise: nil) }
+                if let body {
+                    channel.write(HTTPClientRequestPart.body(.byteBuffer(ByteBuffer(bytes: body))), promise: nil)
+                }
                 channel.writeAndFlush(HTTPClientRequestPart.end(nil)).whenFailure { _ in self.finish(.failed) }
             }
         }
@@ -368,7 +480,7 @@ private final class HTTPPluginOutboundWireLimit: ChannelInboundHandler {
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let size = unwrapInboundIn(data).readableBytes
-        guard size <= 65_536 - received else { exchange.finish(.tooLarge); return }
+        guard size <= exchange.limits.wireBytes - received else { exchange.finish(.tooLarge); return }
         received += size
         context.fireChannelRead(data)
     }
@@ -396,14 +508,33 @@ private final class HTTPPluginOutboundResponse: ChannelInboundHandler {
                 if code == 101 {
                     exchange.finish(.failed)
                 } else if code >= 200 {
+                    if exchange.limits.isFetch, !Self.isAcceptableFetchHead(head) {
+                        exchange.finish(.failed); return
+                    }
                     status = code
                 }
-            case .body: break // Never retain or return secondary response data.
+            case let .body(buffer):
+                // Legacy mode never retains or returns secondary response data.
+                if exchange.limits.isFetch, status != nil, !exchange.append(buffer) {
+                    exchange.finish(.tooLarge)
+                }
             case .end:
                 if let status {
+                    if exchange.limits.isFetch, !exchange.collectedIsUTF8 {
+                        exchange.finish(.failed); return
+                    }
                     exchange.finish(.response(status))
                 }
         }
+    }
+
+    /// Identity content only; chunked is the sole transfer coding and never combines with Content-Length.
+    /// NIO's decoder already rejects malformed chunking and conflicting Content-Length values.
+    private static func isAcceptableFetchHead(_ head: HTTPResponseHead) -> Bool {
+        guard head.headers[canonicalForm: "content-encoding"].allSatisfy({ $0.lowercased() == "identity" }) else { return false }
+        let transfer = head.headers[canonicalForm: "transfer-encoding"].map { $0.lowercased() }
+        guard transfer.isEmpty || transfer == ["chunked"] else { return false }
+        return transfer.isEmpty || head.headers[canonicalForm: "content-length"].isEmpty
     }
 
     func channelInactive(context: ChannelHandlerContext) {

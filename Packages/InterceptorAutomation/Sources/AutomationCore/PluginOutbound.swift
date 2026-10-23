@@ -28,7 +28,9 @@ public enum PluginOutboundPolicy {
         }
     }
 
-    public static func isAllowedJSONBody(_ data: Data) -> Bool { checkJSONBody(data) == .valid }
+    public static func isAllowedJSONBody(_ data: Data) -> Bool {
+        checkJSONBody(data) == .valid
+    }
 
     private static let denied: Set<String> = [
         "host", "content-length", "transfer-encoding", "connection", "upgrade", "te", "trailer", "expect", "keep-alive", "set-cookie",
@@ -80,20 +82,26 @@ public enum PluginOutboundPolicy {
     private static func isSafePath(_ p: String) -> Bool {
         guard PluginManifest.isEncodedPath(p) else { return false }
         let u = Array(p.utf8)
-        func hex(_ c: UInt8) -> UInt8 { c <= 0x39 ? c - 0x30 : (c | 0x20) - 0x61 + 10 }
+        func hex(_ c: UInt8) -> UInt8 {
+            c <= 0x39 ? c - 0x30 : (c | 0x20) - 0x61 + 10
+        }
         var i = 0
         while i < u.count {
             if u[i] == 0x25 {
                 let v = hex(u[i + 1]) << 4 | hex(u[i + 2])
-                if v < 0x20 || v == 0x7F || v == 0x5C { return false }
+                if v < 0x20 || v == 0x7F || v == 0x5C {
+                    return false
+                }
                 i += 3
-            } else { i += 1 }
+            } else {
+                i += 1
+            }
         }
         return true
     }
 }
 
-/// A validated fixed GET, POST or PUT destination and the header names a hook may supply for it.
+/// A validated fixed GET destination and the header names a hook may supply for it.
 public struct PluginOutboundEndpoint: Equatable, Sendable {
     public let url: String
     public let method: String
@@ -112,7 +120,7 @@ public struct PluginOutboundEndpoint: Equatable, Sendable {
         let bad = AutomationError.invalidManifest
         let f = try JSONFields(v, required: ["url", "method", "headers"], error: bad)
         let url = try f.string("url"), method = try f.string("method"), headers = try f.strings("headers")
-        guard ["GET", "POST", "PUT"].contains(method), PluginOutboundPolicy.isAllowedURL(url),
+        guard method == "GET", PluginOutboundPolicy.isAllowedURL(url),
               headers.count <= PluginOutboundPolicy.maxDeclaredHeaders, Set(headers).count == headers.count,
               headers.allSatisfy(PluginOutboundPolicy.isAllowedHeaderName) else { throw bad }
         return PluginOutboundEndpoint(url: url, method: method, headers: headers)
@@ -129,33 +137,17 @@ public enum PluginOutboundIntentError: Error, Equatable, Sendable {
     case malformed, unknownBinding, undeclaredHeader, invalidHeaderValue, limitExceeded
 }
 
-/// An HTTP action `{type, binding, headers[, jsonBody]}` checked against a manifest. The URL and method come only
-/// from the manifest. `jsonBody` is the exact compact JSON string captured by the bridge, forwarded byte for byte.
+/// An HTTP action `{type, binding, headers}` checked against a manifest. The URL comes only from the manifest.
 public struct PluginOutboundIntent: Equatable, Sendable {
     public let binding: String
     public let endpoint: PluginOutboundEndpoint
     public let headers: [String: String]
-    /// Validated strict-JSON UTF-8 bytes; nil means no JSON body; POST/PUT frame that as zero bytes.
-    public let jsonBody: Data?
 
     public static func validating(_ action: JSONValue, manifest: PluginManifest) throws -> PluginOutboundIntent {
-        guard case .object(let o) = action, o.keys.contains("type"), o.keys.contains("binding"), o.keys.contains("headers"),
-              Set(o.keys).isSubset(of: ["type", "binding", "headers", "jsonBody"]),
+        guard case .object(let o) = action, Set(o.keys) == ["type", "binding", "headers"],
               case .string("http")? = o["type"], case .string(let binding)? = o["binding"],
               case .object(let raw)? = o["headers"] else { throw PluginOutboundIntentError.malformed }
         guard let endpoint = manifest.outbound[binding] else { throw PluginOutboundIntentError.unknownBinding }
-        var body: Data?
-        if let b = o["jsonBody"] {
-            guard endpoint.method != "GET", case .string(let s) = b else { throw PluginOutboundIntentError.malformed }
-            let data = Data(s.utf8)
-            guard data.count <= PluginOutboundPolicy.maxJSONBodyBytes else { throw PluginOutboundIntentError.limitExceeded }
-            switch PluginOutboundPolicy.checkJSONBody(data) {
-            case .valid: break
-            case .overLimit: throw PluginOutboundIntentError.limitExceeded
-            case .invalid: throw PluginOutboundIntentError.malformed
-            }
-            body = data
-        }
         var headers: [String: String] = [:], total = 0
         for (name, value) in raw {
             guard endpoint.headers.contains(name) else { throw PluginOutboundIntentError.undeclaredHeader }
@@ -166,9 +158,6 @@ public struct PluginOutboundIntent: Equatable, Sendable {
             headers[name] = s
         }
         guard total <= PluginOutboundPolicy.maxTotalHeaderValueBytes else { throw PluginOutboundIntentError.limitExceeded }
-        if body != nil, let contentType = headers["content-type"], contentType != "application/json" {
-            throw PluginOutboundIntentError.invalidHeaderValue
-        }
-        return PluginOutboundIntent(binding: binding, endpoint: endpoint, headers: headers, jsonBody: body)
+        return PluginOutboundIntent(binding: binding, endpoint: endpoint, headers: headers)
     }
 }

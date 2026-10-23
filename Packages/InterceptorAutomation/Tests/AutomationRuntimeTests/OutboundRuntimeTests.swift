@@ -27,11 +27,11 @@ final class OutboundRuntimeTests: XCTestCase, @unchecked Sendable {
         return try XCTUnwrap(obj["actions"] as? [[String: Any]])
     }
 
-    private func expectError(_ expected: JavaScriptExecutionError, _ body: String, top: String = "", manifest: Data? = nil, context: String = "", line: UInt = #line) async {
+    private func expectError(_ expected: JavaScriptExecutionError, _ body: String, top: String = "", manifest: Data? = nil, line: UInt = #line) async {
         do {
             let r = try await run(body, top: top, manifest: manifest)
-            XCTFail("expected \(expected), got \(r) (\(context))", line: line)
-        } catch { XCTAssertEqual(error as? JavaScriptExecutionError, expected, context, line: line) }
+            XCTFail("expected \(expected), got \(r)", line: line)
+        } catch { XCTAssertEqual(error as? JavaScriptExecutionError, expected, line: line) }
     }
 
     private func webhook(_ n: Int) -> String { "{type:'webhook',endpointId:'\(endpoint)',json:{n:\(n)}}" }
@@ -171,7 +171,7 @@ final class OutboundRuntimeTests: XCTestCase, @unchecked Sendable {
         await accepts(decl(headers: #"["x-api-key","a1","!#$%&'*+-.^_`|~"]"#))
         await accepts(decl(headers: #"["a","b","c","d","e","f","g","h"]"#))
         await rejects(decl(extra: #","body":""#))
-        await rejects(decl(method: "DELETE"))
+        await rejects(decl(method: "POST"))
         await rejects(decl(method: "get"))
         await rejects(#"{"profile":{"url":"https://api.example.com/","method":"GET"}}"#)
         await rejects(#"{"profile":{"url":"https://api.example.com/","headers":[]}}"#)
@@ -214,204 +214,5 @@ final class OutboundRuntimeTests: XCTestCase, @unchecked Sendable {
         for url in bad { await rejects(decl(url: url)) }
         await accepts(decl(url: "https://api.example.com/" + String(repeating: "a", count: 1023)))
         await accepts(decl(url: "https://api.example.com/%41%2f%7E"))
-    }
-}
-
-// MARK: POST/PUT + `json` option
-
-extension OutboundRuntimeTests {
-    private func writeManifest(_ method: String) -> Data {
-        manifest(outbound: #"{"profile":{"url":"https://api.example.com/v1/profile","method":"\#(method)","headers":["authorization"]},"get":{"url":"https://api.example.com/v1/get","method":"GET","headers":[]}}"#)
-    }
-
-    private func body(_ call: String, method: String = "POST", line: UInt = #line) async throws -> String? {
-        let actions = try await run("\(call);", manifest: writeManifest(method))
-        XCTAssertEqual(actions.count, 1, line: line)
-        return actions[0]["jsonBody"] as? String
-    }
-
-    func testManifestAcceptsPostAndPutOnly() async {
-        await accepts(decl(method: "POST"))
-        await accepts(decl(method: "PUT"))
-        for bad in ["DELETE", "PATCH", "post", "put", "Post", "HEAD", ""] { await rejects(decl(method: bad)) }
-    }
-
-    func testGetKeysetIsUnchangedAndWriteWithoutJSONHasNoBodyKey() async throws {
-        let get = try await run("Interceptor.send('get',{headers:{}});", manifest: writeManifest("POST"))
-        XCTAssertEqual(Set(get[0].keys), ["type", "binding", "headers"])
-        for method in ["POST", "PUT"] {
-            let a = try await run("Interceptor.send('profile',{headers:{}});", manifest: writeManifest(method))
-            XCTAssertEqual(Set(a[0].keys), ["type", "binding", "headers"], "absent json means empty body")
-        }
-    }
-
-    func testJSONOptionIsRecordedAsInternalJSONBodyString() async throws {
-        for method in ["POST", "PUT"] {
-            let a = try await run("Interceptor.send('profile',{headers:{authorization:'t'},json:{b:1,a:[true,null,'x']}});", manifest: writeManifest(method))
-            XCTAssertEqual(Set(a[0].keys), ["type", "binding", "headers", "jsonBody"])
-            XCTAssertEqual(a[0]["type"] as? String, "http")
-            XCTAssertEqual(a[0]["jsonBody"] as? String, #"{"b":1,"a":[true,null,"x"]}"#)
-            XCTAssertNil(a[0]["json"])
-        }
-    }
-
-    func testExplicitNullAndScalarsAreBodiesNotAbsence() async throws {
-        let n = try await body("Interceptor.send('profile',{headers:{},json:null})")
-        XCTAssertEqual(n, "null")
-        let z = try await body("Interceptor.send('profile',{headers:{},json:0})")
-        XCTAssertEqual(z, "0")
-        let s = try await body("Interceptor.send('profile',{headers:{},json:'x'})")
-        XCTAssertEqual(s, "\"x\"")
-        let f = try await body("Interceptor.send('profile',{headers:{},json:false})")
-        XCTAssertEqual(f, "false")
-        let e = try await body("Interceptor.send('profile',{headers:{},json:[]})", method: "PUT")
-        XCTAssertEqual(e, "[]")
-    }
-
-    func testJSONBodyBytesAreExactCSerializationNumbersEscapesAndNonASCII() async throws {
-        let cases: [(js: String, expected: String)] = [
-            ("1.5", "1.5"), ("0.1", "0.1"), ("4294967296", "4294967296"), ("1e21", "1e+21"),
-            ("123456789012345680000", "1.2345678901234568e+20"),
-            ("'\\u00e9\\u65e5\\ud83d\\ude00'", "\"\u{e9}\u{65e5}\u{1F600}\""),
-            ("'a\"b\\\\c\\n\\r\\t\\b\\f\\u0001\\u001f/'", #""a\"b\\c\n\r\t\b\f\u0001\u001f/""#),
-            ("'\\u2028\\u007f'", "\"\u{2028}\u{7f}\""),
-            ("{'\\u00e9':1,b:2,a:3}", "{\"\u{e9}\":1,\"b\":2,\"a\":3}"),
-        ]
-        for c in cases {
-            let got = try await body("Interceptor.send('profile',{headers:{},json:\(c.js)})")
-            XCTAssertEqual(got, c.expected, c.js)
-        }
-    }
-
-    func testJSONBodySizeBoundaryIsExactUTF8Bytes() async throws {
-        // {"a":"<n x>"} is 8 + n bytes.
-        let ok = try await body("Interceptor.send('profile',{headers:{},json:{a:'x'.repeat(8184)}})")
-        XCTAssertEqual(ok?.utf8.count, 8192)
-        await expectError(.scriptError, "Interceptor.send('profile',{headers:{},json:{a:'x'.repeat(8185)}});", manifest: writeManifest("POST"))
-        // Two-byte characters: 4092 characters == 8192 bytes; one extra ASCII byte exceeds the cap.
-        let wide = try await body("Interceptor.send('profile',{headers:{},json:{a:'\\u00e9'.repeat(4092)}})")
-        XCTAssertEqual(wide?.utf8.count, 8192)
-        await expectError(.scriptError, "Interceptor.send('profile',{headers:{},json:{a:'\\u00e9'.repeat(4092)+'x'}});", manifest: writeManifest("POST"))
-        // Escaping counts: 4096 newlines serialise to 8192 bytes of "\n" escapes plus braces and key => over.
-        await expectError(.scriptError, "Interceptor.send('profile',{headers:{},json:{a:'\\n'.repeat(4096)}});", manifest: writeManifest("POST"))
-    }
-
-    func testJSONBodyDepthBoundaryIs16() async throws {
-        let ok = try await body("let v=1; for(let i=0;i<16;i++) v=[v]; Interceptor.send('profile',{headers:{},json:v})")
-        XCTAssertEqual(ok, String(repeating: "[", count: 16) + "1" + String(repeating: "]", count: 16))
-        await expectError(.scriptError, "let v=1; for(let i=0;i<17;i++) v=[v]; Interceptor.send('profile',{headers:{},json:v});", manifest: writeManifest("POST"))
-        let objs = try await body("let v=1; for(let i=0;i<16;i++) v={a:v}; Interceptor.send('profile',{headers:{},json:v})")
-        XCTAssertNotNil(objs)
-        await expectError(.scriptError, "let v=1; for(let i=0;i<17;i++) v={a:v}; Interceptor.send('profile',{headers:{},json:v});", manifest: writeManifest("POST"))
-    }
-
-    func testGetRejectsJSONOptionIncludingNull() async {
-        for j in ["null", "{}", "1", "'x'"] {
-            await expectError(.scriptError, "try { Interceptor.send('get',{headers:{},json:\(j)}); } catch (e) {} return {actions:[]};", manifest: writeManifest("POST"))
-            await expectError(.scriptError, "Interceptor.send('profile',{headers:{},json:1}); Interceptor.send('get',{headers:{},json:\(j)});", manifest: writeManifest("POST"))
-        }
-        await expectError(.scriptError, "Interceptor.send('profile',{headers:{},json:{}});", manifest: manifest())
-    }
-
-    func testStickyInvalidJSONValuesDiscardEveryIntent() async {
-        let invalid = [
-            "undefined", "(function(){})", "()=>1", "Symbol('s')", "10n", "NaN", "Infinity", "-Infinity",
-            "new Date(0)", "new Map()", "new Set()", "new Error('x')", "new Number(1)", "new String('x')", "new Boolean(true)",
-            "Promise.resolve(1)", "new Proxy({}, {})", "new Proxy([], {})", "/re/",
-            "{a:undefined}", "{a:()=>1}", "{[Symbol('k')]:1}", "[undefined]", "[1,,2]", "{toJSON(){return 1;}}",
-            "{get a(){return 1;}}", "{set a(v){}}", "Object.defineProperty({}, 'a', {value:1, enumerable:false})",
-            "Object.defineProperty([], 'x', {value:1, enumerable:true})", "'\\ud800'",
-            "(()=>{const o={}; o.self=o; return o;})()", "(()=>{const a=[]; a.push(a); return a;})()",
-            "(()=>{const o={a:{}}; o.a.b=o; return o;})()",
-        ]
-        for j in invalid {
-            await expectError(.scriptError, "Interceptor.send('profile',{headers:{},json:1}); try { Interceptor.send('profile',{headers:{},json:\(j)}); } catch (e) {} return {actions:[]};", manifest: writeManifest("POST"), context: j)
-            await expectError(.scriptError, "Interceptor.send('profile',{headers:{},json:\(j)});", manifest: writeManifest("PUT"), context: j)
-        }
-    }
-
-    func testPresentUndefinedJSONIsInvalidNotAbsentAndAbsentIsValid() async throws {
-        await expectError(.scriptError, "Interceptor.send('profile',{headers:{},json:undefined});", manifest: writeManifest("POST"))
-        let a = try await run("Interceptor.send('profile',{headers:{}});", manifest: writeManifest("POST"))
-        XCTAssertNil(a[0]["jsonBody"])
-    }
-
-    func testJSONGetterAndProxyOptionsAreRejected() async {
-        for opts in ["{headers:{},get json(){return 1;}}", "new Proxy({headers:{},json:1},{})",
-                     "Object.defineProperty({headers:{}}, 'json', {value:1, enumerable:false})"] {
-            await expectError(.scriptError, "try { Interceptor.send('profile',\(opts)); } catch (e) {} return {actions:[]};", manifest: writeManifest("POST"))
-        }
-    }
-
-    func testRawActionAndOverrideAttemptsRemainInvalid() async {
-        let m = writeManifest("POST")
-        await expectError(.invalidResult, "return {actions:[{type:'http',binding:'profile',headers:{},jsonBody:'{}'}]};", manifest: m)
-        await expectError(.invalidResult, "return {actions:[{type:'http',binding:'profile',headers:{}}]};", manifest: m)
-        for extra in ["jsonBody:'{}'", "body:{}", "method:'PUT'", "method:'POST'", "url:'https://evil.example/'", "contentType:'text/plain'", "data:{}"] {
-            await expectError(.scriptError, "try { Interceptor.send('profile',{headers:{},\(extra)}); } catch (e) {} return {actions:[]};", manifest: m)
-        }
-        await expectError(.scriptError, "Interceptor.send('profile',{headers:{},json:{},jsonBody:'{}'});", manifest: m)
-    }
-
-    func testSnapshotIsNotAffectedByLaterMutationOfJSON() async throws {
-        let a = try await run("const o={a:[1],s:'one'}; Interceptor.send('profile',{headers:{},json:o}); o.a.push(2); o.s='two'; o.z=true; Object.freeze(o);", manifest: writeManifest("POST"))
-        XCTAssertEqual(a[0]["jsonBody"] as? String, #"{"a":[1],"s":"one"}"#)
-    }
-
-    func testUserJSONStringifyAndToJSONAreNeverConsulted() async throws {
-        let src = "JSON.stringify = () => { throw new Error('used'); }; Object.prototype.toJSON = function(){ throw new Error('used'); };"
-        let a = try await run("Interceptor.send('profile',{headers:{},json:{a:1}});", top: src, manifest: writeManifest("POST"))
-        XCTAssertEqual(a[0]["jsonBody"] as? String, #"{"a":1}"#)
-    }
-
-    func testJSONBodyIsEscapedCorrectlyInsideTheActionWireObject() async throws {
-        let a = try await run("Interceptor.send('profile',{headers:{authorization:'x'},json:{q:'\"\\\\\\n\\u00e9'}});", manifest: writeManifest("PUT"))
-        XCTAssertEqual(a[0]["jsonBody"] as? String, "{\"q\":\"\\\"\\\\\\n\u{e9}\"}")
-        XCTAssertEqual(a[0]["headers"] as? [String: String], ["authorization": "x"])
-    }
-
-    func testBodiesShareTheCombinedResultAndActionCaps() async throws {
-        let big = "{a:'x'.repeat(8184)}"
-        let two = try await run("Interceptor.send('profile',{headers:{},json:\(big)}); Interceptor.send('profile',{headers:{},json:\(big)});", manifest: writeManifest("POST"))
-        XCTAssertEqual(two.count, 2)
-        await expectError(.scriptError, "for (let i=0;i<3;i++) Interceptor.send('profile',{headers:{},json:1});", manifest: writeManifest("POST"))
-        // Two maximal bodies plus a returned webhook share the two-action cap.
-        await expectError(.invalidResult, "Interceptor.send('profile',{headers:{},json:\(big)}); Interceptor.send('profile',{headers:{},json:\(big)}); return {actions:[\(webhook(1))]};", manifest: writeManifest("POST"))
-    }
-
-    func testEscapedBodiesShareTheCombinedResultByteCap() async throws {
-        let body = #"'\\'.repeat(4095)"#
-        let send = "Interceptor.send('profile',{headers:{},json:\(body)});"
-        let single = try await run(send, manifest: writeManifest("POST"))
-        XCTAssertEqual((single[0]["jsonBody"] as? String)?.utf8.count, 8192)
-        await expectError(.invalidResult, send + send, manifest: writeManifest("POST"))
-    }
-}
-
-extension OutboundRuntimeTests {
-    func testJSONContentTypeMismatchIsStickyBeforeTransport() async {
-        let m = manifest(outbound: #"{"profile":{"url":"https://api.example.com/v1/profile","method":"POST","headers":["content-type"]}}"#)
-        await expectError(.scriptError, "try { Interceptor.send('profile',{headers:{'content-type':'text/plain'},json:{}}); } catch(e) {}", manifest: m)
-    }
-}
-
-extension OutboundRuntimeTests {
-    func testJSONSnapshotContainsOnlyOwnProperties() async throws {
-        let actions = try await run("const inherited={secret:'not-sent'}; const value=Object.create(inherited); value.visible=true; Interceptor.send('profile',{headers:{},json:value});", manifest: writeManifest("POST"))
-        XCTAssertEqual(actions[0]["jsonBody"] as? String, #"{"visible":true}"#)
-    }
-}
-
-extension OutboundRuntimeTests {
-    func testSharedOutboundMethodConformance() async throws {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Fixtures/outbound-conformance.json")
-        let root = try JSONValue(parsing: Data(contentsOf: url))
-        let rows = try XCTUnwrap(root.objectValue?["cases"]?.arrayValue)
-        for row in rows {
-            let fields = try XCTUnwrap(row.objectValue)
-            let outbound = try XCTUnwrap(fields["outbound"]).jsonString()
-            guard case .bool(let valid)? = fields["valid"] else { return XCTFail("invalid shared fixture") }
-            if valid { await accepts(outbound) } else { await rejects(outbound) }
-        }
     }
 }

@@ -292,6 +292,7 @@ private struct OutboundObservedRequest: Sendable {
     let body: Data
     let contentLengthValues: [String]
     let contentTypeValues: [String]
+    var acceptEncodingValues: [String] = []
 }
 
 private final class OutboundLocked<Value>: @unchecked Sendable {
@@ -391,7 +392,9 @@ private final class OutboundDecryptedByteObserver: ChannelInboundHandler, @unche
     typealias InboundIn = ByteBuffer
     private let bytes: OutboundLocked<Int>
 
-    init(bytes: OutboundLocked<Int>) { self.bytes = bytes }
+    init(bytes: OutboundLocked<Int>) {
+        self.bytes = bytes
+    }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         bytes.change { $0 += unwrapInboundIn(data).readableBytes }
@@ -424,9 +427,14 @@ private final class OutboundOriginHandler: ChannelInboundHandler, @unchecked Sen
                                                   headerNames: Set(head.headers.map { $0.name.lowercased() }),
                                                   bodyBytes: bodyBytes, body: body,
                                                   contentLengthValues: head.headers["content-length"],
-                                                  contentTypeValues: head.headers["content-type"]))
+                                                  contentTypeValues: head.headers["content-type"],
+                                                  acceptEncodingValues: head.headers["accept-encoding"]))
                 }
                 guard head.uri != "/silent" else { return }
+                if head.uri.hasPrefix("/fetch/") {
+                    respondToFetch(context: context, uri: head.uri, requestBody: body)
+                    return
+                }
                 let status: HTTPResponseStatus = if head.uri == "/redirect" {
                     .temporaryRedirect
                 } else if head.uri == "/auth/bearer" {
@@ -446,6 +454,47 @@ private final class OutboundOriginHandler: ChannelInboundHandler, @unchecked Sen
                 buffer.writeRepeatingByte(120, count: size)
                 context.write(wrapOutboundOut(.body(.byteBuffer(buffer))), promise: nil)
                 context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
+        }
+    }
+
+    /// Fixture responses for standard-fetch tests; routed by path so legacy paths stay byte-identical.
+    private func respondToFetch(context: ChannelHandlerContext, uri: String, requestBody: Data) {
+        func send(_ status: HTTPResponseStatus, _ headers: [(String, String)], _ chunks: [Data], chunked: Bool = false) {
+            var fields = HTTPHeaders(headers)
+            if chunked {
+                fields.add(name: "transfer-encoding", value: "chunked")
+            } else {
+                fields.add(name: "content-length", value: String(chunks.reduce(0) { $0 + $1.count }))
+            }
+            context.write(wrapOutboundOut(.head(.init(version: .http1_1, status: status, headers: fields))), promise: nil)
+            for chunk in chunks {
+                context.write(wrapOutboundOut(.body(.byteBuffer(context.channel.allocator.buffer(bytes: chunk)))), promise: nil)
+            }
+            context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
+        }
+        switch uri {
+            case "/fetch/echo": send(.ok, [("content-type", "application/json")], [requestBody])
+            case "/fetch/text": send(.ok, [("content-type", "text/plain")], [Data("plain text, not JSON".utf8)])
+            case "/fetch/invalid-utf8": send(.ok, [("content-type", "text/plain")], [Data([0x61, 0xFF, 0xFE, 0x62])])
+            case "/fetch/gzip": send(.ok, [("content-encoding", "gzip")], [Data([0x1F, 0x8B])])
+            case "/fetch/redirect":
+                send(.found, [("location", "https://other.example.com/must-not-be-followed")], [Data("{}".utf8)])
+            case "/fetch/chunked":
+                send(.ok, [("content-type", "application/json")], [Data(#"{"a":"#.utf8), Data("[1,2,".utf8), Data("3]}".utf8)], chunked: true)
+            case "/fetch/chunked-big":
+                send(.ok, [], (0 ..< 8).map { _ in Data(repeating: 0x78, count: 512) }, chunked: true)
+            case "/fetch/slow-chunks":
+                // The first part is flushed immediately; the fetch must not complete before `.end`.
+                context.write(wrapOutboundOut(.head(.init(version: .http1_1, status: .ok,
+                                                          headers: HTTPHeaders([("transfer-encoding", "chunked")])))), promise: nil)
+                context.writeAndFlush(wrapOutboundOut(.body(.byteBuffer(context.channel.allocator.buffer(string: #"{"late":"#)))), promise: nil)
+                let bound = NIOLoopBound(context, eventLoop: context.eventLoop)
+                context.eventLoop.scheduleTask(in: .milliseconds(300)) {
+                    let context = bound.value
+                    context.write(self.wrapOutboundOut(.body(.byteBuffer(context.channel.allocator.buffer(string: "true}")))), promise: nil)
+                    context.writeAndFlush(self.wrapOutboundOut(.end(nil)), promise: nil)
+                }
+            default: send(.notFound, [], [Data()])
         }
     }
 
@@ -650,7 +699,9 @@ extension HTTPPluginOutboundTransportTests {
         func nested(_ depth: Int) -> String {
             String(repeating: "[", count: depth) + String(repeating: "]", count: depth)
         }
-        func string(bytes: Int) -> String { #"""# + String(repeating: "x", count: bytes - 2) + #"""# }
+        func string(bytes: Int) -> String {
+            #"""# + String(repeating: "x", count: bytes - 2) + #"""#
+        }
         XCTAssertTrue(request("POST", body: nested(16)).isValid, "depth 16 is allowed")
         XCTAssertFalse(request("POST", body: nested(17)).isValid, "depth 17 is rejected")
         XCTAssertTrue(request("POST", body: string(bytes: 8192)).isValid, "exactly 8192 bytes is allowed")
@@ -697,6 +748,107 @@ extension HTTPPluginOutboundTransportTests {
             XCTAssertEqual(result, .response(307))
             XCTAssertEqual(origin.requests.value.map(\.path), ["/redirect"])
             XCTAssertEqual(origin.requests.value.map(\.method), ["POST"])
+        }
+    }
+}
+
+// MARK: - Standard fetch over the real TLS/NIO exchange
+
+extension HTTPPluginOutboundTransportTests {
+    private func fetch(_ origin: OutboundOrigin, _ path: String, method: String = "GET", body: String? = nil,
+                       headers: [String: String] = [:], timeout: Int = 5000, cap: Int = 1 << 20) async -> HTTPPluginFetchOutcome
+    {
+        await origin.transport.fetch(
+            .init(host: "api.example.com", path: path, headers: headers, method: method, jsonBody: body.map { Data($0.utf8) }),
+            timeoutMilliseconds: timeout, maxResponseBytes: cap, isAuthorized: { true },
+        )
+    }
+
+    func testFetchReturnsEchoedRequestBodyAndForcesIdentityEncoding() async throws {
+        try await withOrigin { origin in
+            let outcome = await fetch(origin, "/fetch/echo", method: "POST", body: #"{"k":1}"#, headers: ["accept-encoding": "gzip"])
+            XCTAssertEqual(outcome, .response(status: 200, body: Data(#"{"k":1}"#.utf8)))
+            let seen = try XCTUnwrap(origin.requests.value.first)
+            XCTAssertEqual(seen.acceptEncodingValues, ["identity"], "script-supplied accept-encoding must not reach the wire")
+            XCTAssertEqual(seen.body, Data(#"{"k":1}"#.utf8))
+        }
+    }
+
+    func testFetchCompletesOnlyAtEndOfAChunkedResponse() async throws {
+        try await withOrigin { origin in
+            let chunked = await fetch(origin, "/fetch/chunked")
+            XCTAssertEqual(chunked, .response(status: 200, body: Data(#"{"a":[1,2,3]}"#.utf8)))
+            let start = ContinuousClock.now
+            let slow = await fetch(origin, "/fetch/slow-chunks")
+            XCTAssertEqual(slow, .response(status: 200, body: Data(#"{"late":true}"#.utf8)))
+            XCTAssertGreaterThanOrEqual(start.duration(to: .now), .milliseconds(250), "must wait for .end, not the first body part")
+        }
+    }
+
+    func testFetchAcceptsNonJSONTextButRejectsInvalidUTF8() async throws {
+        try await withOrigin { origin in
+            let text = await fetch(origin, "/fetch/text")
+            XCTAssertEqual(text, .response(status: 200, body: Data("plain text, not JSON".utf8)))
+            let invalid = await fetch(origin, "/fetch/invalid-utf8")
+            XCTAssertEqual(invalid, .failed)
+        }
+    }
+
+    func testFetchRejectsEncodedResponses() async throws {
+        try await withOrigin { origin in
+            let outcome = await fetch(origin, "/fetch/gzip")
+            XCTAssertEqual(outcome, .failed)
+        }
+    }
+
+    func testFetchDoesNotFollowRedirectsAndReturnsTheRedirectStatus() async throws {
+        try await withOrigin { origin in
+            let outcome = await fetch(origin, "/fetch/redirect", headers: ["authorization": "Bearer fixture-token"])
+            XCTAssertEqual(outcome, .response(status: 302, body: Data("{}".utf8)))
+            XCTAssertEqual(origin.requests.value.map(\.path), ["/fetch/redirect"])
+        }
+    }
+
+    func testFetchResponseCapAppliesToChunkedBodiesAndLegacyPerformStillDiscardsBodies() async throws {
+        try await withOrigin { origin in
+            let capped = await fetch(origin, "/fetch/chunked-big", cap: 1500)
+            XCTAssertEqual(capped, .tooLarge)
+            let roomy = await fetch(origin, "/fetch/chunked-big")
+            XCTAssertEqual(roomy, .response(status: 200, body: Data(repeating: 0x78, count: 4096)))
+            let legacy = await origin.transport.perform(.init(host: "api.example.com", path: "/fetch/text", headers: [:]), isAuthorized: { true })
+            XCTAssertEqual(legacy, .response(200))
+            XCTAssertEqual(origin.requests.value.last?.acceptEncodingValues, [], "legacy requests keep their exact headers")
+        }
+    }
+
+    func testFetchDeadlineIsCappedByTheCallerAndClosesASilentOrigin() async throws {
+        try await withOrigin { origin in
+            let start = ContinuousClock.now
+            let outcome = await fetch(origin, "/silent", timeout: 300)
+            XCTAssertEqual(outcome, .timedOut)
+            XCTAssertLessThan(start.duration(to: .now), .seconds(3))
+        }
+    }
+
+    func testFetchCancellationClosesAnOutstandingResponse() async throws {
+        try await withOrigin { origin in
+            let task = Task { await fetch(origin, "/silent") }
+            for _ in 0 ..< 100 where origin.requests.value.isEmpty {
+                try? await Task.sleep(nanoseconds: 10_000_000)
+            }
+            XCTAssertEqual(origin.requests.value.map(\.path), ["/silent"])
+            task.cancel()
+            let outcome = await task.value
+            XCTAssertEqual(outcome, .cancelled)
+        }
+    }
+
+    func testFetchRevokedAuthorizationNeverReachesTheOrigin() async throws {
+        try await withOrigin { origin in
+            let outcome = await origin.transport.fetch(.init(host: "api.example.com", path: "/fetch/text", headers: [:]),
+                                                       timeoutMilliseconds: 1000, maxResponseBytes: 1024, isAuthorized: { false })
+            XCTAssertEqual(outcome, .rejected)
+            XCTAssertTrue(origin.requests.value.isEmpty)
         }
     }
 }
