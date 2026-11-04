@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "imageSha256": "9884ad1527e8803cea5e59fb721de65bb987655ef06aa07302ef017914a5d3f8",
+  "capturedAt": "2026-10-23T18:01:58.149000+00:00",
+  "commit": "7eb7487031ce950d498a1591ed7157bbb4b6fbe1",
+  "dirty": true,
+  "contentSha256": "17c82ba2bd8d2e8516904cf6fd0626120605c14cfe1d046af652b731d5dae837",
+  "contentDescription": "Exact source manifest SHA256 for native Sources toolbar UI test; XCTest original width1178 retained without resizing. Product Sources code matches commit7eb7487. Test-only decoder expectation was corrected afterward.",
+  "operatingSystem": {
+    "name": "iOS",
+    "version": "18.5",
+    "build": "22F77"
+  },
+  "device": {
+    "id": "iphone-15",
+    "model": "iPhone 15"
+  },
+  "scale": 3,
+  "orientation": "portrait",
+  "locale": "en_US",
+  "theme": "light",
+  "origin": "simulator",
+  "runId": "plugin-icons-native-tests",
+  "compression": {
+    "sourceFormat": "PNG",
+    "sourceSha256": "e14901044e293f251e9fbf0236c2b2b23adfebc21d9cb01be4533b7377e77611",
+    "sourceBytes": 104060,
+    "dimensions": [
+      1178,
+      2556
+    ],
+    "sourceBitDepth": 8,
+    "scale": 3,
+    "iccSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tool": "cwebp lossless exact metadata all + Pillow12.3.0",
+    "status": "lossless-verified",
+    "verifiedIdenticalRGBA": true,
+    "path": ".codex/plugin-icons/ui-attachments/4A6F8882-F656-4673-AA7E-FAFA8BD2C6EF.webp",
+    "webpSha256": "9884ad1527e8803cea5e59fb721de65bb987655ef06aa07302ef017914a5d3f8",
+    "webpBytes": 22438
+  }
+}

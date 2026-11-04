@@ -1,0 +1,133 @@
+{
+  "host": "studio",
+  "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428",
+  "evidence": "Actual native simulator, isolated synthetic unsaved permission drafts. No real activation/network/credentials. No matching approved regression baseline.",
+  "reviewWindowExpires": "2026-10-19T11:21:00Z",
+  "cleanup": "Owned devices deleted for all four runs; no Simulator windows opened.",
+  "images": [
+    {
+      "file": "iphone265-en-light-external-initial.png",
+      "profile": "iphone265-en-light",
+      "scope": "external",
+      "state": "initial",
+      "sha256": "8efa1a5471450b4cfa26558b89fb00be564c00a016ac96204238b7de97a7bd3b",
+      "run": "ui-r2c-iphone265-en-light",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428"
+    },
+    {
+      "file": "iphone265-en-light-external-footer.png",
+      "profile": "iphone265-en-light",
+      "scope": "external",
+      "state": "footer",
+      "sha256": "d7cd931b3b7f3e2f97770506bb8e66b3c43926a9902ffd05fbb2c06ac7aa7291",
+      "run": "ui-r2c-iphone265-en-light",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428"
+    },
+    {
+      "file": "iphone265-en-light-script-initial.png",
+      "profile": "iphone265-en-light",
+      "scope": "script",
+      "state": "initial",
+      "sha256": "a2cb52f648bd874e2339318205c74429dc6f331508a895b00d6bb3938d214c57",
+      "run": "ui-r2c-iphone265-en-light",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428"
+    },
+    {
+      "file": "iphone265-en-light-script-footer.png",
+      "profile": "iphone265-en-light",
+      "scope": "script",
+      "state": "footer",
+      "sha256": "a2cb52f648bd874e2339318205c74429dc6f331508a895b00d6bb3938d214c57",
+      "run": "ui-r2c-iphone265-en-light",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428"
+    },
+    {
+      "file": "iphone185-ja-light-external-initial.png",
+      "profile": "iphone185-ja-light",
+      "scope": "external",
+      "state": "initial",
+      "sha256": "2ce391887c1f1ae73bc22a4909e41dae9a11cd662a9704325799b06d6a10f2fa",
+      "run": "ui-r2c-iphone185-ja-light",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428"
+    },
+    {
+      "file": "iphone185-ja-light-external-footer.png",
+      "profile": "iphone185-ja-light",
+      "scope": "external",
+      "state": "footer",
+      "sha256": "a1e6f82ac324509c67515adbbd391dffb08b4a9cac5b452cb89dc73d39e62536",
+      "run": "ui-r2c-iphone185-ja-light",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428"
+    },
+    {
+      "file": "iphone185-ja-light-script-initial.png",
+      "profile": "iphone185-ja-light",
+      "scope": "script",
+      "state": "initial",
+      "sha256": "18ca639ff6382c995ddf372f4cc3e165702f42ca6604f39a960e44183d60184e",
+      "run": "ui-r2c-iphone185-ja-light",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428"
+    },
+    {
+      "file": "iphone185-ja-light-script-footer.png",
+      "profile": "iphone185-ja-light",
+      "scope": "script",
+      "state": "footer",
+      "sha256": "46350a09af26d85b2ca959d8442165c4403c3c7331aa3d5415e470992fb286fe",
+      "run": "ui-r2c-iphone185-ja-light",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428"
+    },
+    {
+      "file": "ipad265-ja-dark-external-initial.png",
+      "profile": "ipad265-ja-dark",
+      "scope": "external",
+      "state": "initial",
+      "sha256": "ca9b001dc171e3d6074393a001d470b256987d14e92163b25aed502b647cbe31",
+      "run": "ui-r2c-ipad265-ja-dark",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428",
+      "upright": "ipad265-ja-dark-external-initial-upright.png",
+      "originalOrientation": 8,
+      "exactPixelPermutationVerified": true,
+      "uprightSHA256": "469f77d54b28be78a11ce4ebe998283fe442977de33667259d93028b640448c6"
+    },
+    {
+      "file": "ipad265-ja-dark-script-initial.png",
+      "profile": "ipad265-ja-dark",
+      "scope": "script",
+      "state": "initial",
+      "sha256": "e133d0210947a931e1bd8ec31e5bb0d92036b1f85f5f1a2721e7ecb753171cb4",
+      "run": "ui-r2c-ipad265-ja-dark",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428",
+      "upright": "ipad265-ja-dark-script-initial-upright.png",
+      "originalOrientation": 8,
+      "exactPixelPermutationVerified": true,
+      "uprightSHA256": "26183931e93c0f92fa372a2400a7c216345c62810f71e86a9d32011b645fd636"
+    },
+    {
+      "file": "ipad185-en-dark-external-initial.png",
+      "profile": "ipad185-en-dark",
+      "scope": "external",
+      "state": "initial",
+      "sha256": "26a8aee295b2c8513539ccbee4612fc8169f232df8afe949c2b054413a802c4e",
+      "run": "ui-r2c-ipad185-en-dark",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428",
+      "upright": "ipad185-en-dark-external-initial-upright.png",
+      "originalOrientation": 8,
+      "exactPixelPermutationVerified": true,
+      "uprightSHA256": "437e69102e3944bdea2b6fa3a19313b0ad9add62cf14ba618aea6be0d29ae714"
+    },
+    {
+      "file": "ipad185-en-dark-script-initial.png",
+      "profile": "ipad185-en-dark",
+      "scope": "script",
+      "state": "initial",
+      "sha256": "1c831167c942b98c417a737b40d5fc33719e40066a811732c75324efb7d9ce1d",
+      "run": "ui-r2c-ipad185-en-dark",
+      "sourceFingerprint": "663ef32c29aceb2352cf022d69c8ba89f7bfbbd13d6db9ee87eec8b254706428",
+      "upright": "ipad185-en-dark-script-initial-upright.png",
+      "originalOrientation": 8,
+      "exactPixelPermutationVerified": true,
+      "uprightSHA256": "ed3adfa9e57c705491bea3956fc4218f1ef82450a6fa5662606665f302f7e8d3"
+    }
+  ]
+}

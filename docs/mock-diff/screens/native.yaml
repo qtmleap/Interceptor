@@ -1,0 +1,55 @@
+defaults:
+  locales:
+    - ja_JP
+    - en_US
+  colorSchemes:
+    - light
+    - dark
+  origins:
+    - simulator
+  operatingSystems:
+    - id: ios18
+      name: iOS
+      version: "18.5"
+      build: 22F77
+    - id: ios26
+      name: iOS
+      version: "26.5"
+      build: 23F77
+    - id: ios27
+      name: iOS
+      version: "27.0"
+      build: 24A434
+  versions:
+    current:
+      type: image
+      expectedRevision:
+        commit: efeb620c8bd141fd902851a82298540d56d56acc
+        contentSha256: ab3a753558d42f4c24a014bb460bba7937b531ad6433e451222f8d8b22acc8b2
+      path: ../native/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/current.webp
+      provenance: ../native/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/current.json
+screens:
+  - id: main-home-title-alignment
+    name: Home
+    category: Screens/Main navigation
+    devices: &a1
+      - id: iphone-se-3
+        name: iPhone SE (3rd generation)
+        viewport:
+          width: 375
+          height: 667
+          deviceScaleFactor: 2
+        orientations:
+          - portrait
+      - id: ipad-air-13-m3
+        name: iPad Air 13-inch (M3)
+        viewport:
+          width: 1024
+          height: 1366
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+  - id: main-settings-title-alignment
+    name: Settings
+    category: Screens/Main navigation
+    devices: *a1

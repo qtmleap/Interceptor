@@ -1,0 +1,11 @@
+{
+  "fingerprint": "76b67161f90fa625a0bc00d8b30a1990fb483c5fb614256fde16ee9d3eedeb9a",
+  "files": {
+    "SPEC.md": "c5a77eee15e7ec7002c7763361c32dd9e302acb362d14a6f801e5ee81de99e53",
+    "src/manifest-fixtures.ts": "625a7991ea6f90ae4df05e28094426665bd39251abcbc019f8960182cdc022d1",
+    "src/manifest-components.ts": "d37323d1f4f0ac79e92ddcbb0a43c9aea250dfd7d6536b714909ba1e2e8ea3d6",
+    "src/manifest-screens.ts": "90787e8a6c7326080ea5e731975db5cb0edebcc162657aaab7f60e2a2c68cf7f",
+    "src/sileo-reference-style.ts": "1ed76c5cc19441f704bca60dd4d3a8bf758e906770aa00f16f1a038ddc8c515e"
+  },
+  "scope": "User correction: Package is bundle, no package-wide Method/Path/Hook. Aggregate target hosts from all match rules. Per-script conditions only in explicit file view. Mock only."
+}

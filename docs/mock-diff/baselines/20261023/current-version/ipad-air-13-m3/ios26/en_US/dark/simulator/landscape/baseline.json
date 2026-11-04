@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "imageSha256": "1c2292ad524178f82bdc848213947bfbed286fa1464e68cc897b903ef5bc1bfd",
+  "capturedAt": "2026-10-22T22:59:32.650352+00:00",
+  "commit": "6c46cc9e9b029a5fc40c2648031de4efe92d9153",
+  "dirty": true,
+  "contentSha256": "0bda090f46dab86e45c5c094b7bf8295e121ea63e4378d7d79faef44bda2bbfd",
+  "contentDescription": "Native App/PacketTunnel184-file source projection and pinned dependencies; standalone Publisher CLI excluded, original full producer retained. Capture only; no baseline approval.",
+  "producerSnapshotFingerprint": "ea32b33ebc67862584243ce7ff8c62f4a00d7a6e105c9a132ad45d1170a2d8e6",
+  "operatingSystem": {
+    "name": "iOS",
+    "version": "26.5",
+    "build": "23F77"
+  },
+  "device": {
+    "id": "ipad-air-13-m3",
+    "model": "iPad Air 13-inch (M3)"
+  },
+  "scale": 2,
+  "orientation": "landscape",
+  "locale": "en_US",
+  "theme": "dark",
+  "origin": "simulator",
+  "dependenciesSha256": "656b9f178606e16f4c483c3a37a4b6b058fcb45a8f87a451fff0ce75a60fb649",
+  "runId": "native-dark-repair-137D3F48-D99B-496E-9D74-011EF4916226",
+  "compression": {
+    "sourceSHA256": "f77f5ccdfae5ee15bd93677b48bf026ab1c2a3b0edc8db92b9b5bb50f6247bf2",
+    "imageSHA256": "1c2292ad524178f82bdc848213947bfbed286fa1464e68cc897b903ef5bc1bfd",
+    "sourceBytes": 198485,
+    "bytes": 34646,
+    "pixelWidth": 2732,
+    "pixelHeight": 2048,
+    "scale": 2,
+    "exifOrientation": 1,
+    "iccSHA256": null,
+    "rgbaSHA256": "c2c0ea5ae1501776776a633bf3a3b80b8963c28f66c1497593d56c44d01a4df9",
+    "rgbaIdentical": true,
+    "profileIdentical": true,
+    "dimensionsIdentical": true,
+    "tools": {
+      "cwebp": "1.6.0\nlibsharpyuv: 0.4.2",
+      "Pillow": "12.3.0"
+    },
+    "originalRetention": "none: verified redundant transient PNG removed after manifest write"
+  },
+  "fixtureSHA256": "86494b498c5f8b50ac2775128f4723e0a631121c73055fcbd123e326060b555b",
+  "appearanceVerification": {
+    "requestedAppearance": "dark",
+    "conditionId": "a28dd80f-9f4c-4294-a7ff-3544f4d60807",
+    "observedSimulatorAppearance": "dark",
+    "createdAt": "2026-10-22T22:56:47.538155+00:00",
+    "hostReadbackAtCapture": "dark",
+    "setCommand": [
+      "xcrun",
+      "simctl",
+      "--set",
+      "/Users/devonly/Library/Developer/CoreSimulator/Devices",
+      "ui",
+      "137D3F48-D99B-496E-9D74-011EF4916226",
+      "appearance",
+      "dark"
+    ],
+    "readbackCommand": [
+      "xcrun",
+      "simctl",
+      "--set",
+      "/Users/devonly/Library/Developer/CoreSimulator/Devices",
+      "ui",
+      "137D3F48-D99B-496E-9D74-011EF4916226",
+      "appearance"
+    ],
+    "pixels": {
+      "method": "controlled-native-body-luminance-v1",
+      "regionPixels": [
+        273,
+        512,
+        2458,
+        1740
+      ],
+      "sampleCount": 2683180,
+      "darkLuminanceUpperExclusive": 96,
+      "brightLuminanceLowerInclusive": 160,
+      "darkFraction": 0.9982714540209751,
+      "brightFraction": 0.00014721338113730722,
+      "requiredDarkFraction": 0.65,
+      "maximumBrightFraction": 0.2,
+      "verdict": "dark-consistent"
+    },
+    "scope": "controlled test UI; root must visually verify the two-cell proof before the full repair"
+  }
+}

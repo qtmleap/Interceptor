@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "imageSha256": "019e3d776be42c0dc8b44854d27fde17d324a6ac80b9bf732be675523cbab539",
+  "capturedAt": "2026-10-22T21:09:28.394421+00:00",
+  "commit": "424b53259446697d502556b9d7e021ac06685092",
+  "dirty": true,
+  "contentSha256": "0bda090f46dab86e45c5c094b7bf8295e121ea63e4378d7d79faef44bda2bbfd",
+  "contentDescription": "Native App/PacketTunnel source projection (184 files; standalone RepositoryPublisher CLI excluded) and pinned dependencies; original full producer snapshot retained. Capture only; no baseline approval.",
+  "producerSnapshotFingerprint": "faf273d4941ac3b823b8505302618e6bbe974af591465b52f64fc64a1315853e",
+  "operatingSystem": {
+    "name": "iOS",
+    "version": "27.0",
+    "build": "24A434"
+  },
+  "device": {
+    "id": "iphone-15",
+    "model": "iPhone 15"
+  },
+  "scale": 3,
+  "orientation": "portrait",
+  "locale": "en_US",
+  "theme": "light",
+  "origin": "simulator",
+  "dependenciesSha256": "656b9f178606e16f4c483c3a37a4b6b058fcb45a8f87a451fff0ce75a60fb649",
+  "runId": "native-matrix-20261023-17B998D2-E57D-4704-87FC-8A786C2A3EAC",
+  "compression": {
+    "sourceSHA256": "52694e754c4e5bab55596f9fcd705b2f5342e3a4ba48c0c2f1591b5eaa091f5f",
+    "imageSHA256": "019e3d776be42c0dc8b44854d27fde17d324a6ac80b9bf732be675523cbab539",
+    "sourceBytes": 169005,
+    "bytes": 40642,
+    "pixelWidth": 1179,
+    "pixelHeight": 2556,
+    "scale": 3,
+    "exifOrientation": 1,
+    "iccSHA256": null,
+    "rgbaSHA256": "e807964a42122c1135550e6862c46e6273b77df00853cce42d92b1d5041c6419",
+    "rgbaIdentical": true,
+    "profileIdentical": true,
+    "dimensionsIdentical": true,
+    "tools": {
+      "cwebp": "1.6.0\nlibsharpyuv: 0.4.2",
+      "Pillow": "12.3.0"
+    },
+    "originalRetention": "none: verified redundant transient PNG removed after manifest write"
+  },
+  "fixtureSHA256": "86494b498c5f8b50ac2775128f4723e0a631121c73055fcbd123e326060b555b",
+  "originalProductionDomainFingerprint": "19353b8ae6087526bb4faf6f7bc29ab99c6ae1a4b8020b78b4f2805acf3775b4"
+}

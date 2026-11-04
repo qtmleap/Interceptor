@@ -1,0 +1,14 @@
+{
+  "time": "2026-10-20T14:33:50.709856+00:00",
+  "workspace": "/Users/devonly/Developer/interceptor-live-scripts-20261018/Interceptor/docs/mock-diff",
+  "baseCopies": "/Users/devonly/Developer/interceptor-http-hooks-20261019/build/http-hooks/live-completion/remaining-verification/sileo-reference-refinement/before",
+  "files": {
+    "SPEC.md": "dd83e6cf4044232796579074b36cc5e9f92efdf326266a6b88f2db878545124f",
+    "src/manifest-components.ts": "62fa96fa804d1b4d8ea374d9f8193a8fd83af6d99c023975f76187607b373bea",
+    "src/manifest-screens.ts": "3ee619fb30ea430c6573765085ac802dd425aa99e30348d2de334a2f73a1f5cf",
+    "src/manifest-fixtures.ts": "65ae5e0833106ee5bc46a9afb236d5e86f7f90f9f6715cf2d671eecce821a799",
+    "src/sileo-reference-style.ts": "b92d6a11e838a903c644d71e9e4c0488762c6af1b16a6873d3efacd84596dcad"
+  },
+  "scope": "Mock-only Sileo screenshot refinement, target host first view, source/package/script/delete flows; native app and adoption unchanged",
+  "fingerprint": "70ce1a20fbaa4ebdfdf2ab942211dcaed342051f19e762bbcbdfa733f80b9e8d"
+}

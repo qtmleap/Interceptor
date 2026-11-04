@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "imageSha256": "1558067b875f700fd5ea352de73ca39ddebe95267f4c9dcdc100461d982dbbe6",
+  "capturedAt": "2026-10-22T20:50:54.060103+00:00",
+  "commit": "424b53259446697d502556b9d7e021ac06685092",
+  "dirty": true,
+  "contentSha256": "0bda090f46dab86e45c5c094b7bf8295e121ea63e4378d7d79faef44bda2bbfd",
+  "contentDescription": "Native App/PacketTunnel source projection (184 files; standalone RepositoryPublisher CLI excluded) and pinned dependencies; original full producer snapshot retained. Capture only; no baseline approval.",
+  "operatingSystem": {
+    "name": "iOS",
+    "version": "26.5",
+    "build": "23F77"
+  },
+  "device": {
+    "id": "ipad-air-13-m3",
+    "model": "iPad Air 13-inch (M3)"
+  },
+  "scale": 2,
+  "orientation": "landscape",
+  "locale": "en_US",
+  "theme": "light",
+  "origin": "simulator",
+  "dependenciesSha256": "656b9f178606e16f4c483c3a37a4b6b058fcb45a8f87a451fff0ce75a60fb649",
+  "runId": "native-matrix-20261023-2FD71C27-DFD2-4102-847B-FCD793CA8DEC",
+  "compression": {
+    "sourceSHA256": "4e869a076ca68feb4f0d005ea072eba62a6305d80b00eaf0caca1e5c96fc0a05",
+    "imageSHA256": "1558067b875f700fd5ea352de73ca39ddebe95267f4c9dcdc100461d982dbbe6",
+    "sourceBytes": 279270,
+    "bytes": 53608,
+    "pixelWidth": 2732,
+    "pixelHeight": 2048,
+    "scale": 2,
+    "exifOrientation": 1,
+    "iccSHA256": null,
+    "rgbaSHA256": "42c6c908220c7ce7dbdda76b1128c0930d5a434eaf90529d0683e022def07181",
+    "rgbaIdentical": true,
+    "profileIdentical": true,
+    "dimensionsIdentical": true,
+    "tools": {
+      "cwebp": "1.6.0\nlibsharpyuv: 0.4.2",
+      "Pillow": "12.3.0"
+    },
+    "originalRetention": "none: verified redundant transient PNG removed after manifest write"
+  },
+  "fixtureSHA256": "86494b498c5f8b50ac2775128f4723e0a631121c73055fcbd123e326060b555b",
+  "producerSnapshotFingerprint": "00b32e8e33d37e7531222d55ac99dead08c8e218836db82692d25115345b2899",
+  "originalProductionDomainFingerprint": "19353b8ae6087526bb4faf6f7bc29ab99c6ae1a4b8020b78b4f2805acf3775b4"
+}

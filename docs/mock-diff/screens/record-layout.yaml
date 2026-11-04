@@ -1,0 +1,46 @@
+{
+  "screens": [
+    {
+      "id": "record-safe-area-native",
+      "name": "Record safe area \u2014 native M3",
+      "category": "Screens/Record layout",
+      "devices": [
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1366,
+            "height": 1024,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "landscape"
+          ],
+          "locales": [
+            "en_US"
+          ],
+          "colorSchemes": [
+            "dark"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios27",
+              "name": "iPadOS",
+              "version": "27.0.1"
+            }
+          ],
+          "versions": {
+            "before": {
+              "type": "image",
+              "path": "../reviews/record-safe-area/before.webp"
+            },
+            "after": {
+              "type": "image",
+              "path": "../reviews/record-safe-area/after.webp"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

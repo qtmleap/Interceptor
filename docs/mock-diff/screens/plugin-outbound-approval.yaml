@@ -1,0 +1,60 @@
+{
+  "defaults": {
+    "versions": {
+      "current": {
+        "type": "image",
+        "expectedRevision": {
+          "commit": "9879d7c054740a6c7beab9a5b481ef93563d456c",
+          "contentSha256": "bb15ac411f19884554edea78c6ec30aab27c1cf610425085595c6487fa745059"
+        },
+        "path": "../native/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/current.webp",
+        "provenance": "../native/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/current.json"
+      }
+    }
+  },
+  "screens": [
+    {
+      "id": "plugin-outbound-approval",
+      "name": "External API approval",
+      "category": "Screens/Plugins/Approval",
+      "devices": [
+        {
+          "id": "iphone-se-3",
+          "name": "iPhone SE (3rd generation)",
+          "viewport": {
+            "width": 375,
+            "height": 667,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "portrait"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light"
+          ],
+          "origins": [
+            "simulator"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

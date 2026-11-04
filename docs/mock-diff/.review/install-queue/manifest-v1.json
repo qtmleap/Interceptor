@@ -1,0 +1,14 @@
+{
+  "time": "2026-10-20T16:34:08.014057+00:00",
+  "files": {
+    "SPEC.md": "df0651cb12db5e73589ac4667498c80f4c97ca3bdcd94bd1aca23e75c1be872d",
+    "src/manifest-components.ts": "2c04c246b8fefc74bbfaaa2b30f953eaf4d636294dce9a099fc3f1b59ae1f35c",
+    "src/manifest-screens.ts": "2f176c1b86aeb61efdbd6abe7970092632a02a90ab001f941f4c8c15591628bb",
+    "src/sileo-reference-style.ts": "aece49ee370b7c1f2fe087a959af0f97f725de0d229f39e334a0ec26f8072053",
+    "src/install-queue-model.ts": "7b8bebe468c1c1a77599cdce5404df396ac90f47c7b6a34cd19642761bd82dae",
+    "src/install-queue-model.test.ts": "39bf26f7ff2a6a20d57457ea48f34682511c03901780d3ca124e8b6cdaa8446d",
+    "src/install-queue-ui.ts": "84884aac07a37957163ecb1cd883df6c9c31325239dd3ca79a69854756d42fde"
+  },
+  "fingerprint": "cddeeb3b9facb58777e8a9d15c19eaf1ff9b9dc637f0c0dc8cccf23b918adcbb",
+  "scope": "Mock only: queued batch installs +bottom installed operation sheet; no native/runtime install evidence.13puremodeltests passed; stagedHTML only; watchedHTML/config untouched."
+}

@@ -1,0 +1,11 @@
+{
+  "fingerprint": "b69cdc080514dcaa04241849c498c62bb9df3df3ddf5dbefbcc5a0cbb3c535be",
+  "files": {
+    "SPEC.md": "3863f9b34fd2c52d3e6e2a0e8ac2333fec3708de62c32ee9b1a69e731a3142b0",
+    "src/manifest-fixtures.ts": "625a7991ea6f90ae4df05e28094426665bd39251abcbc019f8960182cdc022d1",
+    "src/manifest-components.ts": "3886ecf9253d97572534990b191a25dcbffe8bed90eda0b1989eef1cad06e3fa",
+    "src/manifest-screens.ts": "c286f6deb487abb466b310046c3e4235e21840c072fce8e23a31d3030429f8bd",
+    "src/sileo-reference-style.ts": "1ed76c5cc19441f704bca60dd4d3a8bf758e906770aa00f16f1a038ddc8c515e"
+  },
+  "delta": "User clarified: selecting Script opens metadata only; Source Code NavigationLink alone opens full-screen read-only code; Done returns exact Script detail. Earlier L1 Test now names Package and Script, L2 Script conditions now show Package + Script path. Package no method/path/hook, aggregated hosts unchanged. New source-request/local/response/preview routes only for code."
+}

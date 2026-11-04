@@ -1,0 +1,1765 @@
+screens:
+  - id: manifest-browser-repositories
+    name: Sources
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repositories.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repositories.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repositories-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repositories-en.html}
+      - id: iphone-reference
+        name: iphone-reference
+        viewport: {width: 375, height: 667, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repositories.html}
+  - id: manifest-browser-repository
+    name: Sources / Categories
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-en.html}
+  - id: manifest-browser-packages
+    name: Packages
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages-en.html}
+      - id: iphone-reference
+        name: iphone-reference
+        viewport: {width: 375, height: 667, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages.html}
+  - id: manifest-browser-scripts
+    name: Scripts
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-scripts.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-scripts.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-scripts-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-scripts-en.html}
+  - id: manifest-browser-components
+    name: Plugin components
+    category: Components/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-components.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-components.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-components-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-components-en.html}
+  - id: manifest-browser-all-packages
+    name: all-packages
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-all-packages.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-all-packages.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-all-packages-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-all-packages-en.html}
+  - id: manifest-browser-category-requests
+    name: Sources / Requests
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-category-requests.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-category-requests.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-category-requests-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-category-requests-en.html}
+  - id: manifest-browser-category-responses
+    name: Sources / Responses
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-category-responses.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-category-responses.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-category-responses-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-category-responses-en.html}
+  - id: manifest-browser-empty
+    name: Sources / Empty
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-empty.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-empty.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-empty-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-empty-en.html}
+  - id: manifest-browser-error
+    name: Sources / Error
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-error.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-error.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-error-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-error-en.html}
+  - id: manifest-browser-manifest
+    name: Package
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-en.html}
+  - id: manifest-browser-manifest-added
+    name: Package / Added
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-added.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-added.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-added-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-added-en.html}
+  - id: manifest-browser-manifest-confirm
+    name: manifest-confirm
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-confirm.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-confirm.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-confirm-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-confirm-en.html}
+  - id: manifest-browser-manifest-delete-confirm
+    name: manifest-delete-confirm
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-delete-confirm.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-delete-confirm.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-delete-confirm-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-delete-confirm-en.html}
+  - id: manifest-browser-manifest-disabled-confirm
+    name: manifest-disabled-confirm
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-disabled-confirm.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-disabled-confirm.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-disabled-confirm-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-disabled-confirm-en.html}
+  - id: manifest-browser-manifest-disabled-update
+    name: manifest-disabled-update
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-disabled-update.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-disabled-update.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-disabled-update-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-disabled-update-en.html}
+  - id: manifest-browser-manifest-enable
+    name: Package / Updated
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-enable.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-enable.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-enable-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-enable-en.html}
+  - id: manifest-browser-manifest-import
+    name: Package / Add
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-import.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-import.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-import-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-import-en.html}
+      - id: iphone-reference
+        name: iphone-reference
+        viewport: {width: 375, height: 667, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-import.html}
+  - id: manifest-browser-manifest-json
+    name: Manifest JSON
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-json.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-json.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-json-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-json-en.html}
+  - id: manifest-browser-manifest-local
+    name: Package / Local
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-en.html}
+  - id: manifest-browser-manifest-local-confirm
+    name: manifest-local-confirm
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-confirm.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-confirm.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-confirm-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-confirm-en.html}
+  - id: manifest-browser-manifest-local-delete-confirm
+    name: manifest-local-delete-confirm
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-delete-confirm.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-delete-confirm.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-delete-confirm-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-delete-confirm-en.html}
+  - id: manifest-browser-manifest-local-enabled
+    name: manifest-local-enabled
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-enabled.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-enabled.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-enabled-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-local-enabled-en.html}
+  - id: manifest-browser-manifest-preview
+    name: manifest-preview
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-en.html}
+  - id: manifest-browser-manifest-preview-added
+    name: manifest-preview-added
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-added.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-added.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-added-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-added-en.html}
+  - id: manifest-browser-manifest-preview-confirm
+    name: manifest-preview-confirm
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-confirm.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-confirm.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-confirm-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-confirm-en.html}
+  - id: manifest-browser-manifest-preview-delete-confirm
+    name: manifest-preview-delete-confirm
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-delete-confirm.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-delete-confirm.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-delete-confirm-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-delete-confirm-en.html}
+  - id: manifest-browser-manifest-preview-enabled
+    name: manifest-preview-enabled
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-enabled.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-enabled.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-enabled-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-preview-enabled-en.html}
+  - id: manifest-browser-manifest-replace-confirm
+    name: manifest-replace-confirm
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-replace-confirm.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-replace-confirm.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-replace-confirm-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-replace-confirm-en.html}
+  - id: manifest-browser-manifest-update
+    name: Package / Update
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-update.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-update.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-update-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-update-en.html}
+  - id: manifest-browser-manifest-updated
+    name: manifest-updated
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-updated.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-updated.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-updated-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-updated-en.html}
+  - id: manifest-browser-manifests
+    name: Sources / Local
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifests.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifests.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifests-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifests-en.html}
+  - id: manifest-browser-packages-added
+    name: packages-added
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages-added.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages-added.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages-added-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages-added-en.html}
+  - id: manifest-browser-packages-repository
+    name: packages-repository
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages-repository.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages-repository.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages-repository-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-packages-repository-en.html}
+  - id: manifest-browser-repositories-edit
+    name: repositories-edit
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repositories-edit.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repositories-edit.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repositories-edit-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repositories-edit-en.html}
+  - id: manifest-browser-repository-add
+    name: Sources / Add Repository
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-add.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-add.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-add-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-add-en.html}
+  - id: manifest-browser-repository-catalog-empty
+    name: Sources / Empty Catalog
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-catalog-empty.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-catalog-empty.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-catalog-empty-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-catalog-empty-en.html}
+  - id: manifest-browser-repository-catalog-loading
+    name: Sources / Loading
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-catalog-loading.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-catalog-loading.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-catalog-loading-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-catalog-loading-en.html}
+  - id: manifest-browser-repository-current
+    name: repository-current
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-current.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-current.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-current-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-current-en.html}
+  - id: manifest-browser-repository-overview
+    name: Sources / Categories
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-overview.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-overview.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-overview-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-overview-en.html}
+      - id: iphone-reference
+        name: iphone-reference
+        viewport: {width: 375, height: 667, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-overview.html}
+  - id: manifest-browser-repository-search
+    name: Sources / Search
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-search.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-search.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-search-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-search-en.html}
+  - id: manifest-browser-repository-search-empty
+    name: Sources / No Results
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-search-empty.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-search-empty.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-search-empty-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-search-empty-en.html}
+  - id: manifest-browser-repository-update
+    name: Sources / Catalog Update
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-update.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-update.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-update-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-repository-update-en.html}
+  - id: manifest-browser-script
+    name: Script
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-en.html}
+  - id: manifest-browser-script-local
+    name: script-local
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-local.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-local.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-local-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-local-en.html}
+  - id: manifest-browser-script-preview
+    name: script-preview
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-preview.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-preview.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-preview-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-preview-en.html}
+  - id: manifest-browser-script-response
+    name: script-response
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-response.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-response.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-response-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-script-response-en.html}
+  - id: manifest-browser-source-local
+    name: source-local
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-local.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-local.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-local-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-local-en.html}
+  - id: manifest-browser-source-preview
+    name: source-preview
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-preview.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-preview.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-preview-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-preview-en.html}
+  - id: manifest-browser-source-request
+    name: source-request
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-request.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-request.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-request-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-request-en.html}
+  - id: manifest-browser-source-response
+    name: source-response
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-response.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-response.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-response-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-source-response-en.html}
+  - id: manifest-browser-sources-error
+    name: Sources / Refresh Error
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-error.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-error.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-error-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-error-en.html}
+  - id: manifest-browser-sources-refreshed
+    name: Sources / Refreshed
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-refreshed.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-refreshed.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-refreshed-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-refreshed-en.html}
+  - id: manifest-browser-sources-refreshing
+    name: Sources / Refreshing
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-refreshing.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-refreshing.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-refreshing-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-sources-refreshing-en.html}
+  - id: manifest-browser-test
+    name: Test
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-test.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-test.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-test-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-test-en.html}
+  - id: manifest-browser-manifest-install-queue
+    name: Install queue
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-install-queue.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-install-queue.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-install-queue-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-install-queue-en.html}
+  - id: manifest-browser-manifest-install-queue-error
+    name: Install queue / Error
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-install-queue-error.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-install-queue-error.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-install-queue-error-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-install-queue-error-en.html}
+  - id: manifest-browser-manifest-manage
+    name: Package / Actions
+    category: Screens/Plugins
+    devices:
+      - id: iphone
+        name: iphone
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-manage.html}
+      - id: ipad
+        name: ipad
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-manage.html}
+      - id: iphone-en
+        name: iphone-en
+        viewport: {width: 402, height: 874, deviceScaleFactor: 2}
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-manage-en.html}
+      - id: ipad-en
+        name: ipad-en
+        viewport: {width: 820, height: 1180, deviceScaleFactor: 2}
+        orientations: [landscape]
+        colorSchemes: [light, dark]
+        versions:
+          native: {type: html, path: mocks/manifest-browser-manifest-manage-en.html}

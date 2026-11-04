@@ -1,0 +1,173 @@
+--- before/SPEC.md
++++ SPEC.md
+@@ -42,7 +42,7 @@
+ 
+ Hierarchy: Repositories → Repository → Manifests → Manifest (enabled/disabled) → Scripts → full-screen Script. A repository contains purpose-specific Manifest bundles; the user adds only the ones they want. In the three-destination shell, Packages contains these Manifest bundles and Scripts contains only their file metadata. Registration and metadata refresh never import or enable a Manifest. The local virtual repository preserves file imports in the same hierarchy, without a publisher or update checks.
+ 
+-Normal Manifest use requires no code: show purpose, published/added/active versions and the state-dependent Add, Add Update, Enable or Disable action. Scripts, Manifest JSON and Test are explicit navigation destinations; show neither code nor sample JSON in the normal Manifest detail. Scripts have no individual enable controls. Source and JSON are read-only; source opens full screen on both phone and tablet, with Done.
++Normal Manifest use requires no code: show purpose, published/added/active versions and the state-dependent Add, Add Update, Enable or Disable action. Scripts, Manifest JSON and Test are explicit navigation destinations; show neither code nor sample JSON in the normal Manifest detail. Scripts have no individual enable controls. Source and JSON are read-only; source opens full screen on both phone and tablet, with Done returning to Script detail. The source viewer requires an explicit Source Code NavigationLink in Script detail.
+ 
+ Check states distinguish not checked, checking, metadata update, up to date and failed. Never call persisted data latest without a successful check. Repository sequence is an update number, while a Manifest has a SemVer version. Published 2.0.0 with imported/active 1.0.0 offers Add Update. Imported 2.0.0 with active 1.0.0 offers Enable 2.0.0; import leaves 1.0.0 active, while explicit enable and OK atomically replace it. No separate Approve action.
+ 
+@@ -62,7 +62,7 @@
+ 
+ Packages lists added Manifest bundles, showing enabled/disabled state and version/update facts. Add means import, leaves the Manifest disabled, and reveals a Packages link plus Enable. Addition and activation remain separate; explicit Enable with OK replaces an older active revision of the same family. Versions are SemVer values, never package counts. Sources registration/refresh never adds all packages or enables one.
+ 
+-Scripts lists metadata for files grouped under their owning Manifest; neither a file listing nor a tab opens source automatically. A selected file opens full-screen read-only source with Done on phone and iPad. No file-level activation, code editor or configuration editor. Normal Sources, catalog and Package screens contain no inline JavaScript/JSON. Manifest JSON and Test remain explicit secondary destinations.
++Scripts lists metadata for files grouped under their owning Manifest; neither a file listing nor a tab opens source automatically. A selected file opens its Script metadata and match conditions. A separate Source Code NavigationLink is the only normal route to full-screen read-only source with Done, on phone and iPad. No file-level activation, code editor or configuration editor. Normal Sources, catalog and Package screens contain no inline JavaScript/JSON. Manifest JSON and Test remain explicit secondary destinations.
+ 
+ Visual components: large native navigation titles; original square colored SVG icons; compact catalog rows with name, concise purpose, state and chevron; a package detail hero with icon, name and compact pill action; quiet version facts below. Destructive Disable is a restrained outlined/text action, not a full-width red banner. Supplemental explanations remain short Section footers. Shared Manifest shell/components are defined once in src/manifest-components.ts and listed in the component catalog before screen composition. Existing six workflow designs and adoption records are untouched.
+ 
+@@ -74,7 +74,7 @@
+ 
+ The human supplied IMG_0003.PNG (Sources), IMG_0004.PNG (repository overview), IMG_0001.PNG (Packages with swipe Uninstall) and IMG_0002.PNG (banner/detail). These four files are the selected visual references; retain exactly three destinations Sources, Packages, Scripts. This updates the concrete mock proposal, without implying native implementation adoption. Use edge-to-edge compact rows, a large title, Source Edit/+ controls, All Packages above Repositories, search/Installed/name sort in Packages, and a compact banner/detail intro. Dark surfaces are approximately #1e1e1e with muted gray separators and teal actions; light surfaces retain system semantics.
+ 
+-Top priority: every Package detail first view shows its name, then a clearly labeled Target host, then labeled Method and Path. These values come from the synthetic fixture's manifest matches, never the repository URL or its display name. Put repository provenance lower. Keep the host visible without scrolling at 375×667 and 402×874, and in the iPad detail pane. Never truncate the complete host beyond recognition; wrap when needed. A compact banner must yield space to this information.
++Top priority: a Package is a bundle of Scripts with potentially different match conditions. Every Package detail first view shows its name and a clearly labeled aggregate of all target hosts declared by its manifest matches. Do not show one Method, Path or Hook for the entire Package. Host aggregation is deduplicated and never inferred from the repository URL or display name. Per-match Method, Path and Hook belong only to the selected Script view. Put repository provenance lower. Keep the host visible without scrolling at 375×667 and 402×874, and in the iPad detail pane. Never truncate the complete host beyond recognition; wrap when needed. A compact banner must yield space to this information.
+ 
+ Sources starts with All Packages across registered catalogs, followed by repository icon/name/URL/count rows. Existing-repository navigation can show an overview with All Packages and Installed Packages counts, then the searchable catalog. Adding a repository still leads directly to its catalog, preserving the previous human request. Index schema has no categories, author or changelog; do not fabricate those fields for screenshot fidelity. Use Details / Versions for existing facts. Count Manifest families, not imported revisions.
+ 
+@@ -85,3 +85,7 @@
+ Visual ownership: new src/sileo-reference-style.ts owns screenshot-derived MF-only styling. src/manifest-components.ts owns reusable source rows, package rows/check badge/swipe shell, search/sort, target-first hero, management menu, counts and empty states. src/manifest-screens.ts composes fixtures; all three consume the canonical components. The component catalog shows changed primitives before screen composition. Existing six workflow screens/components and adoption records remain unchanged.
+ 
+ 2026-10-20 wording clarification: Search limit is a synthetic sample Package name, not a feature status. In package rows put the concrete purpose immediately below its name, then a separately labeled Version and enabled/disabled badge. Avoid an unexplained single string of name/version/enabled. The detail Enabled section has one short footer: runs when matching traffic occurs. Enabled does not mean a run is happening now.
++
++2026-10-20 Package scope correction: the match fixture is an array attached to the bundle. A Script may occur under several rules and hooks; its read-only detail lists those actual conditions. Package details never promote the first script rule to package-wide metadata. Search limit includes a synthetic second host/rule to demonstrate aggregation; Manifest JSON, Script metadata and Package host summary use the same fixture match array. Sources, Packages and the Scripts file list keep source code hidden until explicit file navigation.
++
++2026-10-20 navigation clarification: most users do not inspect JavaScript. Selecting a Script opens its metadata and match conditions without code. Put a quiet ソースコード / Source Code NavigationLink below this metadata; only activating that link opens the full-screen read-only code viewer. Done returns to that exact Script detail. The Scripts tab, Package details and Script detail contain no inline JavaScript. Keep this distinction in the component catalog and JA/EN compositions.
+--- before/src/manifest-fixtures.ts
++++ src/manifest-fixtures.ts
+@@ -1,7 +1,14 @@
+ // Synthetic UI fixtures only. Match data is declared here, never inferred from repository URLs.
+ export const packageFixtures = {
+-  search: {name:'Search limit', glyph:'search', host:'example.com', method:'POST', path:'/synthetic', source:'repo', files:['scripts/request.js','scripts/response.js'], summary:['検索件数の上限を5に変更します。','Sets the search limit to 5.']},
+-  preview: {name:'Response preview', glyph:'response', host:'api.example.com', method:'GET', path:'/preview', source:'repo', files:['scripts/response.js'], summary:['レスポンスのJSONを確認します。','Inspect the response JSON.']},
+-  local: {name:'Local example', glyph:'local', host:'local.example.com', method:'POST', path:'/local', source:'local', files:['scripts/request.js'], summary:['ファイルから追加したサンプル','An example added from a file']},
++  search: {name:'Search limit', glyph:'search', source:'repo', files:['scripts/request.js','scripts/response.js'], matches:[
++    {hosts:['example.com'],methods:['POST'],path:{kind:'exact',value:'/synthetic'},hooks:{request:{onEnter:'scripts/request.js'}}},
++    {hosts:['example.com','api.example.com'],methods:['GET'],path:{kind:'exact',value:'/search'},hooks:{response:{onLeave:'scripts/response.js'}}},
++  ], summary:['検索件数の上限を5に変更します。','Sets the search limit to 5.']},
++  preview: {name:'Response preview', glyph:'response', source:'repo', files:['scripts/response.js'], matches:[
++    {hosts:['api.example.com'],methods:['GET'],path:{kind:'exact',value:'/preview'},hooks:{response:{onLeave:'scripts/response.js'}}},
++  ], summary:['レスポンスのJSONを確認します。','Inspect the response JSON.']},
++  local: {name:'Local example', glyph:'local', source:'local', files:['scripts/request.js'], matches:[
++    {hosts:['local.example.com'],methods:['POST'],path:{kind:'exact',value:'/local'},hooks:{request:{onEnter:'scripts/request.js'}}},
++  ], summary:['ファイルから追加したサンプル','An example added from a file']},
+ } as const;
+ export type PackageID = keyof typeof packageFixtures;
+--- before/src/manifest-components.ts
++++ src/manifest-components.ts
+@@ -45,13 +45,19 @@
+ export const codeBlock = (value:string) => `<pre class="code" tabindex="0">${escape(value)}</pre>`;
+ export const navRow = (label:string,destination:string,lang:Lang,value='') => `<a href="${href(destination,lang)}" class="row"><span class="label">${escape(label)}</span><span class="value">${escape(value)}</span><span class="chevron">›</span></a>`;
+ export const iconRow = (name:string,purpose:string,state:string,destination:string,lang:Lang,glyph:Glyph='package',searchable=true) => `<a class="row" href="${href(destination,lang)}" ${searchable?`data-catalog-item data-package="${name==='Search limit'?'search':name==='Response preview'?'preview':'local'}" data-search="${escape(`${name} ${purpose}`.toLowerCase())}"`:''}>${tile(glyph)}<span class="label"><strong>${escape(name)}</strong><span class="sub">${escape(purpose)}</span>${state?`<span class="state">${escape(state)}</span>`:''}</span><span class="chevron">›</span></a>`;
+-export const scriptRow = (name:string,path:string,lang:Lang) => iconRow(name,path,'',name==='response.js'?'script-response':'script',lang,'script',false);
++export const scriptRow = (name:string,path:string,lang:Lang,owner:PackageID='search') => iconRow(name,path,'',owner==='local'?'script-local':owner==='preview'?'script-preview':name==='response.js'?'script-response':'script',lang,'script',false);
++export const scriptMatches = (owner:PackageID,file:string,lang:Lang) => {
++ const matches=packageFixtures[owner].matches.flatMap(match=>Object.entries(match.hooks).flatMap(([direction,hooks])=>Object.entries(hooks).filter(([,script])=>script===file).map(([hook])=>({match,hook:direction+'.'+hook}))));
++ if(!matches.length)throw new Error(`No manifest binding for ${owner}/${file}`);
++ return matches.map(({match,hook},index)=>section((lang==='ja'?'実行条件':'Matching traffic')+(matches.length>1?' '+(index+1):''),row('Package',packageFixtures[owner].name)+row('Script',file)+row(lang==='ja'?'対象ホスト':'Target hosts',match.hosts.join(', '))+row(lang==='ja'?'メソッド':'Method',match.methods.join(', '))+row(lang==='ja'?'パス':'Path',match.path.value)+row('Hook',hook))).join('');
++};
+ export const packageHero = (name:string,purpose:string,action:string,glyph:Glyph='package',lang:Lang='ja') => {
+  if(glyph==='source')return `<div class="package-hero">${tile(glyph,true)}<div class="hero-copy"><h1>${escape(name)}</h1><p>${escape(purpose)}</p></div></div>`;
+  const entry=Object.entries(packageFixtures).find(([,fixture])=>fixture.name===name);
+  if(!entry)throw new Error(`No declared match fixture for ${name}`);
+  const [id,fixture]=entry;
+- return `<div class="package-banner"><div class="package-profile" data-detail-owner="${id}">${tile(glyph,true)}<div class="profile-copy"><h1>${escape(name)}</h1><div class="target-summary"><div class="host-line"><span>${lang==='ja'?'対象ホスト':'Target host'}</span> <strong>${escape(fixture.host)}</strong></div><div class="match-line"><span>${lang==='ja'?'メソッド':'Method'} <b>${fixture.method}</b></span> <span>${lang==='ja'?'パス':'Path'} <b>${escape(fixture.path)}</b></span></div></div></div></div><div class="profile-actions">${action}</div></div><nav class="detail-tabs" aria-label="Package details"><a href="#package-details" class="active">Details</a><a href="#package-versions">Versions</a></nav><p class="package-purpose" id="package-details">${escape(purpose)}</p>`;
++ const hosts=[...new Set(fixture.matches.flatMap(match=>match.hosts))];
++ return `<div class="package-banner"><div class="package-profile" data-detail-owner="${id}">${tile(glyph,true)}<div class="profile-copy"><h1>${escape(name)}</h1><div class="target-summary"><div class="host-line"><span>${lang==='ja'?'対象ホスト':'Target hosts'}</span>${hosts.map(host=>`<strong>${escape(host)}</strong>`).join('')}</div></div></div></div><div class="profile-actions">${action}</div></div><nav class="detail-tabs" aria-label="Package details"><a href="#package-details" class="active">Details</a><a href="#package-versions">Versions</a></nav><p class="package-purpose" id="package-details">${escape(purpose)}</p>`;
+ };
+ export const repoRow = (name:string,subtitle:string,count:string,page:string,lang:Lang,glyph:Glyph='source',countKey='',repo=false) => `<a class="row repo-row" href="${href(page,lang)}" ${repo?'data-source-row':''}>${tile(glyph)}<span class="label"><strong>${escape(name)}</strong><span class="sub">${escape(subtitle)}</span></span><span class="trailing-count" ${countKey?`data-count="${countKey}"`:''}>${escape(count)}</span><span class="chevron">›</span></a>`;
+ export const packageRow = (id:PackageID,lang:Lang,installed=false) => {
+@@ -122,7 +128,7 @@
+  const action=options.fullscreen?link(options.donePage??'scripts',en?'Done':'完了',lang,'action'):options.action?link(options.actionPage??'repository-add',options.action,lang,'action'):options.large&&active==='Sources'?`<a class="action" aria-label="${en?'Add Repository':'リポジトリを追加'}" href="${href('repository-add',lang)}">${svg('plus')}</a>`:'';
+  return `<!doctype html><html lang="${lang}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)}</title><style>${css}${extraCss}${referenceCss}</style><body class="mf ${options.fullscreen?'full':''}">${options.fullscreen?'':`<aside class="sidebar"><div class="sidebar-title">Plugins</div>${tabs}</aside>`}<div class="detail"><header><div class="status"><span>9:41</span><span>Wi-Fi ▰</span></div><div class="bar">${back||'<span class="spacer"></span>'}<strong>${options.large?'':escape(title)}</strong>${action||'<span class="spacer"></span>'}</div></header><main>${options.large?`<h1 class="large-title">${escape(title)}</h1>`:''}${contents}</main></div>${options.fullscreen?'':`<nav class="tabbar" aria-label="Plugins">${tabs}</nav>`}${searchScript}</body></html>`;
+ }
+-export const parts={row,section,badge,statusRow,checkRow,stateRow,primaryButton,pill,codeBlock,navRow,iconRow,scriptRow,packageHero,versionRows,confirmation,searchField,manifestPage,href,svg,tile,repoRow,packageRow,managePill,activationRow,deleteConfirmation} as const;
++export const parts={row,section,badge,statusRow,checkRow,stateRow,primaryButton,pill,codeBlock,navRow,iconRow,scriptRow,packageHero,versionRows,confirmation,searchField,manifestPage,href,svg,tile,repoRow,packageRow,managePill,activationRow,deleteConfirmation,scriptMatches} as const;
+ export type PartName=keyof typeof parts;
+ export function requireParts<N extends PartName>(names:readonly N[]):Pick<typeof parts,N>{
+  const missing=names.filter(name=>!(name in parts));if(missing.length)throw new Error(`Missing components: ${missing.join(', ')}`);
+--- before/src/manifest-screens.ts
++++ src/manifest-screens.ts
+@@ -1,17 +1,17 @@
+ import {checkStates,requireParts,type Lang,type Tab} from './manifest-components';
+ import {packageFixtures, type PackageID} from './manifest-fixtures';
+-const {row,section,statusRow,checkRow,stateRow,primaryButton,pill,codeBlock,navRow,iconRow,scriptRow,packageHero,versionRows,confirmation,searchField,manifestPage,href,svg,repoRow,packageRow,managePill,activationRow,deleteConfirmation}=requireParts(['row','section','statusRow','checkRow','stateRow','primaryButton','pill','codeBlock','navRow','iconRow','scriptRow','packageHero','versionRows','confirmation','searchField','manifestPage','href','svg','repoRow','packageRow','managePill','activationRow','deleteConfirmation'] as const);
++const {row,section,statusRow,checkRow,stateRow,primaryButton,pill,codeBlock,navRow,iconRow,scriptRow,packageHero,versionRows,confirmation,searchField,manifestPage,href,svg,repoRow,packageRow,managePill,activationRow,deleteConfirmation,scriptMatches}=requireParts(['row','section','statusRow','checkRow','stateRow','primaryButton','pill','codeBlock','navRow','iconRow','scriptRow','packageHero','versionRows','confirmation','searchField','manifestPage','href','svg','repoRow','packageRow','managePill','activationRow','deleteConfirmation','scriptMatches'] as const);
+ const base=`${import.meta.dir}/..`;
+ const sourceFile='scripts/request.js';
+ const sourceCode='Interceptor.attach({\n  request: {\n    onEnter(req, cfg) {\n      req.body.limit = 5;\n    }\n  }\n});';
+-const manifest={schemaVersion:2,id:'22222222-2222-4222-8222-222222222222',name:'Search limit',version:'1.0.0',summary:'Set the search limit to 5.',matches:[{hosts:['example.com'],methods:['POST'],path:{kind:'exact',value:'/synthetic'},hooks:{request:{onEnter:sourceFile},response:{onLeave:'scripts/response.js'}}}],read:{metadata:['method','host','path'],headers:[],queryKeys:[],body:{mode:'json'}},write:{requestBody:true,responseBody:false},endpointBindings:[],settings:{}};
++const manifest={schemaVersion:2,id:'22222222-2222-4222-8222-222222222222',name:'Search limit',version:'1.0.0',summary:'Set the search limit to 5.',matches:packageFixtures.search.matches,read:{metadata:['method','host','path'],headers:[],queryKeys:[],body:{mode:'json'}},write:{requestBody:true,responseBody:false},endpointBindings:[],settings:{}};
+ const generated:string[]=[];
+ const withDialog=(page:string,dialog:string)=>page.replace('<script>',dialog+'<script>');
+ async function build(lang:Lang){
+  const en=lang==='en',t=(ja:string,english:string)=>en?english:ja;
+  const write=async(name:string,html:string)=>{
+-  if(!['components','script','script-local','script-response','manifest-json','test'].includes(name)&&(/<pre\b|Interceptor\.attach/.test(html)))throw new Error(`Unexpected code in ${name}`);
+-  if(['script','script-local','script-response','manifest-json','test'].includes(name)&&(/<(input|textarea)\b|contenteditable/.test(html)))throw new Error(`Editable content in ${name}`);
++  if(!['components','source-request','source-local','source-response','source-preview','manifest-json','test'].includes(name)&&(/<pre\b|Interceptor\.attach/.test(html)))throw new Error(`Unexpected code in ${name}`);
++  if(['source-request','source-local','source-response','source-preview','manifest-json','test'].includes(name)&&(/<(input|textarea)\b|contenteditable/.test(html)))throw new Error(`Editable content in ${name}`);
+   generated.push(`${name}:${lang}`);return Bun.write(`${base}/mocks/manifest-browser-${name}${en?'-en':''}.html`,html);
+  };
+  const shell=(title:string,content:string,tab:Tab='Sources',back='Sources',backPage='repositories',large=false)=>manifestPage(title,content,{lang,tab,back,backPage,large});
+@@ -29,10 +29,10 @@
+   return packagePage(hero+activation+versions(published,added,active)+provenance+contents(id),f.name,fromSource);
+  };
+  const packages=(repoOnly=false)=>searchField(lang,'','packages')+`<div class="installed-heading"><h2>${t('追加済み','Installed')}</h2><select class="sort-select" data-sort aria-label="${t('並べ替え','Sort Packages')}"><option value="asc">${t('名前 ↑','Name ↑')}</option><option value="desc">${t('名前 ↓','Name ↓')}</option></select></div><div class="catalog edge-list" data-package-list>${(repoOnly?['search','preview']:['local','preview','search']).map(id=>packageRow(id as PackageID,lang,true)).join('')}</div>`;
+- const fileList=`<div data-empty-scripts class="empty" hidden>${svg('script')}<strong>${t('Scriptはありません','No Scripts')}</strong><p>${t('Packageを追加すると表示されます。','Add a Package to see its Scripts.')}</p></div>`+(['local','search','preview'] as const).map(id=>`<div data-script-owner="${id}">${section(packageFixtures[id].name,`<div class="catalog edge-list">${packageFixtures[id].files.map(file=>id==='local'?iconRow('request.js',file,'','script-local',lang,'script',false):scriptRow(file.split('/').pop()!,file,lang)).join('')}</div>`)}</div>`).join('');
++ const fileList=`<div data-empty-scripts class="empty" hidden>${svg('script')}<strong>${t('Scriptはありません','No Scripts')}</strong><p>${t('Packageを追加すると表示されます。','Add a Package to see its Scripts.')}</p></div>`+(['local','search','preview'] as const).map(id=>`<div data-script-owner="${id}">${section(packageFixtures[id].name,`<div class="catalog edge-list">${packageFixtures[id].files.map(file=>scriptRow(file.split('/').pop()!,file,lang,id)).join('')}</div>`)}</div>`).join('');
+  const sources=()=>repoRow('All Packages',t('登録したリポジトリのPackage','Packages from your sources'),'3','all-packages',lang,'package','all').replace('class="row repo-row"','class="row source-summary"')+`<h2 class="section-title">Repositories</h2><div class="edge-list">${repoRow('Example Repository','https://example.com/repository.json','2','repository-overview',lang,'source','repo',true)+repoRow(t('ローカル','Local'),t('ファイルから追加したPackage','Packages added from files'),'1','manifests',lang,'local','local')}</div><p class="repository-foot"><span data-count="sources">1</span> ${t('リポジトリ','source')}</p>`;
+  // Define changed component states in the catalog before composing screen outputs.
+- await write('components',shell(t('共通コンポーネント','Components'),section(t('リポジトリの行','Source rows'),`<div class="edge-list">${repoRow('Example Repository','https://example.com/repository.json','2','repository-overview',lang)}</div>`)+section(t('Packageの行と削除','Package rows and deletion'),`<div class="edge-list">${packageRow('local',lang,true)}</div>`)+searchField(lang)+section(t('更新確認','Update Check'),checkStates.map(s=>checkRow(s,lang)).join(''))+packageHero('Search limit',packageFixtures.search.summary[en?1:0],managePill('search',lang),'search',lang)+section(t('実行状態','Execution'),activationRow('local',lang))+`<div class="hero-action"><button class="pill disabled" disabled>${t('追加','Add')}</button><button class="pill disabled" disabled aria-busy="true">${t('追加中…','Adding…')}</button></div>`+versions('2.0.0','2.0.0','1.0.0')+confirmation(t('Search limitを有効にしますか？','Enable Search limit?'),'OK',t('キャンセル','Cancel'),lang,'manifest',true)+section(t('ファイル','Files'),scriptRow('request.js',sourceFile,lang)+codeBlock(sourceCode))));
++ await write('components',shell(t('共通コンポーネント','Components'),section(t('リポジトリの行','Source rows'),`<div class="edge-list">${repoRow('Example Repository','https://example.com/repository.json','2','repository-overview',lang)}</div>`)+section(t('Packageの行と削除','Package rows and deletion'),`<div class="edge-list">${packageRow('local',lang,true)}</div>`)+searchField(lang)+section(t('更新確認','Update Check'),checkStates.map(s=>checkRow(s,lang)).join(''))+packageHero('Search limit',packageFixtures.search.summary[en?1:0],managePill('search',lang),'search',lang)+section(t('実行状態','Execution'),activationRow('local',lang))+`<div class="hero-action"><button class="pill disabled" disabled>${t('追加','Add')}</button><button class="pill disabled" disabled aria-busy="true">${t('追加中…','Adding…')}</button></div>`+versions('2.0.0','2.0.0','1.0.0')+confirmation(t('Search limitを有効にしますか？','Enable Search limit?'),'OK',t('キャンセル','Cancel'),lang,'manifest',true)+scriptMatches('search',sourceFile,lang)+section(t('ファイル','Files'),scriptRow('request.js',sourceFile,lang)+navRow(t('ソースコード','Source Code'),'source-request',lang))));
+  await write('repositories',shell('Sources',sources(),'Sources','Sources','repositories',true));
+  await write('repositories-edit',manifestPage('Sources',sources()+section('',`<a class="row error" data-source-row href="${href('repositories',lang)}?removeSource=repo">${t('Example Repositoryを削除','Delete Example Repository')}</a>`,t('追加済みのPackageは残ります。','Added Packages are kept.')),{lang,tab:'Sources',action:t('完了','Done'),actionPage:'repositories'}));
+  await write('repository-overview',shell('Example Repository',`<div class="edge-list">${navRow('All Packages','repository',lang,'2')+navRow('Installed Packages','packages-repository',lang,'0').replace('<span class="value">0</span>','<span class="value" data-count="installed">0</span>')}</div>`+section(t('更新確認','Update Check'),checkRow('unknown',lang)+navRow(t('更新を確認','Check for Updates'),'repository-update',lang))+repoDetails));
+@@ -68,11 +68,19 @@
+  await write('manifest-disabled-confirm',withDialog(detail('search','2.0.0','2.0.0'),confirmation(t('Search limitの2.0.0を有効にして、対象の通信を変更しますか？','Enable Search limit 2.0.0 and change matching traffic?'),'OK',t('キャンセル','Cancel'),lang,'manifest-updated',false,'manifest-disabled-update')));
+  for(const id of ['search','preview','local'] as const){const name=id==='search'?'manifest-delete-confirm':`manifest-${id}-delete-confirm`;await write(name,withDialog(detail(id,id==='local'?undefined:'1.0.0','1.0.0'),deleteConfirmation(id,lang)));}
+  await write('scripts',shell('Scripts',fileList,'Scripts','Packages','packages',true));
+- await write('script',manifestPage('request.js',section(sourceFile,codeBlock(sourceCode)),{lang,tab:'Scripts',fullscreen:true}));
+- await write('script-local',manifestPage('request.js',section('Local example / scripts/request.js',codeBlock(sourceCode)),{lang,tab:'Scripts',fullscreen:true}));
+- await write('script-response',manifestPage('response.js',section('scripts/response.js',codeBlock('Interceptor.attach({\n  response: {\n    onLeave(res, cfg) {\n      console.log(res.body);\n    }\n  }\n});')),{lang,tab:'Scripts',fullscreen:true}));
++ const scriptDetail=(owner:PackageID,file:string,sourcePage:string)=>shell(file.split('/').pop()!,scriptMatches(owner,file,lang)+section('',navRow(t('ソースコード','Source Code'),sourcePage,lang)),'Scripts','Scripts','scripts');
++ const responseCode='Interceptor.attach({\n  response: {\n    onLeave(res, cfg) {\n      console.log(res.body);\n    }\n  }\n});';
++ await write('script',scriptDetail('search',sourceFile,'source-request'));
++ await write('script-local',scriptDetail('local',sourceFile,'source-local'));
++ await write('script-response',scriptDetail('search','scripts/response.js','source-response'));
++ await write('script-preview',scriptDetail('preview','scripts/response.js','source-preview'));
++ const sourceViewer=(owner:PackageID,file:string,code:string,backPage:string)=>manifestPage(file.split('/').pop()!,section(packageFixtures[owner].name+' / '+file,codeBlock(code)),{lang,tab:'Scripts',fullscreen:true,donePage:backPage});
++ await write('source-request',sourceViewer('search',sourceFile,sourceCode,'script'));
++ await write('source-local',sourceViewer('local',sourceFile,sourceCode,'script-local'));
++ await write('source-response',sourceViewer('search','scripts/response.js',responseCode,'script-response'));
++ await write('source-preview',sourceViewer('preview','scripts/response.js',responseCode,'script-preview'));
+  await write('manifest-json',manifestPage('Manifest JSON',section('',codeBlock(JSON.stringify(manifest,null,2)).replace('<pre class="code"','<pre data-manifest-json class="code"')),{lang,tab:'Packages',fullscreen:true,donePage:'manifest'}));
+- await write('test',shell(t('テスト','Test'),section(t('対象','Target'),row('Hook','request.onEnter'))+section(t('サンプルイベント','Sample Event'),codeBlock(JSON.stringify({request:{method:'POST',host:'example.com',path:'/synthetic',body:{limit:20}}},null,2)))+section(t('サンプル設定','Sample Configuration'),codeBlock('{\n  "settings": {},\n  "endpoints": {}\n}'))+primaryButton(t('テストを実行','Run Test'),'test',lang)+section(t('結果','Result'),statusRow('neutral',t('未実行','Not run')),t('サンプルで実行します。実通信の変更や外部送信は行いません。','Uses sample data without changing live traffic or sending data externally.')),'Packages','Search limit','manifest'));
++ await write('test',shell(t('テスト','Test'),section(t('テスト対象','Test target'),row('Package','Search limit')+row('Script',sourceFile)+row('Hook','request.onEnter'))+section(t('サンプルイベント','Sample Event'),codeBlock(JSON.stringify({request:{method:'POST',host:'example.com',path:'/synthetic',body:{limit:20}}},null,2)))+section(t('サンプル設定','Sample Configuration'),codeBlock('{\n  "settings": {},\n  "endpoints": {}\n}'))+primaryButton(t('テストを実行','Run Test'),'test',lang)+section(t('結果','Result'),statusRow('neutral',t('未実行','Not run')),t('サンプルで実行します。実通信の変更や外部送信は行いません。','Uses sample data without changing live traffic or sending data externally.')),'Packages','Search limit','manifest'));
+  await write('empty',shell('Sources',section('',statusRow('neutral',t('リポジトリがありません','No repositories')),t('リポジトリを追加してPackageを探せます。','Add a repository to browse its Packages.'))+primaryButton(t('リポジトリを追加','Add Repository'),'repository-add',lang),'Sources','Sources','repositories',true));
+  await write('error',shell('Example Repository',repoHero+section('',statusRow('error',t('一覧を取得できませんでした','Could not load the catalog')),t('接続を確認して、もう一度お試しください。','Check your connection and try again.'))+primaryButton(t('再試行','Try Again'),'repository',lang)+catalog()+repoDetails));
+ }
+--- before/src/sileo-reference-style.ts
++++ src/sileo-reference-style.ts
+@@ -55,7 +55,6 @@
+ .mf .target-summary{display:block;min-width:0}
+ .mf .host-line{display:block;font-size:13px;line-height:1.3;color:var(--ink);overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+ .mf .host-line b,.mf .host-line strong{color:var(--muted);font-weight:500}
+-.mf .match-line{display:block;margin-top:2px;font-size:12px;line-height:1.3;color:var(--muted);font-family:ui-monospace,Menlo,monospace;overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+ .mf .profile-actions{display:flex;align-items:center;gap:10px;flex:none}
+ .mf .profile-actions .pill,.mf .package-banner .pill{min-height:32px;padding:4px 18px;font-size:15px;border-radius:16px}
+ .mf .package-banner>.profile-actions{justify-content:flex-end}
+@@ -79,10 +78,9 @@
+ /* Integration: action popover, labeled match facts and readonly section rows. */
+ .mf .package-icon{position:relative;display:block;flex:none}
+ .mf .host-line>span{display:block;color:var(--muted);font-size:12px}
+-.mf .host-line>strong{color:var(--ink);font-size:15px;font-weight:600}
++.mf .host-line>strong{display:block;color:var(--ink);font-size:15px;font-weight:600}
+ .mf .package-banner{background:linear-gradient(150deg,color-mix(in srgb,var(--accent) 20%,var(--bg)),var(--bg));min-height:142px}
+ .mf .profile-actions{justify-content:flex-end}
+-.mf .match-line>span{display:block}
+ .mf .detail-view .package-purpose{margin:16px;font-size:16px;line-height:1.45}
+ .mf .detail-view .row{padding-left:16px;padding-right:16px}
+ .mf .togglink{display:flex;width:100%;color:var(--ink);justify-content:space-between;min-height:52px}

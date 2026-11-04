@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "imageSha256": "b1b8035c9e32c56f7a11bb02cbf066b2ebbde0e4103f4b3921be85faca1bc48d",
+  "capturedAt": "2026-10-22T16:10:18.860249+00:00",
+  "commit": "9879d7c054740a6c7beab9a5b481ef93563d456c",
+  "dirty": true,
+  "contentSha256": "bb15ac411f19884554edea78c6ec30aab27c1cf610425085595c6487fa745059",
+  "contentDescription": "Native outbound approval sheet. Product sources match committed revision; private UI harness only. Captured evidence; no approved visual baseline.",
+  "operatingSystem": {
+    "name": "iOS",
+    "version": "26.5",
+    "build": "23F77"
+  },
+  "device": {
+    "id": "iphone-se-3",
+    "model": "iPhone SE (3rd generation)"
+  },
+  "scale": 2,
+  "orientation": "portrait",
+  "locale": "ja_JP",
+  "theme": "light",
+  "origin": "simulator",
+  "dependenciesSha256": "656b9f178606e16f4c483c3a37a4b6b058fcb45a8f87a451fff0ce75a60fb649",
+  "runId": "outbound-approval-20261023-phone26-ja_JP",
+  "compression": {
+    "sourceSHA256": "9400c7abf9e5934b027ecd67a878717749840345a9f25daeeeb53643cbcb0378",
+    "imageSHA256": "b1b8035c9e32c56f7a11bb02cbf066b2ebbde0e4103f4b3921be85faca1bc48d",
+    "sourceBytes": 206368,
+    "bytes": 88850,
+    "pixelWidth": 750,
+    "pixelHeight": 1334,
+    "scale": 2,
+    "exifOrientation": 1,
+    "iccSHA256": null,
+    "rgbaSHA256": "92c9f96e4d491cc07cbece405c2b55b853640c659e35d3d0c24f0401581e0b67",
+    "rgbaIdentical": true,
+    "profileIdentical": true,
+    "dimensionsIdentical": true,
+    "colorSpace": "same untagged/default or declared sRGB interpretation for both decodes",
+    "tools": {
+      "cwebp": "1.6.0\nlibsharpyuv: 0.4.2",
+      "Pillow": "12.3.0"
+    }
+  },
+  "privateHarnessSha256": "26d9e111883cc6133626e8646131adc5da934a7f39c26992de0daabf0a209ee8"
+}

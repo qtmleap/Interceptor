@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "imageSha256": "8e147a58e85926c27d2522333b30ee377f36d50a084edeb2fe82dab97d143973",
+  "capturedAt": "2026-10-22T11:07:38.310000+00:00",
+  "commit": "5d510fda0bd72d43cf7e537baa969e8691164601",
+  "dirty": true,
+  "contentSha256": "da35b584e1f3f5771b84aab8ec8b376376754c3419b2084d3c361f5c20922dcb",
+  "contentDescription": "Native persisted-catalog candidate. Original producer fingerprint retained. Captured only; no matching approved regression baseline.",
+  "operatingSystem": {
+    "name": "iOS",
+    "version": "26.5",
+    "build": "23F77"
+  },
+  "device": {
+    "id": "ipad-air-13-m3",
+    "model": "iPad Air 13-inch (M3)"
+  },
+  "scale": 2,
+  "orientation": "landscape",
+  "locale": "ja_JP",
+  "theme": "dark",
+  "origin": "simulator",
+  "dependenciesSha256": "656b9f178606e16f4c483c3a37a4b6b058fcb45a8f87a451fff0ce75a60fb649",
+  "runId": "catalog-da35-pad26-ja-dark",
+  "compression": {
+    "sourceSHA256": "c14d86e13578db8c71d50a152d7543bac50f4ee1dbc3d3701ce8d8a5f711daf3",
+    "imageSHA256": "8e147a58e85926c27d2522333b30ee377f36d50a084edeb2fe82dab97d143973",
+    "sourceBytes": 198832,
+    "bytes": 39098,
+    "pixelWidth": 2048,
+    "pixelHeight": 2732,
+    "scale": 2,
+    "exifOrientation": 8,
+    "iccSHA256": null,
+    "rgbaSHA256": "723264108c49055ddecaa0ae0505cf0cc0affd1d731bc9d2e902495af1669b4a",
+    "rgbaIdentical": true,
+    "profileIdentical": true,
+    "dimensionsIdentical": true
+  }
+}

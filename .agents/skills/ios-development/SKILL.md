@@ -96,6 +96,10 @@ evidence. Report required missing evidence as "not verified".
 
 ## 6. UI previews, screenshots, App Store
 
+For UI usability and user-facing wording review, read
+[references/ui-review.md](references/ui-review.md). LocalGPT judges that UI from
+visual evidence only, without code context or LocalMCP.
+
 - Web previews: follow the root Tailscale-only policy; discover the address
   yourself instead of asking. A web prototype does not replace simulator/device
   UI checks.

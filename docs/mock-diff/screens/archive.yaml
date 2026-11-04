@@ -1,0 +1,377 @@
+screens:
+  - id: workflow-dangerous
+    name: Dangerousの確認 / script / previous capture
+    category: Archive/Automation
+    devices:
+      - id: iphone-16-pro
+        name: iPhone 16 Pro
+        viewport:
+          width: 402
+          height: 874
+          deviceScaleFactor: 3
+        colorSchemes:
+          - light
+        versions:
+          native:
+            type: html
+            path: ../mocks/dangerous-script-en.html
+        actual:
+          type: png
+          path: ../actual/ui-review-cycle-20261019/iphone265-en-light-script-initial.png
+        locales:
+          - en_US
+        operatingSystems:
+          - id: ios26
+            name: iOS
+            version: "26.5"
+  - id: workflow-dangerous-archive-iphone265-en-light-external
+    name: Dangerousの確認 / external / previous capture
+    category: Archive/Automation
+    devices:
+      - id: iphone-16-pro
+        name: iPhone 16 Pro
+        viewport:
+          width: 402
+          height: 874
+          deviceScaleFactor: 3
+        colorSchemes:
+          - light
+        versions:
+          native:
+            type: html
+            path: ../mocks/dangerous-en.html
+        actual:
+          type: png
+          path: ../actual/ui-review-cycle-20261019/iphone265-en-light-external-initial.png
+        locales:
+          - en_US
+        operatingSystems:
+          - id: ios26
+            name: iOS
+            version: "26.5"
+  - id: workflow-dangerous-archive-iphone185-ja-light-script
+    name: Dangerousの確認 / script / previous capture
+    category: Archive/Automation
+    devices:
+      - id: iphone-16-pro
+        name: iPhone 16 Pro
+        viewport:
+          width: 402
+          height: 874
+          deviceScaleFactor: 3
+        colorSchemes:
+          - light
+        versions:
+          native:
+            type: html
+            path: ../mocks/dangerous-script.html
+        actual:
+          type: png
+          path: ../actual/ui-review-cycle-20261019/iphone185-ja-light-script-initial.png
+        locales:
+          - ja_JP
+        operatingSystems:
+          - id: ios18
+            name: iOS
+            version: "18.5"
+  - id: workflow-dangerous-archive-iphone185-ja-light-external
+    name: Dangerousの確認 / external / previous capture
+    category: Archive/Automation
+    devices:
+      - id: iphone-16-pro
+        name: iPhone 16 Pro
+        viewport:
+          width: 402
+          height: 874
+          deviceScaleFactor: 3
+        colorSchemes:
+          - light
+        versions:
+          native:
+            type: html
+            path: ../mocks/dangerous.html
+        actual:
+          type: png
+          path: ../actual/ui-review-cycle-20261019/iphone185-ja-light-external-initial.png
+        locales:
+          - ja_JP
+        operatingSystems:
+          - id: ios18
+            name: iOS
+            version: "18.5"
+  - id: workflow-dangerous-archive-ipad265-ja-dark-script
+    name: Dangerousの確認 / script / previous capture
+    category: Archive/Automation
+    devices:
+      - id: ipad-air-11-m3
+        name: iPad Air 11-inch (M3)
+        viewport:
+          width: 820
+          height: 1180
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+        colorSchemes:
+          - dark
+        versions:
+          native:
+            type: html
+            path: ../mocks/dangerous-script.html
+        actual:
+          type: png
+          path: ../actual/ui-review-cycle-20261019/ipad265-ja-dark-script-initial-upright.png
+        locales:
+          - ja_JP
+        operatingSystems:
+          - id: ios26
+            name: iOS
+            version: "26.5"
+  - id: workflow-dangerous-archive-ipad265-ja-dark-external
+    name: Dangerousの確認 / external / previous capture
+    category: Archive/Automation
+    devices:
+      - id: ipad-air-11-m3
+        name: iPad Air 11-inch (M3)
+        viewport:
+          width: 820
+          height: 1180
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+        colorSchemes:
+          - dark
+        versions:
+          native:
+            type: html
+            path: ../mocks/dangerous.html
+        actual:
+          type: png
+          path: ../actual/ui-review-cycle-20261019/ipad265-ja-dark-external-initial-upright.png
+        locales:
+          - ja_JP
+        operatingSystems:
+          - id: ios26
+            name: iOS
+            version: "26.5"
+  - id: workflow-dangerous-archive-ipad185-en-dark-script
+    name: Dangerousの確認 / script / previous capture
+    category: Archive/Automation
+    devices:
+      - id: ipad-air-11-m3
+        name: iPad Air 11-inch (M3)
+        viewport:
+          width: 820
+          height: 1180
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+        colorSchemes:
+          - dark
+        versions:
+          native:
+            type: html
+            path: ../mocks/dangerous-script-en.html
+        actual:
+          type: png
+          path: ../actual/ui-review-cycle-20261019/ipad185-en-dark-script-initial-upright.png
+        locales:
+          - en_US
+        operatingSystems:
+          - id: ios18
+            name: iOS
+            version: "18.5"
+  - id: workflow-dangerous-archive-ipad185-en-dark-external
+    name: Dangerousの確認 / external / previous capture
+    category: Archive/Automation
+    devices:
+      - id: ipad-air-11-m3
+        name: iPad Air 11-inch (M3)
+        viewport:
+          width: 820
+          height: 1180
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+        colorSchemes:
+          - dark
+        versions:
+          native:
+            type: html
+            path: ../mocks/dangerous-en.html
+        actual:
+          type: png
+          path: ../actual/ui-review-cycle-20261019/ipad185-en-dark-external-initial-upright.png
+        locales:
+          - en_US
+        operatingSystems:
+          - id: ios18
+            name: iOS
+            version: "18.5"
+  - id: main-home-title-alignment-archive-ios27
+    name: Home — navigation title / previous candidates / iOS 27
+    category: Archive/Main navigation
+    devices:
+      - id: ipad-air-13-m3
+        name: iPad Air 13-inch (M3)
+        viewport:
+          width: 1024
+          height: 1366
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+        colorSchemes:
+          - light
+        versions:
+          original:
+            type: png
+            path: ../mocks/main-title-introspect-20261022/before-home-bd8487c1.png
+          aligned-introspect:
+            type: png
+            path: ../mocks/main-title-introspect-20261022/home-87396886.png
+          aligned-right-pane:
+            type: png
+            path: ../mocks/main-title-layout-20261021/proposal-home.png
+        locales:
+          - en_US
+        operatingSystems:
+          - id: ios27
+            name: iOS
+            version: "27.0"
+  - id: main-home-title-alignment-archive-ios18
+    name: Home — navigation title / previous candidates / iOS 18
+    category: Archive/Main navigation
+    devices:
+      - id: ipad-air-13-m3
+        name: iPad Air 13-inch (M3)
+        viewport:
+          width: 1024
+          height: 1366
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+        colorSchemes:
+          - light
+        versions:
+          aligned-right-pane:
+            type: png
+            path: ../mocks/main-title-layout-os-20261022/18.5-home.png
+          aligned-introspect:
+            type: png
+            path: ../mocks/main-title-introspect-20261022/18.5-home-80c1916f.png
+        locales:
+          - en_US
+        operatingSystems:
+          - id: ios18
+            name: iOS
+            version: "18.5"
+  - id: main-home-title-alignment-archive-ios26
+    name: Home — navigation title / previous candidates / iOS 26
+    category: Archive/Main navigation
+    devices:
+      - id: ipad-air-13-m3
+        name: iPad Air 13-inch (M3)
+        viewport:
+          width: 1024
+          height: 1366
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+        colorSchemes:
+          - light
+        versions:
+          aligned-right-pane:
+            type: png
+            path: ../mocks/main-title-layout-os-20261022/26.5-home.png
+          aligned-introspect:
+            type: png
+            path: ../mocks/main-title-introspect-20261022/26.5-home-e6108573.png
+        locales:
+          - en_US
+        operatingSystems:
+          - id: ios26
+            name: iOS
+            version: "26.5"
+  - id: main-settings-title-alignment-archive-ios27
+    name: Settings — navigation title / previous candidates / iOS 27
+    category: Archive/Main navigation
+    devices:
+      - id: ipad-air-13-m3
+        name: iPad Air 13-inch (M3)
+        viewport:
+          width: 1024
+          height: 1366
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+        colorSchemes:
+          - light
+        versions:
+          original:
+            type: png
+            path: ../mocks/main-title-introspect-20261022/before-settings-ce1d5607.png
+          aligned-introspect:
+            type: png
+            path: ../mocks/main-title-introspect-20261022/settings-3d013a6c.png
+          aligned-right-pane:
+            type: png
+            path: ../mocks/main-title-layout-20261021/proposal-settings.png
+        locales:
+          - en_US
+        operatingSystems:
+          - id: ios27
+            name: iOS
+            version: "27.0"
+  - id: main-settings-title-alignment-archive-ios18
+    name: Settings — navigation title / previous candidates / iOS 18
+    category: Archive/Main navigation
+    devices:
+      - id: ipad-air-13-m3
+        name: iPad Air 13-inch (M3)
+        viewport:
+          width: 1024
+          height: 1366
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+        colorSchemes:
+          - light
+        versions:
+          aligned-right-pane:
+            type: png
+            path: ../mocks/main-title-layout-os-20261022/18.5-settings.png
+          aligned-introspect:
+            type: png
+            path: ../mocks/main-title-introspect-20261022/18.5-settings-942e96d4.png
+        locales:
+          - en_US
+        operatingSystems:
+          - id: ios18
+            name: iOS
+            version: "18.5"
+  - id: main-settings-title-alignment-archive-ios26
+    name: Settings — navigation title / previous candidates / iOS 26
+    category: Archive/Main navigation
+    devices:
+      - id: ipad-air-13-m3
+        name: iPad Air 13-inch (M3)
+        viewport:
+          width: 1024
+          height: 1366
+          deviceScaleFactor: 2
+        orientations:
+          - landscape
+        colorSchemes:
+          - light
+        versions:
+          aligned-right-pane:
+            type: png
+            path: ../mocks/main-title-layout-os-20261022/26.5-settings.png
+          aligned-introspect:
+            type: png
+            path: ../mocks/main-title-introspect-20261022/26.5-settings-d779c78d.png
+        locales:
+          - en_US
+        operatingSystems:
+          - id: ios26
+            name: iOS
+            version: "26.5"

@@ -1,0 +1,19 @@
+{
+  "kind": "sanitized physical M3 native before/after evidence",
+  "device": "iPad Air 13-inch M3",
+  "os": "iPadOS 27.0.1",
+  "pixels": [
+    2732,
+    2048
+  ],
+  "scale": 2,
+  "beforeCode": "custom safe-area override present",
+  "afterCode": "standard TabView safe-area ownership",
+  "differences": [
+    "safe area shifts title/content",
+    "clock",
+    "selected row highlight"
+  ],
+  "approvedBaseline": false,
+  "comparisonScope": "Evidence-only before/after image comparison. Both are native physical captures, but exact installed-source provenance for the pre-existing before build was not recorded. No native revision verification or adopted-design pass is claimed."
+}

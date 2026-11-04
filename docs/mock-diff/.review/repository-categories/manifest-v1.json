@@ -1,0 +1,12 @@
+{
+  "time": "2026-10-20T15:44:32.692926+00:00",
+  "files": {
+    "SPEC.md": "6fb37513f62c3732fce9d07a41d71ebb47e91b3dafeb957e809a3886f88ea679",
+    "src/manifest-components.ts": "204b0a7e2fc92d1c45d15b1bbd304763a36cfb68c900f9f52d75f324142c2421",
+    "src/manifest-screens.ts": "9dbd99588e4e93ad2a16ce1026c803389a8b06e170a916099f85a8b2e45ed0bc",
+    "src/manifest-fixtures.ts": "4d823a1e2531bfc2561946ea87c7d84fdf4f2b3a87d6c09aed18b1e67652b1e9",
+    "src/sileo-reference-style.ts": "d7f5a9cbe8588fdc7b86067958d0c622eb3688c0d5488a81f78f9d902aec085c"
+  },
+  "fingerprint": "8fa68db8078e7250ef5dab150551f290b6847cf2305042a803978d11c03974e7",
+  "scope": "Mock only. Single installed version; category browsing; Sources Pull to Refresh only; three-line package rows; badge ring removed. Native/SDK unchanged."
+}

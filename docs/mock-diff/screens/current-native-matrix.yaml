@@ -1,0 +1,916 @@
+{
+  "defaults": {
+    "versions": {
+      "current": {
+        "type": "image",
+        "expectedRevision": {
+          "contentSha256": "0bda090f46dab86e45c5c094b7bf8295e121ea63e4378d7d79faef44bda2bbfd"
+        },
+        "path": "../native/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/current.webp",
+        "provenance": "../native/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/current.json"
+      },
+      "baseline-20261023": {
+        "type": "image",
+        "path": "../baselines/20261023/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/baseline.webp",
+        "provenance": "../baselines/20261023/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/baseline.json",
+        "expectedRevision": {
+          "contentSha256": "0bda090f46dab86e45c5c094b7bf8295e121ea63e4378d7d79faef44bda2bbfd"
+        }
+      }
+    }
+  },
+  "screens": [
+    {
+      "id": "current-home",
+      "name": "Home",
+      "category": "Screens/Current native",
+      "devices": [
+        {
+          "id": "iphone-15",
+          "name": "iPhone 15",
+          "viewport": {
+            "width": 393,
+            "height": 852,
+            "deviceScaleFactor": 3
+          },
+          "orientations": [
+            "portrait"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        },
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "portrait",
+            "landscape"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "current-settings",
+      "name": "Settings",
+      "category": "Screens/Current native",
+      "devices": [
+        {
+          "id": "iphone-15",
+          "name": "iPhone 15",
+          "viewport": {
+            "width": 393,
+            "height": 852,
+            "deviceScaleFactor": 3
+          },
+          "orientations": [
+            "portrait"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        },
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "portrait",
+            "landscape"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "current-sources",
+      "name": "Sources",
+      "category": "Screens/Current native",
+      "devices": [
+        {
+          "id": "iphone-15",
+          "name": "iPhone 15",
+          "viewport": {
+            "width": 393,
+            "height": 852,
+            "deviceScaleFactor": 3
+          },
+          "orientations": [
+            "portrait"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ],
+          "actual": {
+            "type": "image",
+            "path": "../reviews/plugin-icons/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/actual.webp",
+            "provenance": "../reviews/plugin-icons/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/actual.json",
+            "expectedRevision": {
+              "contentSha256": "17c82ba2bd8d2e8516904cf6fd0626120605c14cfe1d046af652b731d5dae837"
+            }
+          }
+        },
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "portrait",
+            "landscape"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "current-packages",
+      "name": "Packages",
+      "category": "Screens/Current native",
+      "devices": [
+        {
+          "id": "iphone-15",
+          "name": "iPhone 15",
+          "viewport": {
+            "width": 393,
+            "height": 852,
+            "deviceScaleFactor": 3
+          },
+          "orientations": [
+            "portrait"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        },
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "portrait",
+            "landscape"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "current-detail",
+      "name": "Package",
+      "category": "Screens/Current native",
+      "devices": [
+        {
+          "id": "iphone-15",
+          "name": "iPhone 15",
+          "viewport": {
+            "width": 393,
+            "height": 852,
+            "deviceScaleFactor": 3
+          },
+          "orientations": [
+            "portrait"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        },
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "portrait",
+            "landscape"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "current-version",
+      "name": "Version",
+      "category": "Screens/Current native",
+      "devices": [
+        {
+          "id": "iphone-15",
+          "name": "iPhone 15",
+          "viewport": {
+            "width": 393,
+            "height": 852,
+            "deviceScaleFactor": 3
+          },
+          "orientations": [
+            "portrait"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        },
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "portrait",
+            "landscape"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "current-modify",
+      "name": "Modify",
+      "category": "Screens/Current native",
+      "devices": [
+        {
+          "id": "iphone-15",
+          "name": "iPhone 15",
+          "viewport": {
+            "width": 393,
+            "height": 852,
+            "deviceScaleFactor": 3
+          },
+          "orientations": [
+            "portrait"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        },
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "portrait",
+            "landscape"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "current-scripts",
+      "name": "Scripts",
+      "category": "Screens/Current native",
+      "devices": [
+        {
+          "id": "iphone-15",
+          "name": "iPhone 15",
+          "viewport": {
+            "width": 393,
+            "height": 852,
+            "deviceScaleFactor": 3
+          },
+          "orientations": [
+            "portrait"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ],
+          "versions": {
+            "tree-navigation": {
+              "type": "html",
+              "path": "../mocks/manifest-browser-scripts.html"
+            }
+          },
+          "actual": {
+            "type": "image",
+            "path": "../reviews/script-tree/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/actual.webp",
+            "provenance": "../reviews/script-tree/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/actual.json",
+            "expectedRevision": {
+              "contentSha256": "a1928e9ffc5c069f0b8b3fcedfbbcb863e54015bd198e4f7571a0dc2bf19da60"
+            }
+          }
+        },
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "portrait",
+            "landscape"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ],
+          "versions": {
+            "tree-navigation": {
+              "type": "html",
+              "path": "../mocks/manifest-browser-scripts.html"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "current-search",
+      "name": "Search",
+      "category": "Screens/Current native",
+      "devices": [
+        {
+          "id": "iphone-15",
+          "name": "iPhone 15",
+          "viewport": {
+            "width": 393,
+            "height": 852,
+            "deviceScaleFactor": 3
+          },
+          "orientations": [
+            "portrait"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        },
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "portrait",
+            "landscape"
+          ],
+          "locales": [
+            "en_US",
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "light",
+            "dark"
+          ],
+          "origins": [
+            "simulator",
+            "device"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios18",
+              "name": "iOS",
+              "version": "18.5",
+              "build": "22F77"
+            },
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            },
+            {
+              "id": "ios27",
+              "name": "iOS",
+              "version": "27.0",
+              "build": "24A434"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

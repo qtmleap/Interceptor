@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "imageSha256": "b8c1e62a893da23d9f22faa6bbc733c0c85fd77ae9a8e6240d24b46b38b83fd2",
+  "capturedAt": "2026-10-22T11:05:04.011000+00:00",
+  "commit": "5d510fda0bd72d43cf7e537baa969e8691164601",
+  "dirty": true,
+  "contentSha256": "da35b584e1f3f5771b84aab8ec8b376376754c3419b2084d3c361f5c20922dcb",
+  "contentDescription": "Native persisted-catalog candidate. Original producer fingerprint retained. Captured only; no matching approved regression baseline.",
+  "operatingSystem": {
+    "name": "iOS",
+    "version": "18.5",
+    "build": "22F77"
+  },
+  "device": {
+    "id": "iphone-se-3",
+    "model": "iPhone SE (3rd generation)"
+  },
+  "scale": 2,
+  "orientation": "portrait",
+  "locale": "en_US",
+  "theme": "light",
+  "origin": "simulator",
+  "dependenciesSha256": "656b9f178606e16f4c483c3a37a4b6b058fcb45a8f87a451fff0ce75a60fb649",
+  "runId": "catalog-da35-phone18-en-light",
+  "compression": {
+    "sourceSHA256": "c114cf5f11976609636ab749533a66dd1ebc8f78d88dc2c8c46b5de230b6ba0f",
+    "imageSHA256": "b8c1e62a893da23d9f22faa6bbc733c0c85fd77ae9a8e6240d24b46b38b83fd2",
+    "sourceBytes": 116729,
+    "bytes": 24166,
+    "pixelWidth": 750,
+    "pixelHeight": 1334,
+    "scale": 2,
+    "exifOrientation": 1,
+    "iccSHA256": null,
+    "rgbaSHA256": "31e51c602709b8129b1aed8c8c9288575fe2ca2797fb752fb8df5cbfbd265052",
+    "rgbaIdentical": true,
+    "profileIdentical": true,
+    "dimensionsIdentical": true
+  }
+}

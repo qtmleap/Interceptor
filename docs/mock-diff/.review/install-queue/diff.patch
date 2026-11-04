@@ -1,0 +1,418 @@
+--- before/SPEC.md
++++ after/SPEC.md
+@@ -99,3 +99,5 @@
+ 2026-10-21 Package row alignment: align the icon and name/author/version/summary block at their top edges in catalog and installed lists. Override the more-specific catalog row centering rule and omit the icon top offset. Add Repository enters the synthetic Categories directly; the separate loading route is a fixed capture fixture. Stale Add links cannot change an existing installation; only the explicit Update route may replace its base fixture version with the refreshed catalog version.
+ 
+ 2026-10-21 verification scope correction: verify and capture only changed screens and the screens affected by a changed shared component. A wording-only edit needs the affected search field/screen, not every screen/device/locale/theme. Do not use the previous stop/build/restart/all-render integration routine for incremental UI edits: Viewer startup and watched-file reload both call renderAll. Stage changes and use a targeted capture route or focused browser verification. Broaden captures only for a concrete affected dependency or an explicitly requested full regression. This preference supersedes earlier exhaustive recapture instructions.
++
++2026-10-21 Sileo install queue (mock proposal, supersedes immediate Add): Get/追加 queues a Package id, selected version and operation without installing or enabling. Deduplicate by id; retain snapshot versions across catalog refresh and navigation. A bottom Queued count opens the Install sheet: remove individual items, Clear Queue, close retaining queue, then Confirm/インストール commits the batch. Initial installs are disabled. Empty and invalid queues cannot confirm. Confirm validates all entries and commits atomically; failure retains installed state and the queue for retry. During processing disable edits, dismissal and duplicate confirmation; show a short error or completion. Reinstall from installed Modify/管理 bottom action sheet queues the currently installed version and preserves its current enabled state on commit; a changed installed version makes that queued operation stale rather than downgrading. The action sheet also exposes existing Delete/削除 with its short confirmation and separate Cancel. Update remains explicit and retains existing enabled-state semantics. Never trigger install from a URL query: legacy Add/apply URLs on an uninstalled id are no-ops. No-demo installation state pages are fixed sample captures only. The shared queue bar and sheets are defined in the component catalog before composing fixtures. Keep 3 tabs, category origin, host-first details, explicit source navigation and JA/EN search wording. New queue/management work is a mock proposal only, not native adoption or runtime/network installation evidence. Capture only representative affected details and sheets.
+--- before/src/manifest-components.ts
++++ after/src/manifest-components.ts
+@@ -1,4 +1,6 @@
+-import {referenceCss} from './sileo-reference-style';
++import {createQueueModel} from './install-queue-model';
++import {installQueueClient} from './install-queue-ui';
++import {referenceCss, queueCss} from './sileo-reference-style';
+ import {packageFixtures, categoryFixtures, catalogUpdates, catalogRevisions, type PackageID, type CategoryID} from './manifest-fixtures';
+ import {row, section, badge, escape, css} from './components';
+ 
+@@ -69,8 +71,10 @@
+ };
+ export const managePill = (id:PackageID,lang:Lang) => {
+  const name=packageFixtures[id].name,confirm=id==='search'?'manifest-delete-confirm':id==='preview'?'manifest-preview-delete-confirm':'manifest-local-delete-confirm';
+- return `<button type="button" class="pill" data-open-management="${id}" aria-haspopup="dialog">${lang==='ja'?'管理':'Manage'}</button><dialog class="dialog management" data-management="${id}" aria-label="${escape(name)}"><h3>${escape(name)}</h3><div class="dialog-actions"><button type="button" data-close>${lang==='ja'?'キャンセル':'Cancel'}</button><a class="error" href="${href(confirm,lang)}">${lang==='ja'?'削除':'Delete'}</a></div></dialog>`;
+-};
++ return `<button type="button" class="pill" data-open-management="${id}" aria-haspopup="dialog">${lang==='ja'?'管理':'Modify'}</button><dialog class="action-sheet" data-management="${id}" aria-label="${escape(name)}"><div class="sheet-options"><button type="button" data-reinstall="${id}">${lang==='ja'?'再インストール':'Reinstall'}</button><a class="sheet-delete" href="${href(confirm,lang)}">${lang==='ja'?'削除':'Uninstall'}</a></div><button type="button" class="sheet-cancel" data-close>${lang==='ja'?'キャンセル':'Cancel'}</button></dialog>`;
++};
++export const queueBar = (lang:Lang,preview=false) => `<button type="button" class="queue-tray ${preview?'queue-preview':''}" ${preview?'data-queue-open':'data-queue-tray hidden'}><span>${lang==='ja'?'キュー':'Queued'}<strong ${preview?'':'data-queue-count'}>${preview?(lang==='ja'?'2件':'2 Packages'):''}</strong></span><span aria-hidden="true">⌃</span></button>`;
++export const installSheet = (lang:Lang) => `<dialog class="install-sheet" data-install-sheet aria-labelledby="install-sheet-title"><button type="button" class="sheet-dismiss" data-queue-close aria-label="${lang==='ja'?'閉じる':'Close'}"><span aria-hidden="true">⌄</span></button><h2 id="install-sheet-title">${lang==='ja'?'インストール':'Install'}</h2><div class="queue-items" data-queue-items></div><p class="queue-status" role="status" aria-live="polite" data-queue-status></p><div class="queue-footer"><button type="button" class="queue-confirm" data-queue-confirm>${lang==='ja'?'インストール':'Confirm'}</button><button type="button" class="queue-clear" data-queue-clear>${lang==='ja'?'キューを消去':'Clear Queue'}</button></div></dialog>`;
+ export const activationRow = (id:PackageID,lang:Lang) => `<a class="row togglink" data-activation-owner="${id}" href="${href('manifest-confirm',lang)}" role="switch" aria-checked="false"><span class="label">${lang==='ja'?'有効':'Enabled'}</span><span class="toggle" aria-hidden="true"></span></a>`;
+ export const deleteConfirmation = (id:PackageID,lang:Lang) => `<dialog class="dialog" data-auto aria-label="${lang==='ja'?'削除の確認':'Confirm deletion'}"><h3>${escape(packageFixtures[id].name)}${lang==='ja'?'を削除しますか？':' — Delete this Package?'}</h3><div class="dialog-actions"><a data-cancel data-return-owner="${id}" autofocus href="${href('packages',lang)}">${lang==='ja'?'キャンセル':'Cancel'}</a><a class="error" href="${href('packages',lang)}?remove=${id}">${lang==='ja'?'削除':'Delete'}</a></div></dialog>`;
+ export const versionRows = (lang:Lang,version:string) => `<div class="row" style="display:block"><div style="display:flex;gap:14px;align-items:center"><div class="label">${lang==='ja'?'バージョン':'Version'}</div><div class="value" style="max-width:58%" data-detail-version>${escape(version)}</div></div></div>`;
+@@ -103,18 +107,23 @@
+ const catalogUpdates = ${JSON.stringify(catalogUpdates)};
+ const categories = ${JSON.stringify(categoryFixtures)};
+ const saved = (() => { try { const value=JSON.parse(parameters.get('demo') || '{}'); return value && !Array.isArray(value) && typeof value==='object' ? value : {}; } catch { return {}; } })();
+-const normalize = (key, value) => key in fixtures && value && typeof value==='object' && !('version' in value) && 'added' in value ? {version:value.active||value.added,enabled:!!value.active} : value;
++const normalize = (key, value) => Object.hasOwn(fixtures,key) && value && typeof value==='object' && !('version' in value) && 'added' in value ? {version:value.active||value.added,enabled:!!value.active} : value;
+ const migrated = Object.fromEntries(Object.entries(saved).map(([key,value])=>[key,normalize(key,value)]));
+ const demo = {local:{version:'1.0.0',enabled:false}, ...migrated};
+ demo.catalogRev = Number.isFinite(demo.catalogRev) ? demo.catalogRev : ${catalogRevisions.initial};
++const queueModel = (${createQueueModel.toString()})(${JSON.stringify(Object.fromEntries(Object.entries(packageFixtures).map(([id,f])=>[id,[f.version,...(catalogUpdates[id as keyof typeof catalogUpdates]?[catalogUpdates[id as keyof typeof catalogUpdates].version]:[])]])))});
++demo.queue=queueModel.normalize(demo.queue);
++if(!parameters.has('demo')&&['manifest-install-queue','manifest-install-queue-error','components'].includes(route))demo.queue=[{id:'search',version:'1.0.0',kind:'add'},{id:'preview',version:'1.0.0',kind:'add'}];
++if(!parameters.has('demo')&&route==='manifest-manage')demo.search={version:'1.0.0',enabled:false};
++
+ if(['sources-refreshed','manifest-update'].includes(route))demo.catalogRev = Math.max(demo.catalogRev,${catalogRevisions.refreshed});
+ const catalogVersion = id => { const update=catalogUpdates[id]; return update && demo.catalogRev>=update.rev ? update.version : fixtures[id].version; };
+ const removed = parameters.get('remove');
+-if(removed && removed in fixtures)demo[removed]=null;
++if(removed && Object.hasOwn(fixtures,removed))demo[removed]=null;
+ if(parameters.get('removeSource')==='repo')demo.sourceHidden=true;
+ if(parameters.get('addSource')==='repo')demo.sourceHidden=false;
+ const states = {'packages-added':['search','1.0.0',false],'manifest-update':['search','1.0.0',true],'manifest-added':['search','1.0.0',false],manifest:['search','1.0.0',true],'manifest-enable':['search','2.0.0',true],'manifest-replace-confirm':['search','2.0.0',true],'manifest-updated':['search','2.0.0',true],'manifest-disabled-update':['search','2.0.0',false],'manifest-preview-added':['preview','1.0.0',false],'manifest-preview-enabled':['preview','1.0.0',true],'manifest-local':['local','1.0.0',false],'manifest-local-enabled':['local','1.0.0',true]};
+-if(states[route]){const [id,version,enabled]=states[route];const apply=parameters.get('apply')==='1',add=parameters.get('add')==='1',current=demo[id];if(removed!==id){if(!parameters.has('demo'))demo[id]={version,enabled};else if(apply){if(!current){if(add)demo[id]={version:catalogVersion(id),enabled:false};}else if(add){if(route==='manifest-updated'&&catalogUpdates[id]&&current.version===fixtures[id].version&&catalogVersion(id)===catalogUpdates[id].version)demo[id]={version:catalogVersion(id),enabled:current.enabled};}else demo[id]={version:current.version,enabled};}}}
++if(states[route]){const [id,version,enabled]=states[route];const apply=parameters.get('apply')==='1',add=parameters.get('add')==='1',current=demo[id];if(removed!==id){if(!parameters.has('demo'))demo[id]={version,enabled};else if(apply){if(!current){/* Legacy Add URLs never install; only the sheet Confirm commits. */}else if(add){if(route==='manifest-updated'&&catalogUpdates[id]&&current.version===fixtures[id].version&&catalogVersion(id)===catalogUpdates[id].version)demo[id]={version:catalogVersion(id),enabled:current.enabled};}else demo[id]={version:current.version,enabled};}}}
+ const target=(id,state)=>id==='search'?(!state?'manifest-import':state.version==='2.0.0'?(state.enabled?'manifest-updated':'manifest-disabled-update'):state.enabled?'manifest':'manifest-added'):id==='preview'?(!state?'manifest-preview':state.enabled?'manifest-preview-enabled':'manifest-preview-added'):state?(state.enabled?'manifest-local-enabled':'manifest-local'):'manifests';
+ const renderCatalog = () => {
+  document.querySelectorAll('[data-package-link]').forEach(item=>{const id=item.dataset.package,state=demo[id];item.href=destination(target(id,state));const installedList=!!item.closest('[data-installed-template]');item.querySelector('[data-package-meta]').textContent=fixtures[id].author+' · '+(installedList&&state?state.version:catalogVersion(id));item.querySelector('.install-badge').hidden=!state;});
+@@ -155,6 +164,7 @@
+ if(origin&&originBack&&detailFamily(location.pathname.split('/').pop())){originBack.href=destination(origins[origin].page);originBack.textContent='‹ '+origins[origin].label;const tab=destination(origin==='packages'?'packages':'repositories');document.querySelectorAll('.tabbar a,.sidebar a').forEach(a=>{const on=a.getAttribute('href')===tab;a.classList.toggle('active',on);if(on)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});}
+ const syncLinks = () => document.querySelectorAll('a[href]').forEach(anchor=>{if(anchor.getAttribute('href').startsWith('#'))return;const url=new URL(anchor.href);url.searchParams.set('demo',JSON.stringify(demo));const own=anchor.dataset.from,carry=origin&&carryFamily(url.pathname.split('/').pop())&&!anchor.closest('.tabbar,.sidebar')&&!anchor.hasAttribute('data-origin-back');const next=own&&Object.hasOwn(origins,own)?own:carry?origin:'';if(next)url.searchParams.set('from',next);else url.searchParams.delete('from');anchor.href=url.href;});
+ syncLinks();
++(${installQueueClient.toString()})({demo,fixtures,model:queueModel,catalogVersion,syncLinks,target,destination,route,origin,icons:${JSON.stringify(Object.fromEntries(Object.entries(packageFixtures).map(([id,f])=>[id,tile(f.glyph)])))}});
+ // Sources refresh: the pull gesture and the Refresh button share one handler. Only catalog metadata (demo.catalogRev) changes; installed versions and enabled state never do.
+ const refresh = document.querySelector('[data-refresh]');
+ if(refresh&&['repositories','sources-refreshing','sources-refreshed','sources-error'].includes(route)){
+@@ -194,9 +204,9 @@
+  const tabs=([['Sources','repositories','source'],['Packages','packages','package'],['Scripts','scripts','script']] as const).map(([label,page,glyph])=>`<a class="${active===label?'active':''}" ${active===label?'aria-current="page"':''} href="${href(page,lang)}">${svg(glyph)}${label}</a>`).join('');
+  const back=options.large&&active==='Sources'?link('repositories-edit',en?'Edit':'編集',lang,'back'):options.fullscreen||options.large?'':link(options.backPage??'repositories',`‹ ${options.back??'Sources'}`,lang,'back',options.detailBack?'data-origin-back':'');
+  const action=options.fullscreen?link(options.donePage??'scripts',en?'Done':'完了',lang,'action'):options.action?link(options.actionPage??'repository-add',options.action,lang,'action'):options.large&&active==='Sources'?`<a class="action" aria-label="${en?'Add Repository':'リポジトリを追加'}" href="${href('repository-add',lang)}">${svg('plus')}</a>`:'';
+- return `<!doctype html><html lang="${lang}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)}</title><style>${css}${extraCss}${referenceCss}</style><body class="mf ${options.fullscreen?'full':''}">${options.fullscreen?'':`<aside class="sidebar"><div class="sidebar-title">Plugins</div>${tabs}</aside>`}<div class="detail"><header><div class="status"><span>9:41</span><span>Wi-Fi ▰</span></div><div class="bar">${back||'<span class="spacer"></span>'}<strong>${options.large?'':escape(title)}</strong>${action||'<span class="spacer"></span>'}</div></header><main>${options.large?`<h1 class="large-title">${escape(title)}</h1>`:''}${contents}</main></div>${options.fullscreen?'':`<nav class="tabbar" aria-label="Plugins">${tabs}</nav>`}${searchScript}</body></html>`;
++ return `<!doctype html><html lang="${lang}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)}</title><style>${css}${extraCss}${referenceCss}${queueCss}</style><body class="mf ${options.fullscreen?'full':''}">${options.fullscreen?'':`<aside class="sidebar"><div class="sidebar-title">Plugins</div>${tabs}</aside>`}<div class="detail"><header><div class="status"><span>9:41</span><span>Wi-Fi ▰</span></div><div class="bar">${back||'<span class="spacer"></span>'}<strong>${options.large?'':escape(title)}</strong>${action||'<span class="spacer"></span>'}</div></header><main>${options.large?`<h1 class="large-title">${escape(title)}</h1>`:''}${contents}</main></div>${options.fullscreen?'':`<nav class="tabbar" aria-label="Plugins">${tabs}</nav>`}${options.fullscreen?'':queueBar(lang)+installSheet(lang)}${searchScript}</body></html>`;
+ }
+-export const parts={categoryRow,refreshControl,sortControl,updatePill,row,section,badge,statusRow,checkRow,stateRow,primaryButton,pill,codeBlock,navRow,iconRow,scriptRow,packageHero,versionRows,confirmation,searchField,manifestPage,href,svg,tile,repoRow,packageRow,managePill,activationRow,deleteConfirmation,scriptMatches} as const;
++export const parts={queueBar,installSheet,categoryRow,refreshControl,sortControl,updatePill,row,section,badge,statusRow,checkRow,stateRow,primaryButton,pill,codeBlock,navRow,iconRow,scriptRow,packageHero,versionRows,confirmation,searchField,manifestPage,href,svg,tile,repoRow,packageRow,managePill,activationRow,deleteConfirmation,scriptMatches} as const;
+ export type PartName=keyof typeof parts;
+ export function requireParts<N extends PartName>(names:readonly N[]):Pick<typeof parts,N>{
+  const missing=names.filter(name=>!(name in parts));if(missing.length)throw new Error(`Missing components: ${missing.join(', ')}`);
+--- before/src/manifest-screens.ts
++++ after/src/manifest-screens.ts
+@@ -1,7 +1,8 @@
+ import {refreshStates,requireParts,type Lang,type Tab} from './manifest-components';
+ import {packageFixtures, categoryFixtures, type PackageID, type CategoryID} from './manifest-fixtures';
+-const {categoryRow,refreshControl,sortControl,updatePill,checkRow,row,section,statusRow,stateRow,primaryButton,pill,codeBlock,navRow,iconRow,scriptRow,packageHero,versionRows,confirmation,searchField,manifestPage,href,svg,repoRow,packageRow,managePill,activationRow,deleteConfirmation,scriptMatches}=requireParts(['categoryRow','refreshControl','sortControl','updatePill','checkRow','row','section','statusRow','stateRow','primaryButton','pill','codeBlock','navRow','iconRow','scriptRow','packageHero','versionRows','confirmation','searchField','manifestPage','href','svg','repoRow','packageRow','managePill','activationRow','deleteConfirmation','scriptMatches'] as const);
++const {queueBar,installSheet,categoryRow,refreshControl,sortControl,updatePill,checkRow,row,section,statusRow,stateRow,primaryButton,pill,codeBlock,navRow,iconRow,scriptRow,packageHero,versionRows,confirmation,searchField,manifestPage,href,svg,repoRow,packageRow,managePill,activationRow,deleteConfirmation,scriptMatches}=requireParts(['queueBar','installSheet','categoryRow','refreshControl','sortControl','updatePill','checkRow','row','section','statusRow','stateRow','primaryButton','pill','codeBlock','navRow','iconRow','scriptRow','packageHero','versionRows','confirmation','searchField','manifestPage','href','svg','repoRow','packageRow','managePill','activationRow','deleteConfirmation','scriptMatches'] as const);
+ const base=`${import.meta.dir}/..`;
++const outputDirectory=process.env.MANIFEST_MOCK_OUTPUT_DIR??`${base}/mocks`;
+ const sourceFile='scripts/request.js';
+ const sourceCode='Interceptor.attach({\n  request: {\n    onEnter(req, cfg) {\n      req.body.limit = 5;\n    }\n  }\n});';
+ const manifest={schemaVersion:2,id:'22222222-2222-4222-8222-222222222222',name:'Search limit',version:'1.0.0',summary:'Set the search limit to 5.',matches:packageFixtures.search.matches,read:{metadata:['method','host','path'],headers:[],queryKeys:[],body:{mode:'json'}},write:{requestBody:true,responseBody:false},endpointBindings:[],settings:{}};
+@@ -12,7 +13,7 @@
+  const write=async(name:string,html:string)=>{
+   if(!['components','source-request','source-local','source-response','source-preview','manifest-json','test'].includes(name)&&(/<pre\b|Interceptor\.attach/.test(html)))throw new Error(`Unexpected code in ${name}`);
+   if(['source-request','source-local','source-response','source-preview','manifest-json','test'].includes(name)&&(/<(input|textarea)\b|contenteditable/.test(html)))throw new Error(`Editable content in ${name}`);
+-  generated.push(`${name}:${lang}`);return Bun.write(`${base}/mocks/manifest-browser-${name}${en?'-en':''}.html`,html);
++  generated.push(`${name}:${lang}`);return Bun.write(`${outputDirectory}/manifest-browser-${name}${en?'-en':''}.html`,html);
+  };
+  const shell=(title:string,content:string,tab:Tab='Sources',back='Sources',backPage='repositories',large=false,detailBack=false)=>manifestPage(title,content,{lang,tab,back,backPage,large,detailBack});
+  // Category membership is mock-only proposed metadata (not in the wire manifest/Index schema; unimplemented in native/SDK).
+@@ -29,7 +30,7 @@
+  const contents=(id:PackageID)=>section(t('内容','Contents'),navRow('Scripts','scripts',lang,t(`${packageFixtures[id].files.length}件`,`${packageFixtures[id].files.length} files`))+(id==='search'?navRow('Manifest JSON','manifest-json',lang)+navRow(t('テスト','Test'),'test',lang):''));
+  const detail=(id:PackageID,version:string,installed=true,action?:string,fromSource=false)=>{
+   const f=packageFixtures[id];
+-  const hero=packageHero(f.name,f.summary[en?1:0],action??(installed?managePill(id,lang)+(id==='search'?updatePill(id,lang):''):pill(t('追加','Add'),id==='preview'?'manifest-preview-added':'manifest-added',lang,'add').replace('class="pill add"',`class="pill add" data-install-cta="${id}"`)),f.glyph,lang);
++  const hero=packageHero(f.name,f.summary[en?1:0],action??(installed?managePill(id,lang)+(id==='search'?updatePill(id,lang):''):`<button type="button" class="pill" data-install-cta="${id}">${t('追加','Get')}</button>`),f.glyph,lang);
+   const activation=installed?`<div data-activation-section="${id}">${section('',activationRow(id,lang),t('対象の通信が発生したときに実行します。','Runs when matching traffic occurs.'))}</div>`:'';
+   const provenance=section('Repository',navRow(f.source==='local'?t('ローカル','Local'):'Example Repository',f.source==='local'?'manifests':'repository-overview',lang));
+   return packagePage(hero+activation+versions(version,id)+provenance+contents(id),id,fromSource);
+@@ -38,7 +39,7 @@
+  const fileList=`<div data-empty-scripts class="empty" hidden>${svg('script')}<strong>${t('Scriptはありません','No Scripts')}</strong><p>${t('Packageを追加すると表示されます。','Add a Package to see its Scripts.')}</p></div>`+(['local','search','preview'] as const).map(id=>`<div data-script-owner="${id}">${section(packageFixtures[id].name,`<div class="catalog edge-list">${packageFixtures[id].files.map(file=>scriptRow(file.split('/').pop()!,file,lang,id)).join('')}</div>`)}</div>`).join('');
+  const sources=()=>refreshControl('idle',lang)+`<h2 class="section-title">Repositories</h2><div class="edge-list">${repoRow('Example Repository','https://example.com/repository.json','2','repository-overview',lang,'source','repo',true)+repoRow(t('ローカル','Local'),t('ファイルから追加したPackage','Packages added from files'),'1','manifests',lang,'local','local')}</div><p class="repository-foot"><span data-count="sources">1</span> ${t('リポジトリ','source')}</p>`;
+  // Define changed component states in the catalog before composing screen outputs.
+- await write('components',shell(t('共通コンポーネント','Components'),section(t('カテゴリの行','Category rows'),`<div class="edge-list">${categoryIDs.filter(id=>id!=='local').map(id=>categoryRow(id,String(inCategory(id).length),lang)).join('')}</div>`,t('カテゴリは仮のメタデータで、実装には未対応です。','Categories are proposed metadata and are not implemented yet.'))+section(t('更新操作','Refresh'),refreshStates.map(state=>refreshControl(state,lang)).join(''),t('待機中は何も表示せず、Refreshボタンは読み上げとキーボード操作で使えます。','Idle shows nothing; the Refresh button stays available to screen readers and keyboard focus.'))+section(t('リポジトリの行','Source rows'),`<div class="edge-list">${repoRow('Example Repository','https://example.com/repository.json','2','repository-overview',lang)}</div>`)+section(t('Packageの行と削除','Package rows and deletion'),`<div class="edge-list">${packageRow('local',lang,true)}</div>`)+searchField(lang)+sortControl(lang)+packageHero('Search limit',packageFixtures.search.summary[en?1:0],managePill('search',lang),'search',lang)+section(t('実行状態','Execution'),activationRow('local',lang))+`<div class="hero-action"><button class="pill disabled" disabled>${t('追加','Add')}</button><button class="pill disabled" disabled aria-busy="true">${t('追加中…','Adding…')}</button></div>`+versions('1.0.0')+confirmation(t('Search limitを有効にしますか？','Enable Search limit?'),'OK',t('キャンセル','Cancel'),lang,'manifest',true)+scriptMatches('search',sourceFile,lang)+section(t('ファイル','Files'),scriptRow('request.js',sourceFile,lang)+navRow(t('ソースコード','Source Code'),'source-request',lang))));
++ await write('components',shell(t('共通コンポーネント','Components'),section(t('キュー','Install queue'),queueBar(lang,true))+section(t('操作シート','Installed actions'),managePill('local',lang))+section(t('カテゴリの行','Category rows'),`<div class="edge-list">${categoryIDs.filter(id=>id!=='local').map(id=>categoryRow(id,String(inCategory(id).length),lang)).join('')}</div>`,t('カテゴリは仮のメタデータで、実装には未対応です。','Categories are proposed metadata and are not implemented yet.'))+section(t('更新操作','Refresh'),refreshStates.map(state=>refreshControl(state,lang)).join(''),t('待機中は何も表示せず、Refreshボタンは読み上げとキーボード操作で使えます。','Idle shows nothing; the Refresh button stays available to screen readers and keyboard focus.'))+section(t('リポジトリの行','Source rows'),`<div class="edge-list">${repoRow('Example Repository','https://example.com/repository.json','2','repository-overview',lang)}</div>`)+section(t('Packageの行と削除','Package rows and deletion'),`<div class="edge-list">${packageRow('local',lang,true)}</div>`)+searchField(lang)+sortControl(lang)+packageHero('Search limit',packageFixtures.search.summary[en?1:0],managePill('search',lang),'search',lang)+section(t('実行状態','Execution'),activationRow('local',lang))+`<div class="hero-action"><button class="pill disabled" disabled>${t('追加','Add')}</button><button class="pill disabled" disabled aria-busy="true">${t('追加中…','Adding…')}</button></div>`+versions('1.0.0')+confirmation(t('Search limitを有効にしますか？','Enable Search limit?'),'OK',t('キャンセル','Cancel'),lang,'manifest',true)+scriptMatches('search',sourceFile,lang)+section(t('ファイル','Files'),scriptRow('request.js',sourceFile,lang)+navRow(t('ソースコード','Source Code'),'source-request',lang))));
+  await write('repositories',shell('Sources',sources(),'Sources','Sources','repositories',true));
+  await write('sources-refreshing',shell('Sources',sources().replace(refreshControl('idle',lang),refreshControl('refreshing',lang)),'Sources','Sources','repositories',true));
+  await write('sources-refreshed',shell('Sources',sources().replace(refreshControl('idle',lang),refreshControl('refreshed',lang)),'Sources','Sources','repositories',true));
+@@ -59,6 +60,9 @@
+  await write('packages-repository',shell('Packages',packages(),'Packages','Sources','repositories',true));
+  await write('manifest',detail('search','1.0.0'));
+  await write('manifest-import',detail('search','1.0.0',false,undefined,true));
++ await write('manifest-install-queue',detail('search','1.0.0',false,undefined,true));
++ await write('manifest-install-queue-error',detail('search','1.0.0',false,undefined,true));
++ await write('manifest-manage',detail('search','1.0.0'));
+  await write('manifest-added',detail('search','1.0.0'));
+  await write('manifest-confirm',withDialog(detail('search','1.0.0'),confirmation(t('Search limitを有効にして、対象の通信を変更しますか？','Enable Search limit and change matching traffic?'),'OK',t('キャンセル','Cancel'),lang)));
+  await write('manifest-preview',detail('preview','1.0.0',false,undefined,true));
+--- before/src/sileo-reference-style.ts
++++ after/src/sileo-reference-style.ts
+@@ -144,3 +144,26 @@
+ @media(prefers-reduced-motion:reduce){.mf .refresh[data-state="refreshing"] .row-spinner{animation:none}.mf .pull-indicator{transition:none}}
+ @media(prefers-reduced-motion:reduce){.mf .swipe-track{transition:none}}
+ `;
++
++// Sileo-style install queue and installed operations, scoped to the mock browser.
++export const queueCss = `
++.mf .queue-tray{position:fixed;left:0;right:0;bottom:78px;z-index:5;width:100%;min-height:64px;border:0;border-top:.5px solid var(--line);background:var(--bg);color:var(--ink);display:flex;align-items:center;justify-content:space-between;padding:10px 16px;text-align:left;font:15px -apple-system,sans-serif}
++.mf .queue-tray>span:first-child{color:var(--muted)}.mf .queue-tray strong{display:block;font-size:18px;margin-top:4px}.mf .queue-tray>span:last-child{font-size:25px;color:var(--accent)}
++.mf.has-install-queue main{padding-bottom:166px}.mf .queue-preview{position:static;border-bottom:.5px solid var(--line)}
++.mf dialog.action-sheet{position:fixed;inset:auto 8px 16px;margin:0 auto;padding:0;width:calc(100% - 16px);max-width:560px;border:0;background:none;color:var(--accent);overflow:visible}
++.mf .action-sheet::backdrop,.mf .install-sheet::backdrop{background:#0008}
++.mf .sheet-options{border-radius:14px;background:var(--surface);overflow:hidden}.mf .sheet-options>*{display:flex;width:100%;justify-content:center;align-items:center;min-height:56px;padding:12px;border:0;background:none;color:var(--accent);font:20px -apple-system,sans-serif;text-decoration:none}
++.mf .sheet-options>*+*{border-top:.5px solid var(--line)}.mf .sheet-options .sheet-delete{color:var(--danger)}.mf .sheet-cancel{display:block;width:100%;min-height:56px;border:0;border-radius:14px;margin:8px 0 0;background:var(--surface);color:var(--accent);font:600 20px -apple-system,sans-serif}
++.mf dialog.install-sheet{position:fixed;inset:24px 0 0;margin:0 auto;width:100%;max-width:640px;height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);padding:0;border:0;border-radius:16px 16px 0 0;background:var(--bg);color:var(--ink);overflow:hidden}
++.mf .sheet-dismiss{display:block;width:100%;height:44px;border:0;background:none;color:var(--muted);font:700 32px -apple-system,sans-serif}
++.mf .install-sheet h2{font-size:22px;margin:12px 16px 0;padding:0 0 14px;border-bottom:.5px solid var(--line)}
++.mf .queue-items{padding:0 16px;overflow:auto;max-height:calc(100dvh - 290px)}.mf .queue-item{display:flex;align-items:flex-start;gap:16px;padding:12px 0}.mf .queue-item+.queue-item{border-top:.5px solid var(--line)}
++.mf .queue-remove{width:24px;height:24px;min-width:24px;border:0;border-radius:50%;margin-top:8px;background:var(--danger);color:white;font:22px/1 -apple-system,sans-serif;padding:0}
++.mf .queue-icon .tile{width:40px;height:40px;border-radius:9px}.mf .queue-icon .tile svg{width:24px;height:24px}.mf .queue-item-label{min-width:0;flex:1}.mf .queue-item-label strong{display:block;font-size:18px;overflow-wrap:anywhere}.mf .queue-item-label span{display:block;color:var(--muted);font-size:14px;margin-top:3px}.mf .queue-invalid .queue-item-label span{color:var(--danger)}
++.mf .queue-status{margin:12px 16px;font-size:14px;color:var(--muted)}.mf .queue-status:empty{display:none}.mf .queue-empty{padding:20px 0;color:var(--muted)}
++.mf .queue-footer{position:absolute;left:20px;right:20px;bottom:max(16px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px}
++.mf .queue-confirm{min-height:50px;border:0;border-radius:12px;background:var(--accent);color:var(--buttonInk);font:600 18px -apple-system,sans-serif}.mf .queue-clear{min-height:44px;border:0;background:none;color:var(--accent);font:600 17px -apple-system,sans-serif}
++.mf .install-sheet button:disabled{opacity:.45}.mf .sheet-options button:disabled{opacity:.45}
++@media(min-width:700px){.mf .queue-tray{left:248px;width:calc(100% - 248px);bottom:0}.mf dialog.action-sheet{left:264px;right:16px;max-width:520px}.mf dialog.install-sheet{inset:40px 16px 40px 264px;width:calc(100% - 280px);height:calc(100dvh - 80px);max-height:calc(100dvh - 80px);border-radius:16px}.mf .queue-items{max-height:calc(100dvh - 350px)}}
++@media(max-width:699px) and (max-height:700px){.mf .queue-tray{bottom:50px}.mf.has-install-queue main{padding-bottom:140px}.mf dialog.install-sheet{inset:20px 0 0;height:calc(100dvh - 20px);max-height:calc(100dvh - 20px)}}
++`;
+--- before/src/install-queue-model.ts
++++ after/src/install-queue-model.ts
+@@ -0,0 +1,59 @@
++export type QueueKind = 'add' | 'reinstall'
++export type QueueEntry = { id: string; version: string; kind: QueueKind }
++export type InstalledRecord = { version: string; enabled: boolean; [key: string]: unknown }
++export type InstalledMap = Record<string, InstalledRecord | null>
++
++// Pure and self-contained (no outer references) so it can be stringified into a browser script.
++export function createQueueModel(specs: Record<string, readonly string[]>) {
++  const maxEntries = Object.keys(specs).length
++
++  const normalize = (raw: unknown): QueueEntry[] => {
++    if (!Array.isArray(raw)) return []
++    const seen = new Set<string>()
++    const out: QueueEntry[] = []
++    for (const item of raw) {
++      if (out.length >= maxEntries) break
++      if (typeof item !== 'object' || item === null || Array.isArray(item)) continue
++      const { id, version, kind } = item as Record<string, unknown>
++      if (typeof id !== 'string' || typeof version !== 'string') continue
++      if (kind !== 'add' && kind !== 'reinstall') continue
++      if (!Object.hasOwn(specs, id) || seen.has(id)) continue
++      const versions = specs[id]
++      if (!Array.isArray(versions) || !versions.includes(version)) continue
++      seen.add(id)
++      out.push({ id, version, kind })
++    }
++    return out
++  }
++
++  const current = (installed: InstalledMap, id: string) =>
++    Object.hasOwn(installed, id) ? (installed[id] ?? null) : null
++
++  const isValid = (entry: QueueEntry, installed: InstalledMap): boolean => {
++    const [e] = normalize([entry])
++    if (!e) return false
++    const cur = current(installed, e.id)
++    return e.kind === 'add' ? cur === null : cur !== null && cur.version === e.version
++  }
++
++  const enqueue = (rawQueue: unknown, entry: QueueEntry, installed: InstalledMap): QueueEntry[] => {
++    const queue = normalize(rawQueue)
++    const [e] = normalize([entry])
++    if (!e || !isValid(e, installed) || queue.some((q) => q.id === e.id)) return queue
++    return [...queue, e]
++  }
++
++  const confirm = (rawQueue: unknown, installed: InstalledMap) => {
++    const queue = normalize(rawQueue)
++    const invalid = queue.filter((e) => !isValid(e, installed))
++    if (queue.length === 0 || invalid.length > 0) return { ok: false, queue, installed, invalid }
++    const next: InstalledMap = { ...installed }
++    for (const e of queue) {
++      const cur = current(installed, e.id)
++      next[e.id] = e.kind === 'add' ? { version: e.version, enabled: false } : { ...cur!, version: e.version }
++    }
++    return { ok: true, queue: [] as QueueEntry[], installed: next, invalid }
++  }
++
++  return { normalize, isValid, enqueue, confirm }
++}
+--- before/src/install-queue-model.test.ts
++++ after/src/install-queue-model.test.ts
+@@ -0,0 +1,103 @@
++import { describe, expect, test } from 'bun:test'
++import { createQueueModel, type InstalledMap } from './install-queue-model'
++
++const specs1 = { a: ['1'], b: ['1'] }
++const specs2 = { a: ['1', '2'], b: ['1'] }
++const add = (id: string, version = '1') => ({ id, version, kind: 'add' as const })
++const re = (id: string, version = '1') => ({ id, version, kind: 'reinstall' as const })
++
++describe('normalize', () => {
++  const m = createQueueModel(specs1)
++  test('rejects non-arrays and malformed shapes', () => {
++    expect(m.normalize(null)).toEqual([])
++    expect(m.normalize({ 0: add('a') })).toEqual([])
++    expect(m.normalize([null, 'a', [], { id: 1, version: '1', kind: 'add' }, { id: 'a', version: 1, kind: 'add' }])).toEqual([])
++  })
++  test('rejects prototype ids, unknown ids, bad versions and kinds', () => {
++    const bad = ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'zzz', '<img onerror=1>']
++    expect(m.normalize(bad.map((id) => add(id)))).toEqual([])
++    expect(m.normalize([add('a', '9'), { id: 'a', version: '1', kind: 'remove' }, { id: 'a', version: '1' }])).toEqual([])
++  })
++  test('strips extra keys and dedupes by id keeping first', () => {
++    const out = m.normalize([{ ...add('a'), html: '<b>' }, re('a'), add('b')])
++    expect(out).toEqual([add('a'), add('b')])
++    expect(Object.keys(out[0]!)).toEqual(['id', 'version', 'kind'])
++  })
++  test('caps entries at spec count', () => {
++    expect(createQueueModel({ a: ['1'] }).normalize([add('a'), add('b')]).length).toBe(1)
++  })
++})
++
++describe('enqueue', () => {
++  const m = createQueueModel(specs1)
++  test('adds valid entries without mutating installed or input', () => {
++    const installed: InstalledMap = { b: { version: '1', enabled: true } }
++    const copy = structuredClone(installed)
++    const q0 = [add('a')]
++    const q = m.enqueue(q0, re('b'), installed)
++    expect(q).toEqual([add('a'), re('b')])
++    expect(q0).toEqual([add('a')])
++    expect(installed).toEqual(copy)
++  })
++  test('ignores invalid, unnormalized and duplicate entries, keeping first snapshot', () => {
++    const installed: InstalledMap = { b: { version: '1', enabled: true } }
++    expect(m.enqueue([], add('b'), installed)).toEqual([])
++    expect(m.enqueue([], re('a'), installed)).toEqual([])
++    expect(m.enqueue([], { id: '__proto__', version: '1', kind: 'add' }, installed)).toEqual([])
++    expect(m.enqueue([add('a')], add('a'), installed)).toEqual([add('a')])
++  })
++  test('tombstoned (null) install can be added', () => {
++    expect(m.enqueue([], add('a'), { a: null })).toEqual([add('a')])
++  })
++})
++
++describe('confirm', () => {
++  test('empty queue is a no-op failure', () => {
++    const m = createQueueModel(specs1)
++    const installed: InstalledMap = { a: { version: '1', enabled: true } }
++    const r = m.confirm([], installed)
++    expect(r.ok).toBe(false)
++    expect(r.installed).toBe(installed)
++  })
++  test('batch adds install disabled; tombstone add works; input untouched', () => {
++    const m = createQueueModel(specs1)
++    const installed: InstalledMap = { a: null }
++    const r = m.confirm([add('a'), add('b')], installed)
++    expect(r.ok).toBe(true)
++    expect(r.queue).toEqual([])
++    expect(r.installed).toEqual({ a: { version: '1', enabled: false }, b: { version: '1', enabled: false } })
++    expect(installed).toEqual({ a: null })
++  })
++  test('reinstall preserves latest enabled state and unrelated metadata', () => {
++    const m = createQueueModel(specs1)
++    const queue = m.enqueue([], re('a'), { a: { version: '1', enabled: true } })
++    const r = m.confirm(queue, { a: { version: '1', enabled: false, note: 'x' } })
++    expect(r.ok).toBe(true)
++    expect(r.installed.a).toEqual({ version: '1', enabled: false, note: 'x' })
++  })
++  test('queue snapshot keeps version 1 even when catalog later offers 2', () => {
++    const queue = createQueueModel(specs1).enqueue([], add('a'), {})
++    const r = createQueueModel(specs2).confirm(queue, {})
++    expect(r.ok).toBe(true)
++    expect(r.installed.a?.version).toBe('1')
++  })
++  test('stale reinstall after update cannot downgrade; all-or-nothing', () => {
++    const m = createQueueModel(specs2)
++    const queue = [add('b'), re('a', '1')]
++    const installed: InstalledMap = { b: null, a: { version: '2', enabled: true } }
++    const r = m.confirm(queue, installed)
++    expect(r.ok).toBe(false)
++    expect(r.invalid).toEqual([re('a', '1')])
++    expect(r.queue).toEqual(queue)
++    expect(r.installed).toBe(installed)
++    expect(installed.b).toBeNull()
++    expect(installed.a?.version).toBe('2')
++  })
++  test('stale add (installed meanwhile) is flagged, not dropped', () => {
++    const m = createQueueModel(specs1)
++    const r = m.confirm([add('a')], { a: { version: '1', enabled: false } })
++    expect(r.ok).toBe(false)
++    expect(r.queue).toEqual([add('a')])
++    expect(r.invalid).toEqual([add('a')])
++  })
++})
+--- before/src/install-queue-ui.ts
++++ after/src/install-queue-ui.ts
+@@ -0,0 +1,91 @@
++// Browser-only UI adapter for synthetic mock data; no network or app installation.
++export function installQueueClient(ctx: any) {
++ const {demo, fixtures, model, catalogVersion, syncLinks, target, destination, route, origin, icons} = ctx;
++ const sheet = document.querySelector('[data-install-sheet]') as HTMLDialogElement | null;
++ const tray = document.querySelector('[data-queue-tray]') as HTMLButtonElement | null;
++ if (!sheet || !tray) return;
++ const en = document.documentElement.lang === 'en';
++ const rows = sheet.querySelector('[data-queue-items]')!;
++ const confirm = sheet.querySelector('[data-queue-confirm]') as HTMLButtonElement;
++ const clear = sheet.querySelector('[data-queue-clear]') as HTMLButtonElement;
++ const close = sheet.querySelector('[data-queue-close]') as HTMLButtonElement;
++ const status = sheet.querySelector('[data-queue-status]')!;
++ const state = {phase:route==='manifest-install-queue-error'?'error':'idle', failed:route==='manifest-install-queue-error', batch:[] as any[]};
++ const words = (ja:string,english:string) => en ? english : ja;
++ const navigate = () => {
++  const owner = (document.querySelector('[data-detail-owner]') as HTMLElement | null)?.dataset.detailOwner;
++  const url = new URL(location.href);
++  url.pathname = url.pathname.slice(0,url.pathname.lastIndexOf('/')+1) + destination(owner ? target(owner,demo[owner]) : route);
++  url.search = ''; url.searchParams.set('demo',JSON.stringify(demo));
++  if(origin)url.searchParams.set('from',origin);
++  location.replace(url.href);
++ };
++ const closeSheet = () => { if(state.phase==='busy')return; if(state.phase==='complete'){navigate();return;} sheet.close(); };
++ const render = () => {
++  demo.queue = model.normalize(demo.queue);
++  const pending = demo.queue;
++  const busy = state.phase==='busy', complete = state.phase==='complete';
++  const entries = complete ? state.batch : pending;
++  const invalid = pending.filter((entry:any)=>!model.isValid(entry,demo));
++  tray.hidden = pending.length===0 || complete;
++  document.body.classList.toggle('has-install-queue',!tray.hidden);
++  const count = tray.querySelector('[data-queue-count]')!;
++  count.textContent = en ? pending.length+(pending.length===1?' Package':' Packages') : pending.length+'件';
++  document.querySelectorAll('[data-install-cta]').forEach(item=>{
++   const button=item as HTMLButtonElement,id=button.dataset.installCta!;
++   button.hidden=!!demo[id]; button.textContent=pending.some((entry:any)=>entry.id===id)?words('キュー','Queued'):words('追加','Get');
++  });
++  rows.replaceChildren();
++  if(!entries.length){const empty=document.createElement('p');empty.className='queue-empty';empty.textContent=words('キューは空です','Queue is empty');rows.append(empty);}
++  entries.forEach((entry:any)=>{
++   const valid=complete||model.isValid(entry,demo), row=document.createElement('div');row.className='queue-item';
++   const remove=document.createElement('button');remove.type='button';remove.className='queue-remove';remove.textContent='−';remove.disabled=busy;remove.hidden=complete;
++   remove.setAttribute('aria-label',en?'Remove '+fixtures[entry.id].name:fixtures[entry.id].name+'を取り消す');
++   remove.addEventListener('click',()=>{if(state.phase==='busy')return;demo.queue=pending.filter((item:any)=>item.id!==entry.id);state.phase='idle';syncLinks();render();});
++   const icon=document.createElement('span');icon.className='queue-icon';icon.innerHTML=icons[entry.id];
++   const label=document.createElement('div');label.className='queue-item-label';
++   const name=document.createElement('strong');name.textContent=fixtures[entry.id].name;
++   const detail=document.createElement('span');detail.textContent=entry.version+' · '+(complete?words('完了','Installed'):busy?words('インストール中…','Installing…'):!valid?words('状態が変わりました','Package changed'):entry.kind==='reinstall'?words('再インストール','Reinstall'):words('待機中','Queued'));
++   if(!valid)row.classList.add('queue-invalid');
++   label.append(name,detail);row.append(remove,icon,label);rows.append(row);
++  });
++  close.disabled=busy;clear.disabled=busy;clear.hidden=complete||pending.length===0;
++  confirm.disabled=busy||(!complete&&(!pending.length||invalid.length>0));confirm.setAttribute('aria-busy',String(busy));
++  confirm.textContent=complete?words('完了','Done'):busy?words('インストール中…','Installing…'):state.phase==='error'?words('再試行','Retry'):words('インストール','Confirm');
++  status.textContent=complete?words('インストールしました','Installed'):state.phase==='error'?words('インストールできませんでした','Could not install'):invalid.length?words('変更された項目を取り消してください','Remove the changed items'):'';
++ };
++ const open = () => {render();if(!sheet.open)sheet.showModal();};
++ document.querySelectorAll('[data-install-cta]').forEach(item=>item.addEventListener('click',()=>{
++  const id=(item as HTMLElement).dataset.installCta!;if(!Object.hasOwn(fixtures,id)||demo[id])return;
++  if(demo.queue.some((entry:any)=>entry.id===id)){open();return;}
++  demo.queue=model.enqueue(demo.queue,{id,version:catalogVersion(id),kind:'add'},demo);state.phase='idle';syncLinks();render();
++ }));
++ document.querySelectorAll('[data-reinstall]').forEach(item=>item.addEventListener('click',()=>{
++  const id=(item as HTMLElement).dataset.reinstall!,installed=demo[id];if(!Object.hasOwn(fixtures,id)||!installed)return;
++  (item.closest('dialog') as HTMLDialogElement)?.close();
++  demo.queue=model.enqueue(demo.queue,{id,version:installed.version,kind:'reinstall'},demo);state.phase='idle';syncLinks();render();
++ }));
++ tray.addEventListener('click',open);document.querySelectorAll('[data-queue-open]').forEach(button=>button.addEventListener('click',open));close.addEventListener('click',closeSheet);
++ sheet.addEventListener('cancel',event=>{event.preventDefault();closeSheet();});
++ clear.addEventListener('click',()=>{if(state.phase==='busy')return;demo.queue=[];state.phase='idle';syncLinks();render();});
++ confirm.addEventListener('click',()=>{
++  if(state.phase==='complete'){navigate();return;}
++  if(state.phase==='busy'||!demo.queue.length)return;
++  const batch=model.normalize(demo.queue);
++  if(!model.confirm(batch,demo).ok){render();return;}
++  state.batch=batch;state.phase='busy';render();
++  setTimeout(()=>{
++   const result=model.confirm(batch,demo);
++   if((new URLSearchParams(location.search).get('install')==='fail'&&!state.failed)||!result.ok){state.failed=true;state.phase='error';render();return;}
++   Object.assign(demo,result.installed);demo.queue=[];state.phase='complete';syncLinks();render();
++  },700);
++ });
++ render();
++ const requested = new URLSearchParams(location.search).get('sheet');
++ if(requested==='install'||route==='manifest-install-queue'||route==='manifest-install-queue-error')open();
++ const manage = requested?.startsWith('manage:') ? requested.slice(7) : route==='manifest-manage'?'search':'';
++ if(manage&&Object.hasOwn(fixtures,manage)&&demo[manage]){
++  const dialog=document.querySelector('[data-management="'+manage+'"]') as HTMLDialogElement | null;
++  if(dialog&&!dialog.open)dialog.showModal();
++ }
++}

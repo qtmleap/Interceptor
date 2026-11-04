@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "imageSha256": "45d51dc69b72c0c7c0f37771d22c66ee4131f856bc946be93f7bc069747927ac",
+  "capturedAt": "2026-10-22T04:08:25.483986+00:00",
+  "commit": "efeb620c8bd141fd902851a82298540d56d56acc",
+  "dirty": true,
+  "contentSha256": "ab3a753558d42f4c24a014bb460bba7937b531ad6433e451222f8d8b22acc8b2",
+  "contentDescription": "Source18 immutable clean efeb620c archive plus explicit ContentView and TabNavigationAlignment overlay; production fingerprint; retained Simulator build-for-testing host normally launched without XCTest",
+  "operatingSystem": {
+    "name": "iOS",
+    "version": "27.0",
+    "build": "24A434"
+  },
+  "device": {
+    "id": "iphone-se-3",
+    "model": "iPhone SE (3rd generation)"
+  },
+  "scale": 2,
+  "orientation": "portrait",
+  "locale": "ja_JP",
+  "theme": "light",
+  "origin": "simulator",
+  "dependenciesSha256": "f50711a5594d49050c9755542c4c9e58b9a88216f0e3fb7829a4b58ad286eba2",
+  "runId": "76c5376d-b395-41b3-ab00-f33f57564990"
+}

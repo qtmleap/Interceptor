@@ -1,0 +1,499 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Search limit</title><style>:root{color-scheme:light dark;--bg:#f2f2f7;--surface:#fff;--ink:#111;--muted:#6b6b70;--line:#d9d9de;--accent:#007aff;--ok:#248a3d;--warn:#8d6900;--error:#d70015}*{box-sizing:border-box}body{margin:0;font:17px -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;color:var(--ink);background:var(--bg)}header{height:94px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}header .status{height:42px;display:flex;justify-content:space-between;padding:12px 22px 0;font-size:14px;font-weight:600}.bar{height:50px;display:grid;grid-template-columns:90px 1fr 90px;align-items:center;padding:0 16px;gap:8px}.bar strong{text-align:center;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.action,.back{color:var(--accent);text-decoration:none;font-weight:500}.back{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.action{text-align:right}.disabled{color:var(--muted);opacity:.5}main{padding:8px 16px 100px;max-width:900px;margin:auto}section{margin:24px 0 0}h2{font-size:13px;font-weight:400;text-transform:uppercase;color:var(--muted);padding:0 16px;margin:0 0 8px}.group{background:var(--surface);border-radius:14px;overflow:hidden}.row{min-height:48px;display:flex;gap:14px;align-items:center;padding:12px 16px;position:relative}.row+.row:before{content:"";position:absolute;top:0;left:16px;right:0;height:.5px;background:var(--line)}.label{flex:1;min-width:0}.value{color:var(--muted);overflow-wrap:anywhere;text-align:right}.chevron{color:var(--muted)}.sub{display:block;color:var(--muted);font-size:13px;line-height:1.45;margin-top:4px}p.footer{white-space:pre-line;font-size:13px;color:var(--muted);line-height:1.5;margin:8px 16px 0}.badge{display:inline-flex;gap:8px;align-items:center;font-size:15px}.ok{color:var(--ok)}.warn{color:var(--warn)}.error{color:var(--error)}.neutral{color:var(--muted)}.selected{color:var(--accent)}.check{font-size:20px;color:var(--accent)}code{font:14px ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.sidebar{display:none}.tabbar{position:fixed;bottom:0;height:76px;background:var(--surface);border-top:.5px solid var(--line);display:flex;width:100%;justify-content:space-around;padding:12px 0 24px;font-size:12px;text-align:center;z-index:2}.tabbar span{display:block;font-size:23px;margin-bottom:2px}.tabbar .active{color:var(--accent)}.switch-input{appearance:none;width:51px;height:31px;flex-shrink:0;border-radius:16px;background:var(--line);position:relative;margin:0}.switch-input:before{content:"";position:absolute;left:2px;top:2px;width:27px;height:27px;background:white;border-radius:50%;box-shadow:0 1px 3px #0003;transition:transform .15s}.switch-input:checked{background:var(--ok)}.switch-input:checked:before{transform:translateX(20px)}.switch-input:disabled{opacity:.45}.switch-input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.catalog-note{font-size:14px;color:var(--muted);margin:16px;line-height:1.5}@media(prefers-color-scheme:dark){:root{--bg:#000;--surface:#1c1c1e;--ink:#fff;--muted:#98989f;--line:#38383a;--accent:#0a84ff;--ok:#30d158;--warn:#ffd60a;--error:#ff453a}}@media(min-width:700px){.sidebar{display:block;width:300px;position:fixed;left:0;top:0;bottom:76px;border-right:.5px solid var(--line);padding:56px 20px;background:var(--bg)}.sidebar h1{text-align:center;font-size:20px;margin:8px 0 38px}.sidebar section{margin-top:28px}.detail{margin-left:300px}header{height:94px}.tabbar{height:68px}.bar{grid-template-columns:150px 1fr 150px}main{padding-left:20px;padding-right:20px}}
+.mf{--bg:#fff;--surface:#f5f5f7;--accent:#007e87;--buttonInk:#fff;--muted:#66676c;background:var(--bg)}
+.mf a{color:inherit;text-decoration:none}.mf button,.mf input{font:inherit}.mf a:focus-visible,.mf button:focus-visible,.mf input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.mf .detail{margin-left:0}.mf header{height:88px;border:0;background:var(--bg)}.mf header .status{height:38px;padding-top:10px}.mf .bar{display:flex;height:50px;padding:0 20px;justify-content:space-between}.mf .bar strong{font-size:17px}.mf .back,.mf .action{color:var(--accent);font-size:17px;min-width:44px;min-height:44px;display:flex;align-items:center}.mf .action{justify-content:flex-end}.mf .source-controls{display:flex;gap:16px}.mf .action svg{width:24px;height:24px}.mf .bar .spacer{min-width:44px}
+.mf main{padding:0 20px 100px;max-width:820px}.mf .large-title{font-size:34px;line-height:1.12;letter-spacing:-.8px;margin:10px 0 24px;font-weight:750;overflow-wrap:anywhere}.mf section{margin-top:24px}.mf h2{font-size:18px;font-weight:700;color:var(--ink);text-transform:none;padding:0;margin-bottom:12px}.mf .group{border-radius:12px}.mf .row{padding:12px 16px}.mf .footer{margin:8px 2px 0}.mf .catalog{background:none;border-radius:0}.mf .catalog .row{padding:14px 0;align-items:center;gap:12px;min-height:82px}.mf .catalog .row+.row:before{left:62px}.mf .catalog .label strong{font-size:17px;font-weight:650}.mf .catalog .sub{font-size:13px;line-height:1.35}.mf .state{font-size:12px;color:var(--muted);margin-top:5px;display:block}.mf .chevron{font-size:22px}
+.mf .tile{display:flex;width:50px;height:50px;border-radius:12px;align-items:center;justify-content:center;flex:none;color:white;background:#279caa}.mf .tile svg{width:29px;height:29px}.mf .tile.large{width:72px;height:72px;border-radius:17px}.mf .tile.large svg{width:42px;height:42px}.mf .tile.package,.mf .tile.search{background:#358bac}.mf .tile.response{background:#8b72b1}.mf .tile.local,.mf .tile.script{background:#707d90}
+.mf .package-hero{display:flex;align-items:center;gap:16px;margin:16px 0 24px}.mf .hero-copy{flex:1;min-width:0}.mf .hero-copy h1{font-size:24px;line-height:1.14;margin:0 0 6px;letter-spacing:-.4px;overflow-wrap:anywhere}.mf .hero-copy p{font-size:14px;line-height:1.4;margin:0;color:var(--muted)}.mf .hero-action{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0}.mf .pill{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:7px 20px;border:0;border-radius:22px;background:var(--accent);color:var(--buttonInk);font-size:15px;font-weight:700}.mf .pill.destructive{background:transparent;color:var(--error);box-shadow:inset 0 0 0 1px var(--line)}.mf .pill.disabled{opacity:.4;pointer-events:none}.mf .text-link{color:var(--accent);font-weight:550;min-height:44px;display:inline-flex;align-items:center}.mf .primary{margin:20px 0 0;min-height:46px;border:0;border-radius:12px;background:var(--accent);color:var(--buttonInk);font:600 17px var(--ui-font);width:100%}.mf .primary:disabled{opacity:.4}
+.mf dialog.dialog{padding:0;border:0;color:var(--ink)}.mf dialog.dialog:not([open]){display:none}.mf dialog.dialog::backdrop{background:#0006}.mf .catalog>.row:nth-child(1 of .row:not([hidden])):before{display:none}.mf .search-box{display:flex;gap:8px;align-items:center;border-radius:11px;background:var(--surface);padding:0 12px;min-height:44px;margin:16px 0 10px}.mf .search-box svg{width:19px;height:19px;color:var(--muted);flex:none}.mf .search-box input{border:0;outline:0;background:transparent;min-width:0;width:100%;height:44px;color:var(--ink);font-size:16px}.mf .search-box button{background:none;border:0;color:var(--accent);font-size:14px;min-height:44px;flex:none}.mf .result-count{font-size:13px;color:var(--muted);margin:10px 0 0}.mf [hidden]{display:none!important}.mf .empty{padding:32px 16px;text-align:center;color:var(--muted)}.mf .empty svg{width:30px;height:30px;margin-bottom:12px}.mf .empty strong{display:block;font-size:18px;color:var(--ink);margin-bottom:8px}.mf .repo-url{font-size:13px;color:var(--muted);overflow-wrap:anywhere}.mf .field{background:var(--surface);border-radius:12px;padding:14px;width:100%;border:1px solid var(--line);color:var(--ink)}.mf .field-label{font-size:14px;display:block;margin:20px 0 8px}
+.mf .tabbar{height:78px;padding:9px 12px 22px;gap:8px;background:var(--bg)}.mf .tabbar a{display:flex;flex:1;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted)}.mf .tabbar svg{width:24px;height:24px}.mf .tabbar a.active{color:var(--accent)}.mf .sidebar{display:none}.mf pre.code{margin:0;padding:16px;font:13px/1.6 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.mf.full main{padding-bottom:32px}.mf .dialog-backdrop{position:fixed;inset:0;z-index:9;background:#0006;display:grid;place-items:center}.mf .dialog{width:290px;border-radius:14px;background:var(--surface);text-align:center;overflow:hidden}.mf .dialog h3{font-size:17px;line-height:1.4;margin:20px 18px}.mf .dialog-actions{display:flex;border-top:.5px solid var(--line)}.mf .dialog-actions a{min-height:46px;flex:1;color:var(--accent);display:grid;place-items:center}.mf .dialog-actions a+a{border-left:.5px solid var(--line);font-weight:600}.mf .dialog-backdrop.inline{position:static;background:none;padding:16px}
+@media(prefers-color-scheme:dark){.mf{--bg:#151517;--surface:#242427;--ink:#f7f7f8;--muted:#a1a1a9;--line:#37373c;--accent:#74d1d6;--buttonInk:#123336}.mf .tile{filter:brightness(.9)}}
+@media(min-width:700px){.mf .sidebar{display:block;width:248px;position:fixed;inset:0 auto 0 0;padding:32px 16px;background:var(--surface);border-right:.5px solid var(--line)}.mf .sidebar .sidebar-title{text-align:left;font-size:28px;margin:30px 12px}.mf .sidebar a{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:4px 0;border-radius:10px;font-weight:550}.mf .sidebar svg{width:22px;height:22px}.mf .sidebar .active{background:var(--accent);color:var(--buttonInk)}.mf .detail{margin-left:248px}.mf main{padding:0 30px 48px}.mf .bar{padding:0 30px}.mf .tabbar{display:none}.mf .large-title{margin-top:12px}.mf.full .detail{margin-left:0}.mf.full main{max-width:1000px}.mf.full .sidebar{display:none}}
+
+.mf{--ui-font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Hiragino Sans",sans-serif;font-family:var(--ui-font)}
+.mf button,.mf input,.mf select,.mf .primary{font-family:inherit}
+.mf{--bg:#fff;--surface:#f2f2f7;--line:#c6c6c8;--ink:#000;--muted:#6d6d72;--accent:#2f8f9d;--buttonInk:#fff;--danger:#ef5648;--ok:#5ed855;overflow-x:hidden}
+.mf *{box-sizing:border-box}
+.mf a:focus-visible,.mf button:focus-visible,.mf input:focus-visible,.mf select:focus-visible,.mf [tabindex]:focus-visible{outline:3px solid var(--accent);outline-offset:-3px;border-radius:6px}
+.mf header{height:88px}.mf header .status{height:38px}.mf .bar{height:50px}
+.mf main{padding:0 0 96px;overflow-x:hidden}
+.mf .large-title{font-size:34px;line-height:1.12;font-weight:800;letter-spacing:-.6px;margin:8px 16px 18px}
+.mf .section-title,.mf main h2{font-size:22px;line-height:1.2;font-weight:800;margin:36px 16px 14px;color:var(--ink)}
+.mf section{margin-top:0}
+.mf .footer,.mf .repository-foot{margin:0;padding:10px 16px;font-size:13px;color:var(--muted)}
+.mf .tabbar{border-top:.5px solid var(--line)}
+.mf .tabbar svg{width:25px;height:25px}
+
+.mf .edge-list{background:none;border-radius:0;border-top:.5px solid var(--line);margin:0}
+.mf .edge-list>*:last-child{border-bottom:.5px solid var(--line)}
+.mf .source-summary,.mf .repo-row,.mf .package-row{display:flex;align-items:center;gap:14px;min-height:55px;padding:7px 16px;position:relative;background:var(--bg);color:var(--ink);width:100%}
+.mf .source-summary{min-height:66px;margin:18px 0 0;border-top:.5px solid var(--line);border-bottom:.5px solid var(--line)}
+.mf .repo-row{min-height:55px;padding:8px 16px}
+.mf .repo-row+.repo-row:before,.mf .package-row+.package-row:before,.mf .swipe-wrap+.swipe-wrap:before{content:"";position:absolute;top:0;left:70px;right:0;border-top:.5px solid var(--line)}
+.mf .source-summary .tile,.mf .repo-row .tile,.mf .package-row .tile{width:40px;height:40px;border-radius:9px;flex:none}
+.mf .source-summary .tile svg,.mf .repo-row .tile svg,.mf .package-row .tile svg{width:24px;height:24px}
+.mf .source-summary .label,.mf .repo-row .label,.mf .package-row .label{flex:1;min-width:0}
+.mf .source-summary strong,.mf .repo-row strong,.mf .package-row strong{display:block;font-size:17px;line-height:1.2;font-weight:600;overflow-wrap:anywhere}
+.mf .source-summary .sub,.mf .repo-row .sub,.mf .repo-row .repo-url{display:block;font-size:13px;line-height:1.3;color:var(--muted);overflow-wrap:anywhere}
+.mf .trailing-count{display:flex;align-items:center;gap:8px;flex:none;font-size:13px;color:var(--muted)}
+.mf .trailing-count .chevron{font-size:24px;line-height:1;color:var(--muted)}
+
+.mf .package-row{align-items:flex-start;padding:10px 16px;min-height:66px}
+.mf .package-row .tile{position:relative;margin-top:0;overflow:visible}
+.mf .package-row .meta,.mf .package-row .version{display:block;font-size:14px;line-height:1.3;color:var(--muted);overflow-wrap:anywhere}
+.mf .package-row .sub{display:block;font-size:13px;line-height:1.3;color:var(--muted);overflow-wrap:anywhere}
+.mf .install-badge{position:absolute;right:-4px;bottom:-4px;width:14px;height:14px;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;border:0;box-shadow:none}
+.mf .install-badge svg{width:10px;height:10px;stroke-width:3}
+.mf .installed-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:30px 16px 10px;font-size:22px;font-weight:800}
+.mf .installed-heading h2{margin:0;font-size:inherit}
+.mf .sort-select{appearance:none;border:0;background:transparent;color:var(--accent);font-size:17px;min-height:44px;padding:0 4px;cursor:pointer}
+.mf .search-box{margin:12px 16px 0;border-radius:12px;min-height:44px;background:var(--surface)}
+.mf .search-box input{font-size:17px}
+
+.mf .swipe-wrap{position:relative;overflow:hidden;touch-action:pan-y;width:100%}
+.mf .swipe-track{display:flex;width:calc(100% + 80px);transition:transform .2s ease}
+.mf .swipe-track>.package-row,.mf .swipe-track>.row{flex:0 0 calc(100% - 80px);width:calc(100% - 80px)}
+.mf .swipe-action{flex:0 0 80px;width:80px;min-height:100%;border:0;background:var(--danger);color:#fff;font-size:15px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0}
+.mf .swipe-action svg{width:22px;height:22px}
+.mf .swipe-open{transform:translateX(-80px)}
+.mf .swipe-wrap:focus-within .swipe-track{transform:translateX(-80px)}
+
+.mf .package-banner{display:flex;flex-direction:column;gap:10px;padding:12px 16px 14px;margin:0;border-bottom:.5px solid var(--line);min-height:120px;max-height:none}
+.mf .package-profile{display:flex;align-items:flex-start;gap:14px;min-width:0}
+.mf .package-profile .tile.large,.mf .package-banner .tile.large{width:60px;height:60px;border-radius:14px;flex:none}
+.mf .package-profile .tile.large svg{width:34px;height:34px}
+.mf .profile-copy{flex:1;min-width:0}
+.mf .profile-copy h1{font-size:22px;line-height:1.15;margin:0 0 4px;font-weight:700;letter-spacing:-.3px;overflow-wrap:anywhere}
+.mf .target-summary{display:block;min-width:0}
+.mf .host-line{display:block;font-size:13px;line-height:1.3;color:var(--ink);overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+.mf .host-line b,.mf .host-line strong{color:var(--muted);font-weight:500}
+.mf .profile-actions{display:flex;align-items:center;gap:10px;flex:none}
+.mf .profile-actions .pill,.mf .package-banner .pill{min-height:32px;padding:4px 18px;font-size:15px;border-radius:16px}
+.mf .package-banner>.profile-actions{justify-content:flex-end}
+.mf .detail-tabs{display:flex;gap:0;margin:0 16px}
+.mf .detail-tabs a,.mf .detail-tabs button{flex:1;min-height:44px;display:flex;align-items:center;justify-content:center;border:0;background:none;color:var(--muted);font-size:15px;font-weight:600;position:relative}
+.mf .detail-tabs .active,.mf .detail-tabs [aria-current]{color:var(--accent)}
+.mf .detail-tabs .active:after,.mf .detail-tabs [aria-current]:after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:2px;background:var(--accent)}
+.mf .detail-view{padding:0;margin:0}
+.mf .detail-view .group{border-radius:0;margin:0}
+.mf .management{display:flex;flex-direction:column;margin:16px 16px 0;border-radius:12px;background:var(--surface);overflow:hidden}
+.mf .management>*{min-height:44px;display:flex;align-items:center;padding:0 16px;color:var(--accent);border:0;background:none;text-align:left}
+.mf .management>*+*{border-top:.5px solid var(--line)}
+.mf .management .destructive{color:var(--danger)}
+.mf .togglink{color:var(--accent);min-height:44px;display:inline-flex;align-items:center;font-size:17px;border:0;background:none;padding:0 16px}
+.mf .toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:0 16px}
+.mf .empty{padding:40px 24px;color:var(--muted);text-align:center}
+
+.mf .catalog .package-row{padding:10px 16px;align-items:flex-start}
+.mf .package-row .package-meta{display:block;font-size:14px;line-height:1.3;color:var(--muted);margin:2px 0;overflow-wrap:anywhere}
+/* Integration: action popover, labeled match facts and readonly section rows. */
+.mf .package-icon{position:relative;display:block;flex:none}
+.mf .host-line>span{display:block;color:var(--muted);font-size:12px}
+.mf .host-line>strong{display:block;color:var(--ink);font-size:15px;font-weight:600}
+.mf .package-banner{background:var(--bg);min-height:142px}
+.mf .profile-actions{justify-content:flex-end}
+.mf .detail-view .package-purpose{margin:16px;font-size:16px;line-height:1.45}
+.mf .detail-view .row{padding-left:16px;padding-right:16px}
+.mf .togglink{display:flex;width:100%;color:var(--ink);justify-content:space-between;min-height:52px}
+.mf .toggle{width:44px;height:27px;min-height:0;padding:3px;border-radius:20px;background:var(--muted);display:block;position:relative}
+.mf .toggle:after{content:"";display:block;width:21px;height:21px;border-radius:50%;background:#fff}
+.mf [aria-checked="true"] .toggle{background:var(--accent)}
+.mf [aria-checked="true"] .toggle:after{transform:translateX(17px)}
+.mf dialog.management{margin:auto;padding:0;width:290px;display:block;text-align:center}
+.mf dialog.management>h3{display:block;min-height:0;color:var(--ink);margin:0;padding:20px 18px;text-align:center}
+.mf dialog.management>.dialog-actions{display:flex;padding:0}
+.mf .dialog-actions button{flex:1;min-height:46px;border:0;background:none;color:var(--accent)}
+.mf .dialog-actions .error{color:var(--danger);font-weight:600}
+.mf .swipe-wrap:focus-within .swipe-track:not(.swipe-open){transform:none}
+.mf .result-count{margin:10px 16px}
+.mf .field-label{margin:20px 16px 8px}.mf .field{margin:0 16px;width:calc(100% - 32px)}
+.mf .primary{margin:20px 16px 0;width:calc(100% - 32px)}
+@media(prefers-color-scheme:dark){
+.mf{--bg:#1e1e1e;--surface:#303033;--line:#38383a;--ink:#fff;--muted:#98989d;--accent:#55acb9;--buttonInk:#102f33;--danger:#ef5648;--ok:#66dd5b}
+.mf header{background:var(--bg)}.mf .tabbar{background:#1e1e1e}
+.mf .source-summary,.mf .repo-row,.mf .package-row{background:var(--bg)}
+
+.mf .tile{filter:none}
+}
+
+@media(max-width:699px) and (max-height:700px){
+.mf header{height:64px}.mf header .status{height:20px;padding-top:2px}.mf .bar{height:44px}
+.mf .tabbar{height:50px;padding:4px 8px 4px;gap:4px}.mf .tabbar a{gap:1px;font-size:10px}.mf .tabbar svg{width:22px;height:22px}
+.mf main{padding-bottom:64px}
+.mf .large-title{margin:4px 16px 12px}
+.mf .package-banner{padding-top:8px;padding-bottom:10px}
+}
+@media(max-width:420px){
+.mf .package-banner{padding-left:12px;padding-right:12px}
+.mf .package-profile{gap:12px}
+.mf .package-profile .tile.large{width:56px;height:56px}
+}
+@media(min-width:700px){
+.mf .detail{margin-left:248px}.mf main{padding:0 0 48px}.mf .large-title,.mf .section-title,.mf main h2{margin-left:24px;margin-right:24px}
+.mf .source-summary,.mf .repo-row,.mf .package-row{padding-left:24px;padding-right:24px}
+.mf .detail-tabs{margin:0 24px}
+}
+/* Sources refresh, category rows and Packages sort row. Idle refresh is visually absent; the button is revealed on focus. */
+.mf .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.mf .refresh{--pull:0px;position:relative;margin:0}
+.mf .pull-indicator{height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:13px;transition:height .15s ease}
+.mf .refresh.pulling .pull-indicator{height:var(--pull);transition:none}
+.mf .refresh.ready .pull-indicator{color:var(--accent)}
+.mf .refresh-row{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;color:var(--muted);font-size:14px}
+.mf .refresh[data-state="idle"] .refresh-row:not(:focus-within){position:absolute;width:1px;height:1px;min-height:0;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mf .refresh[data-state="error"] .refresh-row{color:var(--danger)}
+.mf .refresh[data-state="refreshed"] .refresh-row{color:var(--muted)}
+.mf .refresh-text{flex:1;min-width:0}
+.mf .refresh-button{border:0;background:none;color:var(--accent);min-height:44px;padding:0 4px;font-size:15px;font-weight:600;flex:none}
+.mf .refresh[data-state="refreshing"] .refresh-button,.mf .refresh[data-state="refreshed"] .refresh-button{display:none}
+.mf .spinner{display:none;width:16px;height:16px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);flex:none}
+.mf .pull-indicator .spinner{display:inline-block}
+.mf .refresh[data-state="refreshing"] .row-spinner{display:inline-block;animation:mf-spin .8s linear infinite}
+@keyframes mf-spin{to{transform:rotate(360deg)}}
+.mf .sort-row{display:flex;justify-content:flex-end;margin:6px 16px 0}
+.mf .category-row .label strong{font-weight:600}
+@media(min-width:700px){.mf .refresh-row{padding:0 24px}.mf .sort-row{margin:6px 24px 0}}
+@media(prefers-reduced-motion:reduce){.mf .refresh[data-state="refreshing"] .row-spinner{animation:none}.mf .pull-indicator{transition:none}}
+@media(prefers-reduced-motion:reduce){.mf .swipe-track{transition:none}}
+
+.mf .queue-tray{position:fixed;left:0;right:0;bottom:78px;z-index:5;width:100%;min-height:64px;border:0;border-top:.5px solid var(--line);background:var(--bg);color:var(--ink);display:flex;align-items:center;justify-content:space-between;padding:10px 16px;text-align:left;font:15px var(--ui-font)}
+.mf .queue-tray>span:first-child{color:var(--muted)}.mf .queue-tray strong{display:block;font-size:18px;margin-top:4px}.mf .queue-tray>svg{width:22px;height:14px;fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mf.has-install-queue main{padding-bottom:166px}.mf .queue-preview{position:static;border-bottom:.5px solid var(--line)}
+.mf dialog.action-sheet{position:fixed;inset:auto 8px 16px;margin:0 auto;padding:0;width:calc(100% - 16px);max-width:560px;border:0;background:none;color:var(--accent);overflow:visible}
+.mf .action-sheet::backdrop,.mf .install-sheet::backdrop{background:#0008}
+.mf .install-sheet h2[tabindex="-1"]:focus-visible{outline:none}
+.mf .sheet-options{border-radius:14px;background:var(--surface);overflow:hidden}.mf .sheet-options>*{display:flex;width:100%;justify-content:center;align-items:center;min-height:56px;padding:12px;border:0;background:none;color:var(--accent);font:20px var(--ui-font);text-decoration:none}
+.mf .sheet-options>*+*{border-top:.5px solid var(--line)}.mf .sheet-options .sheet-delete{color:var(--danger)}.mf .sheet-cancel{display:block;width:100%;min-height:56px;border:0;border-radius:14px;margin:8px 0 0;background:var(--surface);color:var(--accent);font:600 20px var(--ui-font)}
+.mf dialog.install-sheet{position:fixed;inset:24px 0 0;margin:0 auto;width:100%;max-width:640px;height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);padding:0;border:0;border-radius:16px 16px 0 0;background:var(--bg);color:var(--ink);overflow:hidden}
+.mf .sheet-dismiss{display:block;width:100%;height:44px;border:0;background:none;color:var(--muted);font:700 32px var(--ui-font)}
+.mf .sheet-dismiss svg{width:36px;height:16px;fill:none;stroke:currentColor;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.mf .install-sheet h2{font-size:22px;margin:12px 16px 0;padding:0 0 14px;border-bottom:.5px solid var(--line)}
+.mf .queue-items{padding:0 16px;overflow:auto;max-height:calc(100dvh - 290px)}.mf .queue-item{display:flex;align-items:flex-start;gap:16px;padding:12px 0}.mf .queue-item+.queue-item{border-top:.5px solid var(--line)}
+.mf .queue-remove{width:24px;height:24px;min-width:24px;border:0;border-radius:50%;margin-top:8px;background:var(--danger);color:white;font:22px/1 var(--ui-font);padding:0}
+.mf .queue-icon .tile{width:40px;height:40px;border-radius:9px}.mf .queue-icon .tile svg{width:24px;height:24px}.mf .queue-item-label{min-width:0;flex:1}.mf .queue-item-label strong{display:block;font-size:18px;overflow-wrap:anywhere}.mf .queue-item-label span{display:block;color:var(--muted);font-size:14px;margin-top:3px}.mf .queue-invalid .queue-item-label span{color:var(--danger)}
+.mf .queue-status{margin:12px 16px;font-size:14px;color:var(--muted)}.mf .queue-status:empty{display:none}.mf .queue-empty{padding:20px 0;color:var(--muted)}
+.mf .queue-footer{position:absolute;left:20px;right:20px;bottom:max(16px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px}
+.mf .queue-confirm{min-height:50px;border:0;border-radius:12px;background:var(--accent);color:var(--buttonInk);font:600 18px var(--ui-font)}.mf .queue-clear{min-height:44px;border:0;background:none;color:var(--accent);font:600 17px var(--ui-font)}
+.mf .install-sheet button:disabled{opacity:.45}.mf .sheet-options button:disabled{opacity:.45}
+@media(min-width:700px){.mf .queue-tray{left:248px;width:calc(100% - 248px);bottom:0}.mf dialog.action-sheet{left:264px;right:16px;max-width:520px}.mf dialog.install-sheet{inset:40px 16px 40px 264px;width:calc(100% - 280px);height:calc(100dvh - 80px);max-height:calc(100dvh - 80px);border-radius:16px}.mf .queue-items{max-height:calc(100dvh - 350px)}}
+@media(max-width:699px) and (max-height:700px){.mf .queue-tray{bottom:50px}.mf.has-install-queue main{padding-bottom:140px}.mf dialog.install-sheet{inset:20px 0 0;height:calc(100dvh - 20px);max-height:calc(100dvh - 20px)}}
+</style><body class="mf "><aside class="sidebar"><div class="sidebar-title">Plugins</div><a class="active" aria-current="page" href="manifest-browser-repositories-en.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h7l2 3h9v12H3z"/><path d="M3 6V3h8l2 3"/></svg>Sources</a><a class=""  href="manifest-browser-packages-en.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg>Packages</a><a class=""  href="manifest-browser-scripts-en.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h8l5 5v15H6z"/><path d="M14 2v6h5"/><path d="M10 12l-2 2 2 2"/><path d="M15 12l2 2-2 2"/></svg>Scripts</a><a class=""  href="manifest-browser-search-en.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20l-5-5"/><path d="M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0"/></svg>Search</a></aside><div class="detail"><header><div class="status"><span>9:41</span><span>Wi-Fi ▰</span></div><div class="bar"><a class="back" data-origin-back href="manifest-browser-category-requests-en.html">‹ Requests</a><strong>Search limit</strong><span class="spacer"></span></div></header><main><div class="detail-view"><div class="package-banner"><div class="package-profile" data-detail-owner="search"><span class="tile search large"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20l-5-5"/><path d="M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0"/></svg></span><div class="profile-copy"><h1>Search limit</h1><div class="target-summary"><div class="host-line"><span>Target hosts</span><strong>example.com</strong><strong>api.example.com</strong></div></div></div></div><div class="profile-actions"><button type="button" class="pill" data-install-cta="search">Get</button></div></div><div data-package-panels><div class="detail-tabs" role="tablist" aria-label="Package details"><button type="button" role="tab" id="package-details-tab" aria-controls="package-details-panel" aria-selected="true" class="active" data-package-tab="details">Details</button><button type="button" role="tab" id="package-version-tab" aria-controls="package-version-panel" aria-selected="false" tabindex="-1" data-package-tab="version">Version</button></div><div id="package-details-panel" role="tabpanel" aria-labelledby="package-details-tab" data-package-panel="details"><p class="package-purpose">Sets the search limit to 5.</p><section><h2></h2><div class="group"><div class="row" style="display:block"><div style="display:flex;gap:14px;align-items:center"><div class="label">Author</div><div class="value" style="max-width:58%">Example Team</div></div></div></div></section><section><h2>Repository</h2><div class="group"><a href="manifest-browser-repository-overview-en.html" class="row"><span class="label">Example Repository</span><span class="value"></span><span class="chevron">›</span></a></div></section><section><h2>Contents</h2><div class="group"><a href="manifest-browser-script-package-search-en.html" class="row"><span class="label">Scripts</span><span class="value">2 files</span><span class="chevron">›</span></a><a href="manifest-browser-manifest-json-en.html" class="row"><span class="label">Manifest JSON</span><span class="value"></span><span class="chevron">›</span></a></div></section></div><div id="package-version-panel" role="tabpanel" aria-labelledby="package-version-tab" data-package-panel="version" hidden><section aria-label="Version" data-version-owner="search"><div class="group"><div class="row"><div class="label" data-detail-version>1.0.0</div><div class="value" data-detail-published-at>Oct 19, 2026</div></div></div></section></div></div></div></main></div><nav class="tabbar" aria-label="Plugins"><a class="active" aria-current="page" href="manifest-browser-repositories-en.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h7l2 3h9v12H3z"/><path d="M3 6V3h8l2 3"/></svg>Sources</a><a class=""  href="manifest-browser-packages-en.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg>Packages</a><a class=""  href="manifest-browser-scripts-en.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h8l5 5v15H6z"/><path d="M14 2v6h5"/><path d="M10 12l-2 2 2 2"/><path d="M15 12l2 2-2 2"/></svg>Scripts</a><a class=""  href="manifest-browser-search-en.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20l-5-5"/><path d="M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0"/></svg>Search</a></nav><button type="button" class="queue-tray " data-queue-tray hidden><span>Queued<strong data-queue-count></strong></span><svg viewBox="0 0 24 14" aria-hidden="true"><path d="m3 11 9-8 9 8"/></svg></button><dialog class="install-sheet" data-install-sheet aria-labelledby="install-sheet-title"><button type="button" class="sheet-dismiss" data-queue-close aria-label="Close"><svg viewBox="0 0 36 16" aria-hidden="true"><path d="m4 4 14 8 14-8"/></svg></button><h2 id="install-sheet-title" tabindex="-1" autofocus>Install</h2><div class="queue-items" data-queue-items></div><p class="queue-status" role="status" aria-live="polite" data-queue-status></p><div class="queue-footer"><button type="button" class="queue-confirm" data-queue-confirm>Confirm</button><button type="button" class="queue-clear" data-queue-clear>Clear Queue</button></div></dialog><script>
+const en = document.documentElement.lang === 'en';
+const route = location.pathname.split('/').pop().replace('manifest-browser-', '').replace(/(-en)?\.html$/, '');
+const destination = name => 'manifest-browser-' + name + (en ? '-en' : '') + '.html';
+const parameters = new URLSearchParams(location.search);
+const fixtures = {"search":{"category":"requests","name":"Search limit","author":"Example Team","version":"1.0.0","publishedAt":"2026-10-19T00:00:00Z","glyph":"search","source":"repo","files":["scripts/request.js","scripts/response.js"],"matches":[{"hosts":["example.com"],"methods":["POST"],"path":{"kind":"exact","value":"/synthetic"},"hooks":{"request":{"onEnter":"scripts/request.js"}}},{"hosts":["example.com","api.example.com"],"methods":["GET"],"path":{"kind":"exact","value":"/search"},"hooks":{"response":{"onLeave":"scripts/response.js"}}}],"summary":["検索件数の上限を5に変更します。","Sets the search limit to 5."]},"preview":{"category":"responses","name":"Response preview","author":"Example Team","version":"1.0.0","glyph":"response","source":"repo","files":["scripts/response.js"],"matches":[{"hosts":["api.example.com"],"methods":["GET"],"path":{"kind":"exact","value":"/preview"},"hooks":{"response":{"onLeave":"scripts/response.js"}}}],"summary":["レスポンスのJSONを確認します。","Inspect the response JSON."]},"local":{"category":"local","name":"Local example","author":"Local Author","version":"1.0.0","glyph":"local","source":"local","files":["scripts/request.js"],"matches":[{"hosts":["local.example.com"],"methods":["POST"],"path":{"kind":"exact","value":"/local"},"hooks":{"request":{"onEnter":"scripts/request.js"}}}],"summary":["ファイルから追加したサンプル","An example added from a file"]}};
+const catalogUpdates = {"search":{"rev":13,"version":"2.0.0","publishedAt":"2026-10-20T00:00:00Z"}};
+const publicationDates = {"search":{"1.0.0":"2026-10-19T00:00:00Z","2.0.0":"2026-10-20T00:00:00Z"}};
+const formatPublisherDate = (value, lang) => new Intl.DateTimeFormat(lang === "ja" ? "ja-JP" : "en-US", { calendar: "gregory", timeZone: "UTC", year: "numeric", month: lang === "ja" ? "long" : "short", day: "numeric" }).format(new Date(value));
+const categories = {"requests":{"name":["リクエスト","Requests"],"glyph":"search","page":"category-requests"},"responses":{"name":["レスポンス","Responses"],"glyph":"response","page":"category-responses"},"local":{"name":["ローカル","Local"],"glyph":"local","page":"manifests"}};
+const saved = (() => { try { const value=JSON.parse(parameters.get('demo') || '{}'); return value && !Array.isArray(value) && typeof value==='object' ? value : {}; } catch { return {}; } })();
+const normalize = (key, value) => Object.hasOwn(fixtures,key) && value && typeof value==='object' && !('version' in value) && 'added' in value ? {version:value.active||value.added,enabled:!!value.active} : value;
+const migrated = Object.fromEntries(Object.entries(saved).map(([key,value])=>[key,normalize(key,value)]));
+const demo = {local:{version:'1.0.0',enabled:false}, ...migrated};
+demo.catalogRev = Number.isFinite(demo.catalogRev) ? demo.catalogRev : 12;
+const queueModel = (function createQueueModel(specs) {
+  const maxEntries = Object.keys(specs).length, normalize = (raw) => {
+    if (!Array.isArray(raw))
+      return [];
+    const seen = new Set, out = [];
+    for (const item of raw) {
+      if (out.length >= maxEntries)
+        break;
+      if (typeof item !== "object" || item === null || Array.isArray(item))
+        continue;
+      const { id, version, kind } = item;
+      if (typeof id !== "string" || typeof version !== "string")
+        continue;
+      if (kind !== "add" && kind !== "reinstall")
+        continue;
+      if (!Object.hasOwn(specs, id) || seen.has(id))
+        continue;
+      const versions = specs[id];
+      if (!Array.isArray(versions) || !versions.includes(version))
+        continue;
+      seen.add(id);
+      out.push({ id, version, kind });
+    }
+    return out;
+  }, current = (installed, id) => Object.hasOwn(installed, id) ? installed[id] ?? null : null, isValid = (entry, installed) => {
+    const [e] = normalize([entry]);
+    if (!e)
+      return !1;
+    const cur = current(installed, e.id);
+    return e.kind === "add" ? cur === null : cur !== null && cur.version === e.version;
+  };
+  return { normalize, isValid, enqueue: (rawQueue, entry, installed) => {
+    const queue = normalize(rawQueue), [e] = normalize([entry]);
+    if (!e || !isValid(e, installed) || queue.some((q) => q.id === e.id))
+      return queue;
+    return [...queue, e];
+  }, confirm: (rawQueue, installed) => {
+    const queue = normalize(rawQueue), invalid = queue.filter((e) => !isValid(e, installed));
+    if (queue.length === 0 || invalid.length > 0)
+      return { ok: !1, queue, installed, invalid };
+    const next = { ...installed };
+    for (const e of queue) {
+      const cur = current(installed, e.id);
+      next[e.id] = e.kind === "add" ? { version: e.version, enabled: !1 } : { ...cur, version: e.version };
+    }
+    return { ok: !0, queue: [], installed: next, invalid };
+  } };
+})({"search":["1.0.0","2.0.0"],"preview":["1.0.0"],"local":["1.0.0"]});
+demo.queue=queueModel.normalize(demo.queue);
+if(!parameters.has('demo')&&['manifest-install-queue','manifest-install-queue-error','components'].includes(route))demo.queue=[{id:'search',version:'1.0.0',kind:'add'},{id:'preview',version:'1.0.0',kind:'add'}];
+if(!parameters.has('demo')&&route==='manifest-manage')demo.search={version:'1.0.0',enabled:false};
+
+if(['sources-refreshed','manifest-update'].includes(route))demo.catalogRev = Math.max(demo.catalogRev,13);
+const catalogVersion = id => { const update=catalogUpdates[id]; return update && demo.catalogRev>=update.rev ? update.version : fixtures[id].version; };
+const removed = parameters.get('remove');
+if(removed && Object.hasOwn(fixtures,removed))demo[removed]=null;
+if(parameters.get('removeSource')==='repo')demo.sourceHidden=true;
+if(parameters.get('addSource')==='repo')demo.sourceHidden=false;
+const states = {'packages-added':['search','1.0.0',false],'manifest-update':['search','1.0.0',true],'manifest-added':['search','1.0.0',false],manifest:['search','1.0.0',true],'manifest-enable':['search','2.0.0',true],'manifest-replace-confirm':['search','2.0.0',true],'manifest-updated':['search','2.0.0',true],'manifest-disabled-update':['search','2.0.0',false],'manifest-preview-added':['preview','1.0.0',false],'manifest-preview-enabled':['preview','1.0.0',true],'manifest-local':['local','1.0.0',false],'manifest-local-enabled':['local','1.0.0',true]};
+if(states[route]){const [id,version,enabled]=states[route];const apply=parameters.get('apply')==='1',add=parameters.get('add')==='1',current=demo[id];if(removed!==id){if(!parameters.has('demo'))demo[id]={version,enabled};else if(apply){if(!current){/* Legacy Add URLs never install; only the sheet Confirm commits. */}else if(add){if(route==='manifest-updated'&&catalogUpdates[id]&&current.version===fixtures[id].version&&catalogVersion(id)===catalogUpdates[id].version)demo[id]={version:catalogVersion(id),enabled:current.enabled};}else demo[id]={version:current.version,enabled};}}}
+const target=(id,state)=>id==='search'?(!state?'manifest-import':state.version==='2.0.0'?(state.enabled?'manifest-updated':'manifest-disabled-update'):state.enabled?'manifest':'manifest-added'):id==='preview'?(!state?'manifest-preview':state.enabled?'manifest-preview-enabled':'manifest-preview-added'):state?(state.enabled?'manifest-local-enabled':'manifest-local'):'manifests';
+const renderCatalog = () => {
+ document.querySelectorAll('[data-package-link]').forEach(item=>{const id=item.dataset.package,state=demo[id];item.href=destination(target(id,state));const installedList=!!item.closest('[data-package-template]');item.querySelector('[data-package-meta]').textContent=fixtures[id].author+' · '+(installedList&&state?state.version:catalogVersion(id));item.querySelector('.install-badge').hidden=!state;const wrapper=item.closest('[data-package-template]');if(wrapper)wrapper.querySelector('.swipe-action').hidden=!state;});
+ document.querySelectorAll('[data-version-owner]').forEach(owner=>{const id=owner.dataset.versionOwner,state=demo[id],version=state?state.version:catalogVersion(id),value=owner.querySelector('[data-detail-version]'),date=owner.querySelector('[data-detail-published-at]'),publishedAt=publicationDates[id]?.[version];if(value)value.textContent=version;if(date){date.hidden=!publishedAt;date.textContent=publishedAt?formatPublisherDate(publishedAt,en?'en':'ja'):'';}});
+
+ document.querySelectorAll('[data-catalog-rev]').forEach(item=>{item.textContent=String(demo.catalogRev);});
+ document.querySelectorAll('[data-install-cta]').forEach(item=>{item.hidden=!!demo[item.dataset.installCta];});
+ document.querySelectorAll('[data-update-cta]').forEach(item=>{const id=item.dataset.updateCta,state=demo[id];item.hidden=!!demo.sourceHidden||!(state&&catalogUpdates[id]&&state.version===fixtures[id].version&&catalogVersion(id)===catalogUpdates[id].version);const row=item.closest('[data-version-update-row]');if(row)row.hidden=item.hidden;});
+};
+renderCatalog();
+document.querySelectorAll('[data-script-owner]').forEach(group=>{group.hidden=!demo[group.dataset.scriptOwner];});
+document.querySelectorAll('[data-source-row]').forEach(row=>{row.hidden=!!demo.sourceHidden;});
+const installed=id=>!!demo[id];
+const counts={all:(demo.sourceHidden?0:2)+(demo.local?1:0),local:demo.local?1:0,repo:2,'category-requests':1,'category-responses':1,installed: ['search','preview'].filter(installed).length,sources:demo.sourceHidden?0:1};
+document.querySelectorAll('[data-count]').forEach(label=>{label.textContent=String(counts[label.dataset.count]);});
+document.querySelectorAll('[data-activation-section]').forEach(item=>{item.hidden=!demo[item.dataset.activationSection];});
+document.querySelectorAll('[data-activation-owner]').forEach(item=>{const id=item.dataset.activationOwner,state=demo[id];item.hidden=!state;if(!state)return;item.setAttribute('aria-checked',String(!!state.enabled));const page=state.enabled?(id==='search'?(state.version==='2.0.0'?'manifest-disabled-update':'manifest-added'):id==='preview'?'manifest-preview-added':'manifest-local'):(id==='search'?(state.version==='2.0.0'?'manifest-disabled-confirm':'manifest-confirm'):id==='preview'?'manifest-preview-confirm':'manifest-local-confirm');item.href=destination(page)+(state.enabled?'?apply=1':'');});
+document.querySelectorAll('[data-return-owner]').forEach(item=>{const id=item.dataset.returnOwner;item.href=destination(target(id,demo[id]));});
+document.querySelectorAll('a[href]').forEach(anchor=>{const file=anchor.getAttribute('href').split('/').pop().split('?')[0];if(file===destination('manifest')&&!anchor.search.includes('apply=1'))anchor.href=destination(target('search',demo.search));});
+const manifestJSON=document.querySelector('[data-manifest-json]');if(manifestJSON&&demo.search){const value=JSON.parse(manifestJSON.textContent);value.version=demo.search.version;const publishedAt=publicationDates.search?.[value.version];if(publishedAt)value.publishedAt=publishedAt;else delete value.publishedAt;manifestJSON.textContent=JSON.stringify(value,null,2);}
+const items=[...document.querySelectorAll('[data-catalog-item]')];
+const eligible=item=>{const id=item.dataset.packageTemplate||item.dataset.package;if(item.closest('[data-package-list],[data-search-results]'))return fixtures[id].source!=='local'&&(!demo.sourceHidden||installed(id));return item.hasAttribute('data-package-template')?installed(id):fixtures[id].source==='local'?installed(id):!demo.sourceHidden;};
+const search=document.querySelector('input[type="search"]');
+const globalSearch=!!document.querySelector('[data-search-scope=global]');
+if(globalSearch&&search&&parameters.has('searchQuery'))search.value=parameters.get('searchQuery')||'';
+if(globalSearch&&!parameters.has('demo')&&route==='search-no-source')demo.sourceHidden=true;
+const update=()=>{const query=search?search.value.trim().toLowerCase():'';items.forEach(item=>{item.hidden=!eligible(item)||!item.dataset.search.includes(query)||(globalSearch&&!query);});const matches=items.filter(item=>!item.hidden).length;const count=document.querySelector('[data-result-count]');if(count){count.hidden=globalSearch||!query;count.textContent=en?matches+(matches===1?' Package':' Packages'):matches+'件';}const empty=document.querySelector('[data-no-results]');if(empty){empty.hidden=matches!==0;empty.querySelector('strong').textContent=query?(en?'No matching Packages':'一致するPackageはありません'):(en?'No Packages':'Packageはありません');const help=empty.querySelector('[data-empty-help]');help.hidden=!!query;help.textContent=document.querySelector('[data-search-scope=packages]')?(en?'Add a repository in Sources.':'Sourcesでリポジトリを追加できます。'):route==='manifests'?(en?'Packages added from files appear here.':'ファイルから追加したPackageが表示されます。'):'';}document.querySelectorAll('[data-empty-packages]').forEach(item=>{item.hidden=matches!==0;});};
+if(search){search.addEventListener('input',()=>{update();syncLinks();});document.querySelector('[data-clear]').addEventListener('click',()=>{search.value='';update();syncLinks();search.focus();});}update();
+const sort=document.querySelector('[data-sort]');if(sort)sort.addEventListener('change',()=>{const list=document.querySelector('[data-package-list]');[...list.children].sort((a,b)=>{const first=fixtures[a.dataset.packageTemplate||a.dataset.package].name,second=fixtures[b.dataset.packageTemplate||b.dataset.package].name;return first.localeCompare(second)*(sort.value==='desc'?-1:1);}).forEach(item=>list.appendChild(item));});
+document.querySelectorAll('[data-open-management]').forEach(button=>{button.addEventListener('click',()=>{document.querySelector('[data-management="'+button.dataset.openManagement+'"]').showModal();});});
+document.querySelectorAll('[data-close]').forEach(button=>{button.addEventListener('click',()=>button.closest('dialog').close());});
+document.querySelectorAll('.swipe-wrap').forEach(wrapper=>{const track=wrapper.querySelector('.swipe-track'),action=wrapper.querySelector('.swipe-action');const gesture={x:0,y:0,swiped:false};wrapper.addEventListener('dragstart',event=>event.preventDefault());wrapper.addEventListener('keydown',event=>{if(!installed(wrapper.dataset.packageTemplate))return;if(event.key==='Delete'){event.preventDefault();location.href=action.href;}if(event.key==='Escape'){track.classList.remove('swipe-open');action.tabIndex=-1;}});wrapper.addEventListener('pointerdown',event=>{if(!installed(wrapper.dataset.packageTemplate))return;gesture.x=event.clientX;gesture.y=event.clientY;gesture.swiped=false;});wrapper.addEventListener('pointerup',event=>{if(!installed(wrapper.dataset.packageTemplate))return;const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)){gesture.swiped=true;track.classList.toggle('swipe-open',dx<0);action.tabIndex=dx<0?0:-1;}});wrapper.addEventListener('pointercancel',()=>{gesture.swiped=false;});wrapper.addEventListener('click',event=>{if(gesture.swiped){event.preventDefault();gesture.swiped=false;}},true);});
+// Origin is a whitelisted list key; only Package-detail routes carry it. Tab links and other routes never receive it.
+const origins = {...Object.fromEntries(Object.entries(categories).map(([key,value])=>[key,{page:value.page,label:value.name[en?1:0]}])),packages:{page:'packages',label:'Packages'},search:{page:'search-results',label:'Search'}};
+const originKey = parameters.get('from'), origin = originKey && Object.hasOwn(origins,originKey) ? originKey : '';
+const detailFamily = file => /^manifest-browser-(manifest|test)(-|\.|$)/.test(file);
+const carryFamily = file => /^manifest-browser-(manifest|test|script|source)(-|\.|$)/.test(file);
+const originBack = document.querySelector('[data-origin-back]');
+if(origin&&originBack&&detailFamily(location.pathname.split('/').pop())){originBack.href=destination(origins[origin].page);originBack.textContent='‹ '+origins[origin].label;const tab=destination(origin==='packages'?'packages':origin==='search'?'search':'repositories');document.querySelectorAll('.tabbar a,.sidebar a').forEach(a=>{const on=a.getAttribute('href')===tab;a.classList.toggle('active',on);if(on)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});}
+const carrySearchQuery = url => {if(url.origin!==location.origin)return;const value=globalSearch&&search?search.value:parameters.get('searchQuery');if(value)url.searchParams.set('searchQuery',value);else url.searchParams.delete('searchQuery');};
+const syncLinks = () => document.querySelectorAll('a[href]').forEach(anchor=>{if(anchor.getAttribute('href').startsWith('#'))return;const url=new URL(anchor.href);url.searchParams.set('demo',JSON.stringify(demo));const own=anchor.dataset.from,carry=origin&&carryFamily(url.pathname.split('/').pop())&&!anchor.closest('.tabbar,.sidebar')&&!anchor.hasAttribute('data-origin-back');const next=own&&Object.hasOwn(origins,own)?own:carry?origin:'';if(next)url.searchParams.set('from',next);else url.searchParams.delete('from');carrySearchQuery(url);anchor.href=url.href;});
+syncLinks();
+(function installQueueClient(ctx) {
+  const { demo, fixtures, model, catalogVersion, syncLinks, target, destination, route, origin, icons } = ctx, sheet = document.querySelector("[data-install-sheet]"), tray = document.querySelector("[data-queue-tray]");
+  if (!sheet || !tray)
+    return;
+  const en = document.documentElement.lang === "en", rows = sheet.querySelector("[data-queue-items]"), confirm = sheet.querySelector("[data-queue-confirm]"), clear = sheet.querySelector("[data-queue-clear]"), close = sheet.querySelector("[data-queue-close]"), status = sheet.querySelector("[data-queue-status]"), state = { phase: route === "manifest-install-queue-error" ? "error" : "idle", failed: route === "manifest-install-queue-error", batch: [] }, words = (ja, english) => en ? english : ja, navigate = () => {
+    const owner = document.querySelector("[data-detail-owner]")?.dataset.detailOwner, url = new URL(location.href);
+    url.pathname = url.pathname.slice(0, url.pathname.lastIndexOf("/") + 1) + destination(owner ? target(owner, demo[owner]) : route);
+    url.search = "";
+    url.searchParams.set("demo", JSON.stringify(demo));
+    if (origin)
+      url.searchParams.set("from", origin);
+    location.replace(url.href);
+  }, closeSheet = () => {
+    if (state.phase === "busy")
+      return;
+    if (state.phase === "complete") {
+      navigate();
+      return;
+    }
+    sheet.close();
+  }, render = () => {
+    demo.queue = model.normalize(demo.queue);
+    const pending = demo.queue, busy = state.phase === "busy", complete = state.phase === "complete", entries = complete ? state.batch : pending, invalid = pending.filter((entry) => !model.isValid(entry, demo));
+    tray.hidden = pending.length === 0 || complete;
+    document.body.classList.toggle("has-install-queue", !tray.hidden);
+    const count = tray.querySelector("[data-queue-count]");
+    count.textContent = en ? pending.length + (pending.length === 1 ? " Package" : " Packages") : pending.length + "\u4EF6";
+    document.querySelectorAll("[data-install-cta]").forEach((item) => {
+      const button = item, id = button.dataset.installCta;
+      button.hidden = !!demo[id];
+      button.textContent = pending.some((entry) => entry.id === id) ? words("\u30AD\u30E5\u30FC", "Queued") : words("\u8FFD\u52A0", "Get");
+    });
+    rows.replaceChildren();
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "queue-empty";
+      empty.textContent = words("\u30AD\u30E5\u30FC\u306F\u7A7A\u3067\u3059", "Queue is empty");
+      rows.append(empty);
+    }
+    entries.forEach((entry) => {
+      const valid = complete || model.isValid(entry, demo), row = document.createElement("div");
+      row.className = "queue-item";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "queue-remove";
+      remove.textContent = "\u2212";
+      remove.disabled = busy;
+      remove.hidden = complete;
+      remove.setAttribute("aria-label", en ? "Remove " + fixtures[entry.id].name : fixtures[entry.id].name + "\u3092\u53D6\u308A\u6D88\u3059");
+      remove.addEventListener("click", () => {
+        if (state.phase === "busy")
+          return;
+        demo.queue = pending.filter((item) => item.id !== entry.id);
+        state.phase = "idle";
+        syncLinks();
+        render();
+      });
+      const icon = document.createElement("span");
+      icon.className = "queue-icon";
+      icon.innerHTML = icons[entry.id];
+      const label = document.createElement("div");
+      label.className = "queue-item-label";
+      const name = document.createElement("strong");
+      name.textContent = fixtures[entry.id].name;
+      const detail = document.createElement("span");
+      detail.textContent = entry.version + " \xB7 " + (complete ? words("\u5B8C\u4E86", "Installed") : busy ? words("\u30A4\u30F3\u30B9\u30C8\u30FC\u30EB\u4E2D\u2026", "Installing\u2026") : !valid ? entry.kind === "reinstall" ? demo[entry.id] ? words("\u30D0\u30FC\u30B8\u30E7\u30F3\u304C\u5909\u308F\u308A\u307E\u3057\u305F", "Version changed") : words("\u524A\u9664\u3055\u308C\u307E\u3057\u305F", "No longer installed") : words("\u30A4\u30F3\u30B9\u30C8\u30FC\u30EB\u6E08\u307F", "Already installed") : entry.kind === "reinstall" ? words("\u518D\u30A4\u30F3\u30B9\u30C8\u30FC\u30EB", "Reinstall") : words("\u5F85\u6A5F\u4E2D", "Queued"));
+      if (!valid)
+        row.classList.add("queue-invalid");
+      label.append(name, detail);
+      row.append(remove, icon, label);
+      rows.append(row);
+    });
+    close.disabled = busy;
+    clear.disabled = busy;
+    clear.hidden = complete || pending.length === 0;
+    confirm.disabled = busy || !complete && (!pending.length || invalid.length > 0);
+    confirm.setAttribute("aria-busy", String(busy));
+    confirm.textContent = complete ? words("\u5B8C\u4E86", "Done") : busy ? words("\u30A4\u30F3\u30B9\u30C8\u30FC\u30EB\u4E2D\u2026", "Installing\u2026") : state.phase === "error" ? words("\u518D\u8A66\u884C", "Retry") : words("\u30A4\u30F3\u30B9\u30C8\u30FC\u30EB", "Confirm");
+    status.textContent = complete ? words("\u30A4\u30F3\u30B9\u30C8\u30FC\u30EB\u3057\u307E\u3057\u305F", "Installed") : state.phase === "error" ? words("\u30A4\u30F3\u30B9\u30C8\u30FC\u30EB\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F", "Could not install") : invalid.length ? words("\u5909\u66F4\u3055\u308C\u305F\u9805\u76EE\u3092\u53D6\u308A\u6D88\u3057\u3066\u304F\u3060\u3055\u3044", "Remove the changed items") : "";
+  }, open = () => {
+    render();
+    if (!sheet.open)
+      sheet.showModal();
+  };
+  document.querySelectorAll("[data-install-cta]").forEach((item) => item.addEventListener("click", () => {
+    const id = item.dataset.installCta;
+    if (!Object.hasOwn(fixtures, id) || demo[id])
+      return;
+    if (demo.queue.some((entry) => entry.id === id)) {
+      open();
+      return;
+    }
+    demo.queue = model.enqueue(demo.queue, { id, version: catalogVersion(id), kind: "add" }, demo);
+    state.phase = "idle";
+    syncLinks();
+    render();
+  }));
+  document.querySelectorAll("[data-reinstall]").forEach((item) => item.addEventListener("click", () => {
+    const id = item.dataset.reinstall, installed = demo[id];
+    if (!Object.hasOwn(fixtures, id) || !installed)
+      return;
+    item.closest("dialog")?.close();
+    demo.queue = model.enqueue(demo.queue, { id, version: installed.version, kind: "reinstall" }, demo);
+    state.phase = "idle";
+    syncLinks();
+    render();
+  }));
+  tray.addEventListener("click", open);
+  document.querySelectorAll("[data-queue-open]").forEach((button) => button.addEventListener("click", open));
+  close.addEventListener("click", closeSheet);
+  sheet.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeSheet();
+  });
+  clear.addEventListener("click", () => {
+    if (state.phase === "busy")
+      return;
+    demo.queue = [];
+    state.phase = "idle";
+    syncLinks();
+    render();
+  });
+  confirm.addEventListener("click", () => {
+    if (state.phase === "complete") {
+      navigate();
+      return;
+    }
+    if (state.phase === "busy" || !demo.queue.length)
+      return;
+    const batch = model.normalize(demo.queue);
+    if (!model.confirm(batch, demo).ok) {
+      render();
+      return;
+    }
+    state.batch = batch;
+    state.phase = "busy";
+    render();
+    setTimeout(() => {
+      const result = model.confirm(batch, demo);
+      if (new URLSearchParams(location.search).get("install") === "fail" && !state.failed || !result.ok) {
+        state.failed = !0;
+        state.phase = "error";
+        render();
+        return;
+      }
+      Object.assign(demo, result.installed);
+      demo.queue = [];
+      state.phase = "complete";
+      syncLinks();
+      render();
+    }, 700);
+  });
+  render();
+  const requested = new URLSearchParams(location.search).get("sheet");
+  if (requested === "install" || route === "manifest-install-queue" || route === "manifest-install-queue-error")
+    open();
+  const manage = requested?.startsWith("manage:") ? requested.slice(7) : route === "manifest-manage" ? "search" : "";
+  if (manage && Object.hasOwn(fixtures, manage) && demo[manage]) {
+    const dialog = document.querySelector('[data-management="' + manage + '"]');
+    if (dialog && !dialog.open)
+      dialog.showModal();
+  }
+})({demo,fixtures,model:queueModel,catalogVersion,syncLinks,target,destination,route,origin,icons:{"search":"<span class=\"tile search \"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 20l-5-5\"/><path d=\"M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0\"/></svg></span>","preview":"<span class=\"tile response \"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 6h12a4 4 0 0 1 0 8H5\"/><path d=\"M9 10l-4 4 4 4\"/></svg></span>","local":"<span class=\"tile local \"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 7h7l2 3h9v11H3z\"/><path d=\"M3 7V4h8l2 3\"/></svg></span>"}});
+// Sources refresh: the pull gesture and the Refresh button share one handler. Only catalog metadata (demo.catalogRev) changes; installed versions and enabled state never do.
+const refresh = document.querySelector('[data-refresh]');
+if(refresh&&['repositories','sources-refreshing','sources-refreshed','sources-error'].includes(route)){
+ const copy = {refreshing:en?'Refreshing sources…':'リポジトリを更新中…',error:en?'Couldn’t refresh.':'更新できませんでした。',idle:''};
+ const button = refresh.querySelector('[data-refresh-button]'), text = refresh.querySelector('[data-refresh-text]'), announce = refresh.querySelector('[data-refresh-announce]'), pullText = refresh.querySelector('[data-pull-text]');
+ const refreshState = {busy:false,failed:false};
+ const show = state => { refresh.dataset.state=state; text.textContent=copy[state]; announce.textContent=copy[state]; button.textContent=state==='error'?(en?'Try Again':'再試行'):(en?'Refresh sources':'リポジトリを更新'); button.setAttribute('aria-disabled',String(state==='refreshing')); button.setAttribute('aria-busy',String(state==='refreshing')); };
+ const startRefresh = () => {
+  if(refreshState.busy||button.getAttribute('aria-disabled')==='true')return;
+  refreshState.busy=true;show('refreshing');
+  setTimeout(()=>{
+   refreshState.busy=false;
+   if(parameters.get('refresh')==='fail'&&!refreshState.failed){refreshState.failed=true;show('error');return;}
+   demo.catalogRev=Math.max(demo.catalogRev,13);renderCatalog();syncLinks();show('idle');
+  },900);
+ };
+ button.addEventListener('click',startRefresh);
+ const pull = {y:0,active:false,distance:0,suppressClick:false}, ready = 36;
+ const endPull = trigger => { const go=pull.active&&trigger&&pull.distance>=ready; pull.active=false; refresh.classList.remove('pulling','ready'); refresh.style.removeProperty('--pull'); if(go){pull.suppressClick=true;startRefresh();setTimeout(()=>{pull.suppressClick=false;},0);} };
+ const beginPull = (y,target) => { pull.active=window.scrollY<=0&&!target.closest('input,select,button,dialog,.swipe-wrap'); pull.y=y; pull.distance=0; };
+ const movePull = y => { if(!pull.active)return false; const delta=y-pull.y; if(delta<=0||window.scrollY>0){endPull(false);return false;} pull.distance=Math.min(delta*.5,96); refresh.style.setProperty('--pull',pull.distance+'px'); refresh.classList.add('pulling'); refresh.classList.toggle('ready',pull.distance>=ready); pullText.textContent=pull.distance>=ready?(en?'Release to refresh':'離して更新'):(en?'Pull to refresh':'引いて更新'); return true; };
+ const area = document.querySelector('main');
+ area.addEventListener('dragstart',event=>{if(pull.active)event.preventDefault();});
+ area.addEventListener('click',event=>{if(pull.suppressClick){event.preventDefault();event.stopPropagation();pull.suppressClick=false;}},true);
+ area.addEventListener('touchstart',event=>beginPull(event.touches[0].clientY,event.target),{passive:true});
+ area.addEventListener('touchmove',event=>{if(movePull(event.touches[0].clientY)&&event.cancelable)event.preventDefault();},{passive:false});
+ area.addEventListener('touchend',()=>endPull(true));area.addEventListener('touchcancel',()=>endPull(false));
+ area.addEventListener('pointerdown',event=>{if(event.pointerType==='mouse'&&event.button===0)beginPull(event.clientY,event.target);});
+ window.addEventListener('pointermove',event=>{if(event.pointerType==='mouse')movePull(event.clientY);});
+ window.addEventListener('pointerup',event=>{if(event.pointerType==='mouse')endPull(true);});
+}
+// Details / Version switches content; it never scrolls to an anchor or changes installed state.
+document.querySelectorAll('[data-package-panels]').forEach(group=>{
+ const tabs=[...group.querySelectorAll('[data-package-tab]')],panels=[...group.querySelectorAll('[data-package-panel]')];
+ const select=name=>{tabs.forEach(tab=>{const active=tab.dataset.packageTab===name;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;});panels.forEach(panel=>{panel.hidden=panel.dataset.packagePanel!==name;});};
+ tabs.forEach((tab,index)=>{tab.addEventListener('click',()=>select(tab.dataset.packageTab));tab.addEventListener('keydown',event=>{const next=event.key==='ArrowRight'?(index+1)%tabs.length:event.key==='ArrowLeft'?(index+tabs.length-1)%tabs.length:event.key==='Home'?0:event.key==='End'?tabs.length-1:-1;if(next>=0){event.preventDefault();select(tabs[next].dataset.packageTab);tabs[next].focus();}});});
+ select(parameters.get('panel')==='version'?'version':'details');
+});
+const dialog=document.querySelector('dialog[data-auto]');if(dialog){dialog.showModal();dialog.addEventListener('cancel',event=>{event.preventDefault();location.href=dialog.querySelector('[data-cancel]').href;});}
+</script></body></html>

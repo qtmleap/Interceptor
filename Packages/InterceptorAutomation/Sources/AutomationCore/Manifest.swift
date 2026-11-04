@@ -23,9 +23,11 @@ public struct PluginReadDeclaration: Equatable, Sendable {
     public let body: Body
 }
 
-/// Fully validated v1 manifest. Declarations grant no data access or execution; `json` preserves the
+/// Fully validated v1 or v2 manifest. Declarations grant no data access or execution; `json` preserves the
 /// complete validated manifest so source edits keep every declaration.
 public struct PluginManifest: Equatable, Sendable {
+    public let schemaVersion: Int
+    public let workflow: WorkflowDeclaration?
     public let id: UUID
     public let name: String
     public let version: String
@@ -42,8 +44,9 @@ public struct PluginManifest: Equatable, Sendable {
 
     init(validating v: JSONValue) throws {
         let bad = AutomationError.invalidManifest
-        let f = try JSONFields(v, required: ["schemaVersion", "id", "name", "version", "subscriptions", "read", "endpointBindings", "settings"], optional: ["author", "summary"], error: bad)
-        guard try f.int("schemaVersion") == 1 else { throw bad }
+        guard case .object(let raw) = v, case .integer(let schema)? = raw["schemaVersion"], schema == 1 || schema == 2 else { throw bad }
+        let f = try JSONFields(v, required: Set(["schemaVersion", "id", "name", "version", "subscriptions", "read", "endpointBindings", "settings"]).union(schema == 2 ? ["workflow"] : []), optional: ["author", "summary"], error: bad)
+        schemaVersion = Int(schema)
         let name = try f.string("name"), version = try f.string("version")
         guard Text.isDisplayName(name) else { throw bad }
         _ = try SemVer(parsing: version)
@@ -56,6 +59,12 @@ public struct PluginManifest: Equatable, Sendable {
 
         let bindings = try f.strings("endpointBindings")
         guard bindings.count <= 4, Set(bindings).count == bindings.count, bindings.allSatisfy(PluginManifest.isBindingName) else { throw bad }
+
+        if schema == 2 {
+            let declaration = try WorkflowDeclaration(validating: f.value("workflow"))
+            guard bindings == (declaration.endpointBinding.map { [$0] } ?? []) else { throw bad }
+            workflow = declaration
+        } else { workflow = nil }
 
         let settings = try f.value("settings")
         guard case .object = settings, settings.nesting <= Limits.settingsDepth,
@@ -126,7 +135,7 @@ public struct PluginManifest: Equatable, Sendable {
         return PluginSubscription(phase: phase, hosts: hosts, methods: methods, path: path, status: status)
     }
 
-    private static func readDeclaration(_ v: JSONValue) throws -> PluginReadDeclaration {
+    static func readDeclaration(_ v: JSONValue) throws -> PluginReadDeclaration {
         let bad = AutomationError.invalidManifest
         let f = try JSONFields(v, required: ["metadata", "headers", "queryKeys", "body"], error: bad)
         let metadata = try f.strings("metadata")
@@ -178,14 +187,14 @@ public struct PluginManifest: Equatable, Sendable {
         return true
     }
 
-    private static func isHeaderName(_ s: String) -> Bool {
+    static func isHeaderName(_ s: String) -> Bool {
         let extra = Array("!#$%&'*+-.^_`|~".utf8)
         return !s.isEmpty && s.utf8.count <= 128 && s.utf8.allSatisfy {
             ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x41 && $0 <= 0x5A) || ($0 >= 0x61 && $0 <= 0x7A) || extra.contains($0)
         }
     }
 
-    private static func isJSONPointer(_ s: String) -> Bool {
+    static func isJSONPointer(_ s: String) -> Bool {
         guard s.count <= 256 else { return false }
         if s.isEmpty { return true }
         guard s.first == "/" else { return false }

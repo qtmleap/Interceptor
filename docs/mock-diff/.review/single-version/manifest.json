@@ -1,0 +1,12 @@
+{
+  "time": "2026-10-20T15:21:35.344739+00:00",
+  "files": {
+    "SPEC.md": "fed8f73e6da57513f04b46a2f76e80d4dd28ab0359093952e6fc28f3ac953092",
+    "src/manifest-components.ts": "7f38a5aeb1ef0e3b084a94d6fcbdb40e88f2aa42137de02706d7417e20fddb10",
+    "src/manifest-screens.ts": "8fad138e47b6d1d8ccc16187865187ecad51435bcbe6a5c3eec3475136ed0942",
+    "src/manifest-fixtures.ts": "c2b0e58a7f990fba051c4d4e101c0ddd31f5a3019570a6251a4805d456b1b1d4",
+    "src/sileo-reference-style.ts": "65c61bd6aa0bb8724407a204d3e263041df06a8810bda03b2439c818b5a4ec43"
+  },
+  "fingerprint": "b21db76a8c2ed3b1f61eca9e5606c66fa3c993a07b3073e076c7ca8375dfed2e",
+  "scope": "Mock-only single installed/running version; updates preserve enabled; author/version/summary rows with installed check only; native app/SDK schema unchanged"
+}

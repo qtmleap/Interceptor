@@ -1,0 +1,15 @@
+{
+  "time": "2026-10-20T14:36:49.168160+00:00",
+  "workspace": "/Users/devonly/Developer/interceptor-live-scripts-20261018/Interceptor/docs/mock-diff",
+  "baseCopies": "/Users/devonly/Developer/interceptor-http-hooks-20261019/build/http-hooks/live-completion/remaining-verification/sileo-reference-refinement/before",
+  "files": {
+    "SPEC.md": "0f6f63d2a96eb063f58383f45a4bdd07b096675509217ebf2d40c1ec35237438",
+    "src/manifest-components.ts": "1b63bac12e20e6c5c76952de1e6c1bed184776b2e8ebd0e229168bd2625c12c9",
+    "src/manifest-screens.ts": "ed9d8190da23a567b6e488a83c16c0b8b96012552f9dcd3f4671c5df4b8c805a",
+    "src/manifest-fixtures.ts": "65ae5e0833106ee5bc46a9afb236d5e86f7f90f9f6715cf2d671eecce821a799",
+    "src/sileo-reference-style.ts": "826c1e81bcdf3e941c0b1dacf42958c9037d3517bcc9c3b631a868532dd6781d"
+  },
+  "scope": "Mock-only Sileo screenshot refinement, target host first view, source/package/script/delete flows; native app and adoption unchanged",
+  "fingerprint": "57162165d6a508eb53ab3674fcf37c730540a7bcbe208918f4a232e3d2092bba",
+  "delta": "Only final low fixes: hide Enabled whole section on missing state, SPEC direct seed clarification; version fact label Active version / \u5b9f\u884c\u30d0\u30fc\u30b8\u30e7\u30f3; catalog package row padding override restores 16px side inset."
+}

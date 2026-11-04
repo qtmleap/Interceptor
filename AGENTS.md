@@ -117,6 +117,19 @@ before applying the common defaults below. Preserve existing project-specific ru
 
 ## Review routing and named reviewers
 
+### UI-only usability review
+
+When LocalGPT reviews whether users can understand a UI, use a fresh UI-only
+session and provide only screenshots/visible UI and, when needed, a brief user
+goal. Do not provide code, repository references, design specifications or
+implementation explanations. Prohibit LocalMCP and file/code access; attached
+screenshot reviews use no tools. Ask what the screen communicates before asking
+for fixes, and require visible-UI evidence for ambiguity, outcomes, permission
+scope, risks, repetition and navigation. This UI-only route is separate from the
+actual-file engineering review requirements below. Native UI details and the
+reusable prompt are in `.agents/skills/ios-development/references/ui-review.md`.
+
+
 Applies only when the named tools are available; otherwise report the missing
 preferred capability and use an authorized alternative. Required repo gates and
 existing review policy always still apply.

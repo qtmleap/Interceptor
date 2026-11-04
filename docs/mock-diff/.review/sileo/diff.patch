@@ -1,0 +1,381 @@
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -38,13 +38,13 @@
+ 
+ ## Manifest browser proposals — 2026-10-20
+ 
+-These are proposals, with no adoption implied. Reuse the native grouped-list design, typography and colors above. A human chooses the new catalog and screens in Mock Diff Viewer before native implementation.
++These are proposals, with no adoption implied. On 2026-10-20 the human requested the Sileo package-browser composition and explicitly chose exactly Sources, Packages and Scripts as its three destinations. This supersedes the earlier Settings-form shell for Manifest screens only. Keep system typography and semantic light/dark colors, with a scoped teal accent. A human chooses the concrete catalog and screens in Mock Diff Viewer before native implementation.
+ 
+-Hierarchy: Repositories → Repository → Manifests → Manifest (enabled/disabled) → Scripts → full-screen Script. A repository contains purpose-specific Manifest bundles; the user imports only the ones they want. Registration and metadata refresh never import or enable a Manifest. The local virtual repository preserves file imports in the same hierarchy, without a publisher or update checks.
++Hierarchy: Repositories → Repository → Manifests → Manifest (enabled/disabled) → Scripts → full-screen Script. A repository contains purpose-specific Manifest bundles; the user adds only the ones they want. In the three-destination shell, Packages contains these Manifest bundles and Scripts contains only their file metadata. Registration and metadata refresh never import or enable a Manifest. The local virtual repository preserves file imports in the same hierarchy, without a publisher or update checks.
+ 
+-Normal Manifest use requires no code: show purpose, published/imported/active versions and the state-dependent Import, Import Update, Enable or Disable action. Scripts, Manifest JSON and Test are explicit navigation destinations; show neither code nor sample JSON in the normal Manifest detail. Scripts have no individual enable controls. Source and JSON are read-only; source opens full screen on both phone and tablet, with Done.
++Normal Manifest use requires no code: show purpose, published/added/active versions and the state-dependent Add, Add Update, Enable or Disable action. Scripts, Manifest JSON and Test are explicit navigation destinations; show neither code nor sample JSON in the normal Manifest detail. Scripts have no individual enable controls. Source and JSON are read-only; source opens full screen on both phone and tablet, with Done.
+ 
+-Check states distinguish not checked, checking, metadata update, up to date and failed. Never call persisted data latest without a successful check. Repository sequence is an update number, while a Manifest has a SemVer version. Published 2.0.0 with imported/active 1.0.0 offers Import Update. Imported 2.0.0 with active 1.0.0 offers Enable 2.0.0; import leaves 1.0.0 active, while explicit enable and OK atomically replace it. No separate Approve action.
++Check states distinguish not checked, checking, metadata update, up to date and failed. Never call persisted data latest without a successful check. Repository sequence is an update number, while a Manifest has a SemVer version. Published 2.0.0 with imported/active 1.0.0 offers Add Update. Imported 2.0.0 with active 1.0.0 offers Enable 2.0.0; import leaves 1.0.0 active, while explicit enable and OK atomically replace it. No separate Approve action.
+ 
+ The dedicated Test screen has prepared read-only sample JSON, a prominent Run Test button outside list rows, and a short footer explaining that it does not change live traffic or send data externally. Supplemental explanations belong in footers. Empty/error screens offer recovery. Fixtures use example.com and synthetic packages only.
+ 
+@@ -52,4 +52,20 @@
+ 
+ Build: `bun docs/mock-diff/src/manifest-screens.ts`. Generated HTML is self-contained, with Japanese/English, light/dark, iPhone 402×874 and landscape iPad 1180×820 variants. Browser mocks are design evidence; native captures and regression comparisons remain separate requirements.
+ 
+-The import, active and update mocks are successive states of one synthetic example, not simultaneous inventory. Local example is a separate file-imported bundle, shown disabled with an Enable action. Catalog updates use an explicit catalog label; activation status names the version it describes. The first-import and Manifest JSON mocks show 1.0.0, followed by the separate 2.0.0 update states.
++The import, active and update mocks are successive states of one synthetic example, not simultaneous inventory. Local example is a separate file-imported bundle, shown disabled with an Enable action. Catalog updates use an explicit catalog label; activation status names the version it describes. The first-add and Manifest JSON mocks show 1.0.0, followed by the separate 2.0.0 update states.
++
++### Sileo-style Sources / Packages / Scripts revision — 2026-10-20
++
++Use exactly these English navigation labels in both languages: Sources, Packages, Scripts. The dedicated Plugin browser uses three phone tabs and the same three iPad sidebar destinations. Keep Interceptor traffic capture outside this browser. No Featured, New, rankings, recommendation service, account or separate global-search tab. Primary visual reference: https://getsileo.app/ (official phone/iPad gallery). Use an original composition and inline SVG glyphs; do not reuse Sileo branding.
++
++Sources lists repository icons, names and URLs. Add Repository opens the added repository's Manifest catalog after metadata fetch. The catalog leads with a repository header and accessible local search of names and purposes, then compact icon-led package rows. Search shows a result count and a clear action; distinguish no match, empty catalog, loading and fetch failure. Existing cached catalog survives update failure. Repository URL and catalog search are permitted navigation inputs; Plugin settings, JSON and source remain read-only.
++
++Packages lists added Manifest bundles, showing enabled/disabled state and version/update facts. Add means import, leaves the Manifest disabled, and reveals a Packages link plus Enable. Addition and activation remain separate; explicit Enable with OK replaces an older active revision of the same family. Versions are SemVer values, never package counts. Sources registration/refresh never adds all packages or enables one.
++
++Scripts lists metadata for files grouped under their owning Manifest; neither a file listing nor a tab opens source automatically. A selected file opens full-screen read-only source with Done on phone and iPad. No file-level activation, code editor or configuration editor. Normal Sources, catalog and Package screens contain no inline JavaScript/JSON. Manifest JSON and Test remain explicit secondary destinations.
++
++Visual components: large native navigation titles; original square colored SVG icons; compact catalog rows with name, concise purpose, state and chevron; a package detail hero with icon, name and compact pill action; quiet version facts below. Destructive Disable is a restrained outlined/text action, not a full-width red banner. Supplemental explanations remain short Section footers. Shared Manifest shell/components are defined once in src/manifest-components.ts and listed in the component catalog before screen composition. Existing six workflow designs and adoption records are untouched.
++
++Mocks are self-contained clickable design fixtures, not real repository import/network/activation evidence. Navigation and local search work; add/enable state transitions use explicit fixture links without persisting app data. Keep JA/EN, phone 402×874, landscape iPad 1180×820 and light/dark variants. Native implementation, keyboard/IME, VPN and screenshot regression verification follow concrete design selection.
++
++Browser-only prototype state travels in the navigation URL's demo parameter to keep catalog, Packages and Scripts consistent inside the Viewer's sandbox. It contains synthetic fixture IDs/versions only, never app data, repository content or real activation; no browser storage or sandbox relaxation is used. Each direct state fixture seeds its declared sample; capture contexts are isolated. Initial Packages/Scripts show the file-imported Local example only.
+--- a/src/manifest-components.ts
++++ b/src/manifest-components.ts
+@@ -1,60 +1,89 @@
+-import {page,row,section,badge,escape,css} from './components';
++import {row, section, badge, escape, css} from './components';
+ 
++export type Lang = 'ja'|'en';
++export type Tab = 'Sources'|'Packages'|'Scripts';
+ export type Kind = 'ok'|'warn'|'error'|'neutral';
+-export type Lang = 'ja'|'en';
+-
+-// Extra styles only for the new primitives; everything else comes from the shared stylesheet.
+-export const extraCss = `.act{justify-content:center;color:var(--accent);font-weight:600}.act.destructive{color:var(--error)}.act.off{color:var(--muted);opacity:.5}.primary{display:block;width:100%;min-height:50px;border:0;border-radius:12px;background:var(--accent);color:white;font:600 17px -apple-system,BlinkMacSystemFont,sans-serif;padding:13px 18px;margin:24px 0 0}.primary:disabled{opacity:.45}.primary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.primary.destructive{background:var(--error)}pre.code{margin:0;padding:12px 16px;font:13px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.file{width:20px;height:20px;flex:none;color:var(--muted)}.full .detail{margin-left:0}.dialog-backdrop.inline{position:static;background:none;padding:20px}.dialog-backdrop{position:fixed;inset:0;z-index:9;background:#0006;display:grid;place-items:center}.dialog{width:270px;border-radius:14px;background:var(--surface);text-align:center;overflow:hidden}.dialog h3{font-size:17px;margin:20px 18px}.dialog-actions{display:flex;border-top:.5px solid var(--line)}.dialog-actions button{min-height:46px;flex:1;background:none;border:0;color:var(--accent);font:17px -apple-system,BlinkMacSystemFont,sans-serif}.dialog-actions button+button{border-left:.5px solid var(--line);font-weight:600}@media(min-width:700px){body.sheet.full{background:var(--bg)}.full .detail{width:auto;max-height:none;margin:0;border-radius:0;overflow:visible}}`;
+-
++export type Glyph = 'source'|'package'|'script'|'search'|'response'|'local'|'plus'|'close';
++const paths: Record<Glyph,string> = {
++  source:'M3 6h7l2 3h9v12H3z M3 6V3h8l2 3',
++  package:'m12 2 9 5v10l-9 5-9-5V7z M3 7l9 5 9-5 M12 12v10',
++  script:'M6 2h8l5 5v15H6z M14 2v6h5 M10 12l-2 2 2 2 M15 12l2 2-2 2',
++  search:'M20 20l-5-5 M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0',
++  response:'M4 6h12a4 4 0 0 1 0 8H5 M9 10l-4 4 4 4',
++  local:'M3 7h7l2 3h9v11H3z M3 7V4h8l2 3',
++  plus:'M12 4v16 M4 12h16',
++  close:'m6 6 12 12 M18 6 6 18',
++};
++export const svg = (name: Glyph) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name].split(' M').map((p,i)=>`<path d="${i?'M':''}${p}"/>`).join('')}</svg>`;
++export const tile = (name: Glyph, large = false) => `<span class="tile ${name} ${large?'large':''}">${svg(name)}</span>`;
++export const href = (name: string, lang: Lang) => `manifest-browser-${name}${lang==='en'?'-en':''}.html`;
++const link = (name: string, label: string, lang: Lang, className = '') => `<a class="${className}" href="${href(name,lang)}">${escape(label)}</a>`;
++export const extraCss = `
++.mf{--bg:#fff;--surface:#f5f5f7;--accent:#007e87;--buttonInk:#fff;--muted:#66676c;background:var(--bg)}
++.mf a{color:inherit;text-decoration:none}.mf button,.mf input{font:inherit}.mf a:focus-visible,.mf button:focus-visible,.mf input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
++.mf .detail{margin-left:0}.mf header{height:88px;border:0;background:var(--bg)}.mf header .status{height:38px;padding-top:10px}.mf .bar{display:flex;height:50px;padding:0 20px;justify-content:space-between}.mf .bar strong{font-size:17px}.mf .back,.mf .action{color:var(--accent);font-size:17px;min-width:44px;min-height:44px;display:flex;align-items:center}.mf .action{justify-content:flex-end}.mf .action svg{width:24px;height:24px}.mf .bar .spacer{min-width:44px}
++.mf main{padding:0 20px 100px;max-width:820px}.mf .large-title{font-size:34px;line-height:1.12;letter-spacing:-.8px;margin:10px 0 24px;font-weight:750;overflow-wrap:anywhere}.mf section{margin-top:24px}.mf h2{font-size:18px;font-weight:700;color:var(--ink);text-transform:none;padding:0;margin-bottom:12px}.mf .group{border-radius:12px}.mf .row{padding:12px 16px}.mf .footer{margin:8px 2px 0}.mf .catalog{background:none;border-radius:0}.mf .catalog .row{padding:14px 0;align-items:center;gap:12px;min-height:82px}.mf .catalog .row+.row:before{left:62px}.mf .catalog .label strong{font-size:17px;font-weight:650}.mf .catalog .sub{font-size:13px;line-height:1.35}.mf .state{font-size:12px;color:var(--muted);margin-top:5px;display:block}.mf .chevron{font-size:22px}
++.mf .tile{display:flex;width:50px;height:50px;border-radius:12px;align-items:center;justify-content:center;flex:none;color:white;background:#279caa}.mf .tile svg{width:29px;height:29px}.mf .tile.large{width:72px;height:72px;border-radius:17px}.mf .tile.large svg{width:42px;height:42px}.mf .tile.package,.mf .tile.search{background:#358bac}.mf .tile.response{background:#8b72b1}.mf .tile.local,.mf .tile.script{background:#707d90}
++.mf .package-hero{display:flex;align-items:center;gap:16px;margin:16px 0 24px}.mf .hero-copy{flex:1;min-width:0}.mf .hero-copy h1{font-size:24px;line-height:1.14;margin:0 0 6px;letter-spacing:-.4px;overflow-wrap:anywhere}.mf .hero-copy p{font-size:14px;line-height:1.4;margin:0;color:var(--muted)}.mf .hero-action{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0}.mf .pill{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:7px 20px;border:0;border-radius:22px;background:var(--accent);color:var(--buttonInk);font-size:15px;font-weight:700}.mf .pill.destructive{background:transparent;color:var(--error);box-shadow:inset 0 0 0 1px var(--line)}.mf .pill.disabled{opacity:.4;pointer-events:none}.mf .text-link{color:var(--accent);font-weight:550;min-height:44px;display:inline-flex;align-items:center}.mf .primary{margin:20px 0 0;min-height:46px;border:0;border-radius:12px;background:var(--accent);color:var(--buttonInk);font:600 17px -apple-system,sans-serif;width:100%}.mf .primary:disabled{opacity:.4}
++.mf dialog.dialog{padding:0;border:0;color:var(--ink)}.mf dialog.dialog:not([open]){display:none}.mf dialog.dialog::backdrop{background:#0006}.mf .catalog>.row:nth-child(1 of .row:not([hidden])):before{display:none}.mf .search-box{display:flex;gap:8px;align-items:center;border-radius:11px;background:var(--surface);padding:0 12px;min-height:44px;margin:16px 0 10px}.mf .search-box svg{width:19px;height:19px;color:var(--muted);flex:none}.mf .search-box input{border:0;outline:0;background:transparent;min-width:0;width:100%;height:44px;color:var(--ink);font-size:16px}.mf .search-box button{background:none;border:0;color:var(--accent);font-size:14px;min-height:44px;flex:none}.mf .result-count{font-size:13px;color:var(--muted);margin:10px 0 0}.mf [hidden]{display:none!important}.mf .empty{padding:32px 16px;text-align:center;color:var(--muted)}.mf .empty svg{width:30px;height:30px;margin-bottom:12px}.mf .empty strong{display:block;font-size:18px;color:var(--ink);margin-bottom:8px}.mf .repo-url{font-size:13px;color:var(--muted);overflow-wrap:anywhere}.mf .field{background:var(--surface);border-radius:12px;padding:14px;width:100%;border:1px solid var(--line);color:var(--ink)}.mf .field-label{font-size:14px;display:block;margin:20px 0 8px}
++.mf .tabbar{height:78px;padding:9px 12px 22px;gap:8px;background:var(--bg)}.mf .tabbar a{display:flex;flex:1;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted)}.mf .tabbar svg{width:24px;height:24px}.mf .tabbar a.active{color:var(--accent)}.mf .sidebar{display:none}.mf pre.code{margin:0;padding:16px;font:13px/1.6 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.mf.full main{padding-bottom:32px}.mf .dialog-backdrop{position:fixed;inset:0;z-index:9;background:#0006;display:grid;place-items:center}.mf .dialog{width:290px;border-radius:14px;background:var(--surface);text-align:center;overflow:hidden}.mf .dialog h3{font-size:17px;line-height:1.4;margin:20px 18px}.mf .dialog-actions{display:flex;border-top:.5px solid var(--line)}.mf .dialog-actions a{min-height:46px;flex:1;color:var(--accent);display:grid;place-items:center}.mf .dialog-actions a+a{border-left:.5px solid var(--line);font-weight:600}.mf .dialog-backdrop.inline{position:static;background:none;padding:16px}
++@media(prefers-color-scheme:dark){.mf{--bg:#151517;--surface:#242427;--ink:#f7f7f8;--muted:#a1a1a9;--line:#37373c;--accent:#74d1d6;--buttonInk:#123336}.mf .tile{filter:brightness(.9)}}
++@media(min-width:700px){.mf .sidebar{display:block;width:248px;position:fixed;inset:0 auto 0 0;padding:32px 16px;background:var(--surface);border-right:.5px solid var(--line)}.mf .sidebar .sidebar-title{text-align:left;font-size:28px;margin:30px 12px}.mf .sidebar a{display:flex;align-items:center;gap:12px;padding:13px 14px;margin:4px 0;border-radius:10px;font-weight:550}.mf .sidebar svg{width:22px;height:22px}.mf .sidebar .active{background:var(--accent);color:var(--buttonInk)}.mf .detail{margin-left:248px}.mf main{padding:0 30px 48px}.mf .bar{padding:0 30px}.mf .tabbar{display:none}.mf .large-title{margin-top:12px}.mf.full .detail{margin-left:0}.mf.full main{max-width:1000px}.mf.full .sidebar{display:none}}
++`;
++export const statusRow = (kind: Kind,label:string) => `<div class="row"><div class="label">${badge(kind,label)}</div></div>`;
+ export const checkStates = ['unknown','checking','success','update','failed','catalogUpdate'] as const;
+-export type CheckState = typeof checkStates[number];
+-export type StateKind = 'trusted'|'untrusted'|'published'|'imported'|'enabled'|'disabled';
+-
+-const copy = {
+-  check: {unknown:['未確認','Not checked'],checking:['確認中…','Checking…'],success:['最新です','Up to date'],update:['更新あり','Update available'],failed:['確認できません','Check failed'],catalogUpdate:['一覧に更新があります','Catalog update available']},
+-  state: {trusted:['公開元の鍵を確認済み','Publisher key verified'],untrusted:['公開元の鍵は未確認','Publisher key not verified'],published:['公開済み','Published'],imported:['インポート済み','Imported'],enabled:['有効','Enabled'],disabled:['無効','Disabled']},
+-  version: {published:['公開','Published'],imported:['インポート','Imported'],active:['有効','Active']},
+-} as const;
+-const pick = (pair: readonly [string,string], lang: Lang) => pair[lang === 'ja' ? 0 : 1];
+-
+-const checkKind: Record<CheckState,Kind> = {unknown:'neutral',checking:'neutral',success:'ok',update:'warn',failed:'error',catalogUpdate:'warn'};
+-const stateKind: Record<StateKind,Kind> = {trusted:'ok',untrusted:'warn',published:'neutral',imported:'neutral',enabled:'ok',disabled:'neutral'};
+-
+-const icon = '<svg class="file" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h7l4 4v12H5z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 2v4h4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
+-
+-export const statusRow = (kind: Kind, label: string) => `<div class="row"><div class="label">${badge(kind,label)}</div></div>`;
+-export const checkRow = (state: CheckState, lang: Lang) => statusRow(checkKind[state], pick(copy.check[state], lang));
+-export const stateRow = (state: StateKind, lang: Lang) => statusRow(stateKind[state], pick(copy.state[state], lang));
+-export const actionRow = (label: string, tone: 'primary'|'destructive'|'disabled' = 'primary') =>
+-  `<div class="row act ${tone === 'destructive' ? 'destructive' : tone === 'disabled' ? 'off' : ''}" role="button" tabindex="0" ${tone === 'disabled' ? 'aria-disabled="true"' : ''}>${escape(label)}</div>`;
+-export const primaryButton = (label: string, state: 'ready'|'disabled'|'loading'|'destructive' = 'ready') =>
+-  `<button class="primary ${state === 'destructive' ? 'destructive' : ''}" ${state === 'disabled' || state === 'loading' ? 'disabled' : ''} ${state === 'loading' ? 'aria-busy="true"' : ''}>${escape(label)}</button>`;
+-export const codeBlock = (text: string) => `<pre class="code" tabindex="0">${escape(text)}</pre>`;
+-export const scriptRow = (fileName: string, path: string, detail = true) =>
+-  `<div class="row">${icon}<div class="label">${escape(fileName)}<span class="sub">${escape(path)}</span></div>${detail ? '<span class="chevron">›</span>' : ''}</div>`;
+-
+-// One row per version fact. Omitted values are not shown, so an errored check never implies a latest version.
+-export const versionRows = (lang: Lang, v: {published?: string; imported?: string; active?: string}, none: string) =>
+-  (v.published ? row(pick(copy.version.published, lang), v.published) : '')
+-  + (v.imported ? row(pick(copy.version.imported, lang), v.imported) : '')
+-  + row(pick(copy.version.active, lang), v.active ?? none);
+-
+-export const confirmation = (title: string, ok: string, cancel: string, inline = false) =>
+-  `<div class="dialog-backdrop ${inline ? 'inline' : ''}"><div class="dialog" role="dialog" aria-label="${escape(title)}"><h3>${escape(title)}</h3><div class="dialog-actions"><button>${escape(cancel)}</button><button>${escape(ok)}</button></div></div></div>`;
+-
+-export function manifestPage(title: string, contents: string, options: {back?: string; action?: string; disabled?: boolean; fullscreen?: boolean; lang: Lang}) {
+-  const html = page(title, contents, {back: options.back, action: options.action, disabled: options.disabled, sheet: options.fullscreen, lang: options.lang});
+-  const withClass = options.fullscreen ? html.replace('<body class="sheet">', () => '<body class="sheet full">') : html;
+-  return withClass.replace('</style>', () => `${extraCss}</style>`);
++export const checkRow = (state: typeof checkStates[number],lang: Lang) => {
++ const values={unknown:['未確認','Not checked'],checking:['取得中…','Loading…'],success:['更新なし','No updates'],update:['更新あり','Update available'],failed:['取得できませんでした','Could not load'],catalogUpdate:['一覧に更新があります','Catalog update available']} as const;
++ return statusRow(state==='failed'?'error':state==='update'||state==='catalogUpdate'?'warn':state==='success'?'ok':'neutral',values[state][lang==='ja'?0:1]);
++};
++export const stateRow = (state: 'trusted'|'enabled'|'disabled',lang:Lang) => statusRow(state==='disabled'?'neutral':'ok',({trusted:['公開元の鍵を確認済み','Publisher key verified'],enabled:['有効','Enabled'],disabled:['追加済み・無効','Added · Disabled']} as const)[state][lang==='ja'?0:1]);
++export const primaryButton = (label:string,destination:string,lang:Lang,disabled=false) => disabled?`<button class="primary" disabled>${escape(label)}</button>`:link(destination,label,lang,'primary pill');
++export const pill = (label:string,destination:string,lang:Lang,tone='') => `<a class="pill ${tone}" href="${href(destination,lang)}?apply=1">${escape(label)}</a>`;
++export const codeBlock = (value:string) => `<pre class="code" tabindex="0">${escape(value)}</pre>`;
++export const navRow = (label:string,destination:string,lang:Lang,value='') => `<a href="${href(destination,lang)}" class="row"><span class="label">${escape(label)}</span><span class="value">${escape(value)}</span><span class="chevron">›</span></a>`;
++export const iconRow = (name:string,purpose:string,state:string,destination:string,lang:Lang,glyph:Glyph='package',searchable=true) => `<a class="row" href="${href(destination,lang)}" ${searchable?`data-catalog-item data-package="${name==='Search limit'?'search':name==='Response preview'?'preview':'local'}" data-search="${escape(`${name} ${purpose}`.toLowerCase())}"`:''}>${tile(glyph)}<span class="label"><strong>${escape(name)}</strong><span class="sub">${escape(purpose)}</span>${state?`<span class="state">${escape(state)}</span>`:''}</span><span class="chevron">›</span></a>`;
++export const scriptRow = (name:string,path:string,lang:Lang) => iconRow(name,path,'',name==='response.js'?'script-response':'script',lang,'script',false);
++export const packageHero = (name:string,purpose:string,action:string,glyph:Glyph='package') => `<div class="package-hero">${tile(glyph,true)}<div class="hero-copy"><h1>${escape(name)}</h1><p>${escape(purpose)}</p></div></div><div class="hero-action">${action}</div>`;
++export const versionRows = (lang:Lang,versions:{published?:string;imported?:string;active?:string},none:string) => (versions.published?row(lang==='ja'?'公開':'Published',versions.published):'')+(versions.imported?row(lang==='ja'?'追加済み':'Added',versions.imported):'')+row(lang==='ja'?'有効':'Active',versions.active??none);
++export const confirmation = (title:string,ok:string,cancel:string,lang:Lang,confirmDestination='manifest',inline=false,cancelDestination='manifest-added') => {
++ const contents=`<h3>${escape(title)}</h3><div class="dialog-actions"><a data-cancel autofocus href="${href(cancelDestination,lang)}">${escape(cancel)}</a><a href="${href(confirmDestination,lang)}?apply=1">${escape(ok)}</a></div>`;
++ return inline?`<div class="dialog-backdrop inline"><div class="dialog">${contents}</div></div>`:`<dialog class="dialog" aria-label="${escape(title)}">${contents}</dialog>`;
++};
++export const searchField = (lang:Lang,query='') => `<div class="search-box">${svg('search')}<input type="search" aria-label="${lang==='ja'?'このリポジトリ内を検索':'Search this repository'}" placeholder="${lang==='ja'?'このリポジトリ内を検索':'Search this repository'}" value="${escape(query)}"><button type="button" data-clear>${lang==='ja'?'クリア':'Clear'}</button></div><p class="result-count" aria-live="polite" data-result-count></p><div class="empty" data-no-results hidden>${svg('search')}<strong>${lang==='ja'?'一致するManifestはありません':'No matching Manifests'}</strong></div>`;
++const searchScript = `<script>
++const en = document.documentElement.lang === 'en';
++const route = location.pathname.split('/').pop().replace('manifest-browser-', '').replace(/(-en)?\\.html$/, '');
++const destination = name => 'manifest-browser-' + name + (en ? '-en' : '') + '.html';
++const parameters = new URLSearchParams(location.search);
++const saved = (() => { try { return JSON.parse(parameters.get('demo') || '{}'); } catch { return {}; } })();
++const demo = {local:{added:'1.0.0',active:null}, ...saved};
++const states = {'packages-added':['search','1.0.0',null],'manifest-update':['search','1.0.0','1.0.0'],'manifest-added':['search','1.0.0',null],manifest:['search','1.0.0','1.0.0'],'manifest-enable':['search','2.0.0','1.0.0'],'manifest-updated':['search','2.0.0','2.0.0'],'manifest-disabled-update':['search','2.0.0',null],'manifest-preview-added':['preview','1.0.0',null],'manifest-preview-enabled':['preview','1.0.0','1.0.0'],'manifest-local':['local','1.0.0',null],'manifest-local-enabled':['local','1.0.0','1.0.0']};
++if (states[route]) { const [id,added,active] = states[route]; if(!saved[id] || new URLSearchParams(location.search).get('apply')==='1'){demo[id] = {added,active}; } }
++const target = (id, state) => id === 'search' ? (!state ? 'manifest-import' : state.active === '2.0.0' ? 'manifest-updated' : state.added === '2.0.0' ? (state.active ? 'manifest-enable' : 'manifest-disabled-update') : state.active ? 'manifest' : 'manifest-added') : id === 'preview' ? (!state ? 'manifest-preview' : state.active ? 'manifest-preview-enabled' : 'manifest-preview-added') : state && state.active ? 'manifest-local-enabled' : 'manifest-local';
++const status = state => !state ? (en?'Not added':'未追加') : state.added + ' · ' + (state.active === state.added ? (en?'Enabled':'有効') : state.active ? (en?'Added; active ':'追加済み・有効 ') + state.active : (en?'Added · Disabled':'追加済み・無効'));
++document.querySelectorAll('[data-package]').forEach(item => { const state = demo[item.dataset.package]; item.href = destination(target(item.dataset.package,state)); const label = item.querySelector('.state'); if(label) label.textContent = status(state); });
++document.querySelectorAll('[data-installed-template]').forEach(item => { const state=demo[item.dataset.installedTemplate]; item.hidden=!state; if(state){item.href=destination(target(item.dataset.installedTemplate,state)); item.querySelector('.state').textContent=status(state);} });
++document.querySelectorAll('[data-script-owner]').forEach(group => { group.hidden=!demo[group.dataset.scriptOwner]; });
++const search = document.querySelector('input[type="search"]');
++if (search) { const items=[...document.querySelectorAll('[data-catalog-item]')]; const count=document.querySelector('[data-result-count]'); const empty=document.querySelector('[data-no-results]'); 
++ const update=()=>{const query=search.value.trim().toLowerCase();items.forEach(item=>{item.hidden=!item.dataset.search.includes(query);});const matches=items.filter(item=>!item.hidden).length;count.textContent=en?matches+(matches===1?' Manifest':' Manifests'):matches+'件';empty.hidden=matches!==0;};
++ search.addEventListener('input',update);document.querySelector('[data-clear]').addEventListener('click',()=>{search.value='';update();search.focus();});update(); }
++document.querySelectorAll('a').forEach(anchor=>{const file=anchor.href.split('/').pop().split('?')[0];if(file===destination('manifest')&&!anchor.search.includes('apply=1')&&demo.search)anchor.href=destination(target('search',demo.search));});
++document.querySelectorAll('[data-update-offer]').forEach(row=>{row.hidden=demo.search?.added!=='1.0.0';});
++const manifestJSON=document.querySelector('[data-manifest-json]');if(manifestJSON&&demo.search){const value=JSON.parse(manifestJSON.textContent);value.version=demo.search.added;manifestJSON.textContent=JSON.stringify(value,null,2);}
++document.querySelectorAll('a[href]').forEach(anchor=>{const url=new URL(anchor.href);url.searchParams.set('demo',JSON.stringify(demo));anchor.href=url.href;});
++const dialog=document.querySelector('dialog');if(dialog){dialog.showModal();dialog.addEventListener('cancel',event=>{event.preventDefault();location.href=dialog.querySelector('[data-cancel]').href;});}
++</script>`;
++export function manifestPage(title:string,contents:string,options:{back?:string;backPage?:string;action?:string;actionPage?:string;fullscreen?:boolean;lang:Lang;tab?:Tab;large?:boolean;donePage?:string}) {
++ const lang=options.lang, en=lang==='en', active=options.tab??'Sources';
++ const tabs=([['Sources','repositories','source'],['Packages','packages','package'],['Scripts','scripts','script']] as const).map(([label,page,glyph])=>`<a class="${active===label?'active':''}" ${active===label?'aria-current="page"':''} href="${href(page,lang)}">${svg(glyph)}${label}</a>`).join('');
++ const back=options.fullscreen||options.large?'':link(options.backPage??'repositories',`‹ ${options.back??'Sources'}`,lang,'back');
++ const action=options.fullscreen?link(options.donePage??'scripts',en?'Done':'完了',lang,'action'):options.action?link(options.actionPage??'repository-add',options.action,lang,'action'):options.large&&active==='Sources'?`<a class="action" aria-label="${en?'Add Repository':'リポジトリを追加'}" href="${href('repository-add',lang)}">${svg('plus')}</a>`:'';
++ return `<!doctype html><html lang="${lang}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)}</title><style>${css}${extraCss}</style><body class="mf ${options.fullscreen?'full':''}">${options.fullscreen?'':`<aside class="sidebar"><div class="sidebar-title">Plugins</div>${tabs}</aside>`}<div class="detail"><header><div class="status"><span>9:41</span><span>Wi-Fi ▰</span></div><div class="bar">${back||'<span class="spacer"></span>'}<strong>${options.large?'':escape(title)}</strong>${action||'<span class="spacer"></span>'}</div></header><main>${options.large?`<h1 class="large-title">${escape(title)}</h1>`:''}${contents}</main></div>${options.fullscreen?'':`<nav class="tabbar" aria-label="Plugins">${tabs}</nav>`}${searchScript}</body></html>`;
+ }
+-
+-// Registry of reusable parts: screens look parts up by name so a missing one fails generation.
+-export const parts = {page, row, section, badge, statusRow, checkRow, stateRow, actionRow, primaryButton, codeBlock, scriptRow, versionRows, confirmation, manifestPage} as const;
+-export type PartName = keyof typeof parts;
+-
+-export function requireParts<N extends PartName>(names: readonly N[]): Pick<typeof parts, N> {
+-  const missing = names.filter(name => (parts as Record<string, unknown>)[name] === undefined);
+-  if (missing.length > 0) throw new Error(`Missing manifest browser components: ${missing.join(', ')}`);
+-  if (!css.includes('.group') || !css.includes('.row')) throw new Error('Shared stylesheet lacks .group/.row');
+-  return Object.fromEntries(names.map(name => [name, parts[name]])) as Pick<typeof parts, N>;
++export const parts={row,section,badge,statusRow,checkRow,stateRow,primaryButton,pill,codeBlock,navRow,iconRow,scriptRow,packageHero,versionRows,confirmation,searchField,manifestPage,href,svg,tile} as const;
++export type PartName=keyof typeof parts;
++export function requireParts<N extends PartName>(names:readonly N[]):Pick<typeof parts,N>{
++ const missing=names.filter(name=>!(name in parts));if(missing.length)throw new Error(`Missing components: ${missing.join(', ')}`);
++ return Object.fromEntries(names.map(name=>[name,parts[name]])) as Pick<typeof parts,N>;
+ }
+--- a/src/manifest-screens.ts
++++ b/src/manifest-screens.ts
+@@ -1,123 +1,67 @@
+-import {checkStates, requireParts} from './manifest-components';
+-
+-const base = `${import.meta.dir}/..`;
+-const {row, section, statusRow, checkRow, stateRow, actionRow, primaryButton, codeBlock, scriptRow, versionRows, confirmation, manifestPage} = requireParts([
+-  'row', 'section', 'statusRow', 'checkRow', 'stateRow', 'actionRow', 'primaryButton', 'codeBlock', 'scriptRow', 'versionRows', 'confirmation', 'manifestPage',
+-] as const);
+-
+-// Synthetic examples use the same schema and attach API as the current app.
+-const sourceFile = 'scripts/request.js';
+-const sourceCode = [
+-  'Interceptor.attach({',
+-  '  request: {',
+-  '    onEnter(req, cfg) {',
+-  '      req.body.limit = 5;',
+-  '    }',
+-  '  }',
+-  '});',
+-].join('\n');
+-const manifest = {
+-  schemaVersion: 2, id: '22222222-2222-4222-8222-222222222222',
+-  name: 'Search limit', version: '1.0.0', summary: 'Set the search limit to 5.',
+-  matches: [{hosts: ['example.com'], methods: ['POST'], path: {kind: 'exact', value: '/synthetic'},
+-    hooks: {request: {onEnter: sourceFile}, response: {onLeave: 'scripts/response.js'}}}],
+-  read: {metadata: ['method', 'host', 'path'], headers: [], queryKeys: [], body: {mode: 'json'}},
+-  write: {requestBody: true, responseBody: false}, endpointBindings: [], settings: {},
+-};
+-const testJson = JSON.stringify({request: {method: 'POST', host: 'example.com', path: '/synthetic', body: {limit: 20}}}, null, 2);
+-
+-async function build(lang: 'ja' | 'en') {
+-  const en = lang === 'en';
+-  const t = (ja: string, english: string) => en ? english : ja;
+-  const write = (name: string, html: string) => Bun.write(`${base}/mocks/manifest-browser-${name}${en ? '-en' : ''}.html`, html);
+-  const shell = (title: string, contents: string, back = t('Manifest', 'Manifests'), action = '') =>
+-    manifestPage(title, contents, {back, action, lang});
+-  const none = t('なし', 'None');
+-  const title = 'Search limit';
+-  const purpose = t('検索件数の上限を5に変更します。', 'Sets the search limit to 5.');
+-  const version = (published?: string, imported?: string, active?: string) =>
+-    versionRows(lang, {published, imported, active}, none);
+-  const contents = section(t('詳細', 'Details'),
+-    row(t('スクリプト', 'Scripts'), t('2件', '2 files'), true)
+-    + row('Manifest JSON', '', true) + row(t('テスト', 'Test'), '', true));
+-  const scope = section(t('対象', 'Scope'),
+-    row('POST', 'example.com/synthetic'), t('リクエスト本文を変更します。', 'Changes the request body.'));
+-  const detail = (button: string, versions: string, state: string, name = title, footer = '') =>
+-    section(t('概要', 'About'), row(name, '', false, purpose))
+-    + section(t('バージョン', 'Versions'), versions)
+-    + section(t('状態', 'Status'), state, footer) + button + contents;
+-
+-  await write('components', shell(t('共通コンポーネント', 'Components'),
+-    section(t('更新確認', 'Update check'), checkStates.map(s => checkRow(s, lang)).join(''))
+-    + section(t('状態', 'State'), (['trusted', 'untrusted', 'published', 'imported', 'enabled', 'disabled'] as const).map(s => stateRow(s, lang)).join(''))
+-    + section(t('バージョン', 'Versions'), version('2.0.0', '2.0.0', '1.0.0'))
+-    + primaryButton(t('インポート', 'Import')) + primaryButton(t('有効にする', 'Enable'), 'disabled')
+-    + primaryButton(t('確認中…', 'Checking…'), 'loading')
+-    + section(t('操作行', 'Action row'), actionRow(t('更新を確認', 'Check for Updates')))
+-    + section(t('確認', 'Confirmation'), confirmation(t('有効にしますか？', 'Enable this Manifest?'), 'OK', t('キャンセル', 'Cancel'), true))
+-    + section(t('ファイル', 'Files'), scriptRow('request.js', sourceFile) + codeBlock(sourceCode)),
+-    t('設定', 'Settings')));
+-
+-  await write('repositories', shell(t('リポジトリ', 'Repositories'),
+-    section('', row('Example Repository', '2 Manifest', true) + row(t('ローカル', 'Local'), '1 Manifest', true)),
+-    t('設定', 'Settings'), t('追加', 'Add')));
+-  const manifestRows = row(title, t('1.0.0・有効', '1.0.0 · Enabled'), true)
+-    + row('Response preview', t('未インポート', 'Not imported'), true);
+-  const repoInfo = section(t('リポジトリ', 'Repository'),
+-    row('URL', 'https://example.com/repository.json') + row(t('更新番号', 'Update number'), '12') + stateRow('trusted', lang));
+-  await write('repository', shell('Example Repository',
+-    section('Manifest', manifestRows) + repoInfo
+-    + section(t('更新確認', 'Update check'), checkRow('unknown', lang) + actionRow(t('更新を確認', 'Check for Updates')),
+-      t('必要なManifestを選んでインポートしてください。', 'Choose the Manifests you want to import.')),
+-    t('リポジトリ', 'Repositories')));
+-  await write('repository-update', shell('Example Repository',
+-    section('Manifest', manifestRows) + repoInfo
+-    + section(t('更新確認', 'Update check'), checkRow('catalogUpdate', lang) + row(t('取得した更新番号', 'Fetched update number'), '13'),
+-      t('一覧情報だけを更新します。Manifestは自動でインポートされません。', 'Updates the catalog only. Manifests are not imported automatically.'))
+-    + primaryButton(t('一覧を更新', 'Update Catalog')), t('リポジトリ', 'Repositories')));
+-  await write('manifests', shell(t('ローカル', 'Local'),
+-    section('Manifest', row('Local example', t('1.0.0・無効', '1.0.0 · Disabled'), true)),
+-    t('リポジトリ', 'Repositories')));
+-
+-  await write('manifest', shell(title,
+-    detail(primaryButton(t('無効にする', 'Disable'), 'destructive'), version('1.0.0', '1.0.0', '1.0.0'), stateRow('enabled', lang))));
+-  await write('manifest-local', shell('Local example',
+-    detail(primaryButton(t('有効にする', 'Enable')), version(undefined, '1.0.0'), stateRow('disabled', lang), 'Local example'), t('ローカル', 'Local')));
+-  await write('manifest-import', shell(title,
+-    detail(primaryButton(t('インポート', 'Import')), version('1.0.0'), statusRow('neutral', t('未インポート', 'Not imported')), title, t('インポート後に有効にできます。', 'You can enable it after importing.'))
+-    + scope));
+-  await write('manifest-update', shell(title,
+-    detail(primaryButton(t('2.0.0をインポート', 'Import 2.0.0')), version('2.0.0', '1.0.0', '1.0.0'), checkRow('update', lang), title, t('インポート後も1.0.0が有効です。', '1.0.0 stays enabled after import.')),
+-    'Manifest'));
+-  await write('manifest-enable', shell(title,
+-    detail(primaryButton(t('2.0.0を有効にする', 'Enable 2.0.0')), version('2.0.0', '2.0.0', '1.0.0'), statusRow('neutral', t('2.0.0・無効', '2.0.0 · Disabled')))
+-    + scope + confirmation(t('2.0.0を有効にして1.0.0を置き換えますか？', 'Enable 2.0.0 and replace 1.0.0?'), 'OK', t('キャンセル', 'Cancel'))));
+-
+-  await write('scripts', shell(t('スクリプト', 'Scripts'),
+-    section('', scriptRow('request.js', sourceFile) + scriptRow('response.js', 'scripts/response.js')), title));
+-  await write('script', manifestPage('request.js', section(sourceFile, codeBlock(sourceCode)),
+-    {back: '', action: t('完了', 'Done'), fullscreen: true, lang}));
+-  await write('manifest-json', manifestPage('Manifest JSON', section('', codeBlock(JSON.stringify(manifest, null, 2))),
+-    {back: '', action: t('完了', 'Done'), fullscreen: true, lang}));
+-  await write('test', shell(t('テスト', 'Test'),
+-    section(t('対象', 'Target'), row(t('テストするHook', 'Hook to test'), 'request.onEnter', true))
+-    + section(t('サンプルイベント（JSON）', 'Sample event (JSON)'), codeBlock(testJson))
+-    + section(t('サンプル設定（JSON）', 'Sample configuration (JSON)'), codeBlock('{\n  "settings": {},\n  "endpoints": {}\n}'))
+-    + primaryButton(t('テストを実行', 'Run Test'))
+-    + section(t('結果', 'Result'), statusRow('neutral', t('未実行', 'No result yet.')),
+-      t('サンプルデータで実行します。実通信の変更や外部送信は行いません。', 'Runs with sample data, without changing live traffic or sending data externally.')), title));
+-
+-  await write('empty', shell(t('リポジトリ', 'Repositories'),
+-    section('', statusRow('neutral', t('リポジトリがありません', 'No repositories')),
+-      t('リポジトリを追加してManifestを探せます。', 'Add a repository to browse its Manifests.'))
+-    + primaryButton(t('リポジトリを追加', 'Add Repository')), t('設定', 'Settings')));
+-  await write('error', shell('Example Repository',
+-    section('', statusRow('error', t('更新を確認できませんでした', 'Could not check for updates')),
+-      t('接続を確認して、もう一度お試しください。', 'Check your connection and try again.'))
+-    + section(t('保存済みの情報', 'Saved catalog'), row(t('更新番号', 'Update number'), '12'))
+-    + primaryButton(t('再試行', 'Try Again')), t('リポジトリ', 'Repositories')));
++import {checkStates,requireParts,type Lang,type Tab} from './manifest-components';
++const {row,section,statusRow,checkRow,stateRow,primaryButton,pill,codeBlock,navRow,iconRow,scriptRow,packageHero,versionRows,confirmation,searchField,manifestPage,href,svg}=requireParts(['row','section','statusRow','checkRow','stateRow','primaryButton','pill','codeBlock','navRow','iconRow','scriptRow','packageHero','versionRows','confirmation','searchField','manifestPage','href','svg'] as const);
++const base=`${import.meta.dir}/..`;
++const sourceFile='scripts/request.js';
++const sourceCode='Interceptor.attach({\n  request: {\n    onEnter(req, cfg) {\n      req.body.limit = 5;\n    }\n  }\n});';
++const manifest={schemaVersion:2,id:'22222222-2222-4222-8222-222222222222',name:'Search limit',version:'1.0.0',summary:'Set the search limit to 5.',matches:[{hosts:['example.com'],methods:['POST'],path:{kind:'exact',value:'/synthetic'},hooks:{request:{onEnter:sourceFile},response:{onLeave:'scripts/response.js'}}}],read:{metadata:['method','host','path'],headers:[],queryKeys:[],body:{mode:'json'}},write:{requestBody:true,responseBody:false},endpointBindings:[],settings:{}};
++const generated:string[]=[];
++async function build(lang:Lang){
++ const en=lang==='en',t=(ja:string,english:string)=>en?english:ja;
++ const write=async(name:string,html:string)=>{
++  if(!['components','script','script-local','script-response','manifest-json','test'].includes(name)&&(/<pre\b|Interceptor\.attach/.test(html)))throw new Error(`Unexpected code in ${name}`);
++  if(['script','script-local','script-response','manifest-json','test'].includes(name)&&(/<(input|textarea)\b|contenteditable/.test(html)))throw new Error(`Editable content in ${name}`);
++  generated.push(`${name}:${lang}`);return Bun.write(`${base}/mocks/manifest-browser-${name}${en?'-en':''}.html`,html);
++ };
++ const shell=(title:string,content:string,tab:Tab='Sources',back='Sources',backPage='repositories',large=false)=>manifestPage(title,content,{lang,tab,back,backPage,large});
++ const catalog=(query='',local=false)=>searchField(lang,query)+`<div class="catalog">${local?iconRow('Local example',t('検索件数の上限を5に変更します。','Sets the search limit to 5.'),t('1.0.0 · 追加済み・無効','1.0.0 · Added · Disabled'),'manifest-local',lang,'local'):iconRow('Search limit',t('検索件数の上限を5に変更します。','Sets the search limit to 5.'),t('1.0.0 · 未追加','1.0.0 · Not added'),'manifest-import',lang,'search')+iconRow('Response preview',t('レスポンスのJSONを確認します。','Inspect the response JSON.'),t('1.0.0 · 未追加','1.0.0 · Not added'),'manifest-preview',lang,'response')}</div>`;
++ const repoHero=packageHero('Example Repository','example.com','', 'source');
++ const repoDetails=section(t('リポジトリ情報','Repository Information'),row('URL','https://example.com/repository.json')+row(t('更新番号','Update number'),'12')+stateRow('trusted',lang));
++ const details=section(t('詳細','Details'),navRow('Scripts','scripts',lang,t('2件','2 files'))+navRow('Manifest JSON','manifest-json',lang)+navRow(t('テスト','Test'),'test',lang));
++ const scope=section(t('対象','Scope'),row('POST','example.com/synthetic'),t('リクエスト本文を変更します。','Changes the request body.'));
++ const versions=(published?:string,imported?:string,active?:string)=>section(t('バージョン','Versions'),versionRows(lang,{published,imported,active},t('なし','None')));
++ const hero=(action:string,name='Search limit',purpose=t('検索件数の上限を5に変更します。','Sets the search limit to 5.'))=>packageHero(name,purpose,action,'search');
++ const state=(label:string,footer='',kind:'ok'|'neutral'|'warn'='neutral')=>section(t('状態','Status'),statusRow(kind,label),footer);
++ const packagePage=(content:string,title='Search limit',fromSource=false)=>shell(title,content,fromSource?'Sources':'Packages',fromSource?'Example Repository':'Packages',fromSource?'repository':'packages');
++ const fileList=`<div data-script-owner="local">${section('Local example',`<div class="catalog">${iconRow('request.js','scripts/request.js','','script-local',lang,'script',false)}</div>`)}</div><div data-script-owner="search">${section('Search limit',`<div class="catalog">${scriptRow('request.js',sourceFile,lang)+scriptRow('response.js','scripts/response.js',lang)}</div>`)}</div><div data-script-owner="preview">${section('Response preview',`<div class="catalog">${scriptRow('response.js','scripts/response.js',lang)}</div>`)}</div>`;
++ await write('repositories',shell('Sources',`<div class="catalog">${iconRow('Example Repository','https://example.com/repository.json',t('2件','2 Manifests'),'repository',lang,'source',false)+iconRow(t('ローカル','Local'),t('ファイルから追加したManifest','Manifests added from files'),t('1件','1 Manifest'),'manifests',lang,'local',false)}</div>`,'Sources','Sources','repositories',true));
++ await write('repository',shell('Example Repository',repoHero+catalog()+section(t('更新確認','Update Check'),checkRow('unknown',lang)+navRow(t('更新を確認','Check for Updates'),'repository-update',lang))+repoDetails));
++ await write('repository-current',shell('Example Repository',repoHero+catalog()+section(t('更新確認','Update Check'),checkRow('success',lang))+repoDetails.replace('12</div>','13</div>')));
++ await write('repository-search',shell('Example Repository',repoHero+catalog('Search')));
++ await write('repository-search-empty',shell('Example Repository',repoHero+catalog('missing')));
++ await write('repository-catalog-empty',shell('Example Repository',repoHero+section('',statusRow('neutral',t('Manifestがありません','No Manifests')),
++  t('このリポジトリにはManifestが登録されていません。','This repository has no Manifests.'))+primaryButton(t('更新を確認','Check for Updates'),'repository',lang)));
++ await write('repository-catalog-loading',shell('Example Repository',repoHero+section('',checkRow('checking',lang))+`<a class="text-link" href="${href('repository',lang)}">${t('一覧へ','View Catalog')}</a>`));
++ await write('repository-add',shell(t('リポジトリを追加','Add Repository'),`<label class="field-label" for="repository-url">URL</label><input class="field" id="repository-url" type="url" value="https://example.com/repository.json" aria-label="Repository URL">`+primaryButton(t('リポジトリを追加','Add Repository'),'repository-catalog-loading',lang)+`<p class="footer">${t('必要なManifestを選んで追加します。','Choose the Manifests you want to add.')}</p>`,'Sources'));
++ await write('repository-update',shell('Example Repository',repoHero+catalog()+section(t('更新確認','Update Check'),checkRow('catalogUpdate',lang)+row(t('取得した更新番号','Fetched update number'),'13'),t('一覧だけを更新します。Manifestは自動で追加されません。','Updates the catalog only. Manifests are not added automatically.'))+primaryButton(t('一覧を更新','Update Catalog'),'repository-current',lang)+repoDetails+section(t('Manifestの更新','Manifest Update'),navRow('Search limit 2.0.0','manifest-update',lang).replace('class="row"','class="row" data-update-offer'))));
++ await write('manifests',shell(t('ローカル','Local'),catalog('',true)));
++ const packages=()=>`<div class="catalog">${iconRow('Search limit',t('検索件数の上限を5に変更します。','Sets the search limit to 5.'),'','manifest-added',lang,'search',false).replace('class="row"','class="row" data-installed-template="search"').replace('<span class="chevron">','<span class="state"></span><span class="chevron">')+iconRow('Response preview',t('レスポンスのJSONを確認します。','Inspect the response JSON.'),'','manifest-preview-added',lang,'response',false).replace('class="row"','class="row" data-installed-template="preview"').replace('<span class="chevron">','<span class="state"></span><span class="chevron">')+iconRow('Local example',t('ファイルから追加したサンプル','An example added from a file'),'','manifest-local',lang,'local',false).replace('class="row"','class="row" data-installed-template="local"').replace('<span class="chevron">','<span class="state"></span><span class="chevron">')}</div>`;
++ await write('packages',shell('Packages',packages(),'Packages','Sources','repositories',true));
++ await write('packages-added',shell('Packages',packages(),'Packages','Sources','repositories',true));
++ await write('manifest',packagePage(hero(pill(t('無効にする','Disable'),'manifest-added',lang,'destructive'))+state(t('1.0.0 · 有効','1.0.0 · Enabled'),'','ok')+versions('1.0.0','1.0.0','1.0.0')+details));
++ await write('manifest-import',packagePage(hero(pill(t('追加','Add'),'manifest-added',lang))+state(t('未追加','Not added'),t('追加後に有効にできます。','Enable it after adding.'))+versions('1.0.0')+scope+details,'Search limit',true));
++ await write('manifest-added',packagePage(hero(pill(t('有効にする','Enable'),'manifest-confirm',lang)+`<a class="text-link" href="${href('packages-added',lang)}">Packages ›</a>`)+state(t('1.0.0 · 追加済み・無効','1.0.0 · Added · Disabled'))+versions('1.0.0','1.0.0')+details));
++ await write('manifest-confirm',packagePage(hero(pill(t('有効にする','Enable'),'manifest-confirm',lang))+scope+confirmation(t('Search limitを有効にして、対象の通信を変更しますか？','Enable Search limit and change matching traffic?'),'OK',t('キャンセル','Cancel'),lang)));
++ await write('manifest-preview',packagePage(packageHero('Response preview',t('レスポンスのJSONを確認します。','Inspect the response JSON.'),pill(t('追加','Add'),'manifest-preview-added',lang),'response')+state(t('未追加','Not added'),t('追加後に有効にできます。','Enable it after adding.'))+versions('1.0.0'), 'Response preview',true));
++ await write('manifest-preview-added',packagePage(packageHero('Response preview',t('レスポンスのJSONを確認します。','Inspect the response JSON.'),pill(t('有効にする','Enable'),'manifest-preview-confirm',lang),'response')+state(t('1.0.0 · 追加済み・無効','1.0.0 · Added · Disabled'))+versions('1.0.0','1.0.0'),'Response preview'));
++ await write('manifest-preview-confirm',packagePage(confirmation(t('Response previewを有効にしますか？','Enable Response preview?'),'OK',t('キャンセル','Cancel'),lang,'manifest-preview-enabled',false,'manifest-preview-added'),'Response preview'));
++ await write('manifest-preview-enabled',packagePage(packageHero('Response preview',t('レスポンスのJSONを確認します。','Inspect the response JSON.'),pill(t('無効にする','Disable'),'manifest-preview-added',lang,'destructive'),'response')+state(t('1.0.0 · 有効','1.0.0 · Enabled'),'','ok')+versions('1.0.0','1.0.0','1.0.0'),'Response preview'));
++ await write('manifest-local',packagePage(hero(pill(t('有効にする','Enable'),'manifest-local-confirm',lang),'Local example')+state(t('1.0.0 · 追加済み・無効','1.0.0 · Added · Disabled'))+versions(undefined,'1.0.0'),'Local example'));
++ await write('manifest-local-confirm',packagePage(confirmation(t('Local exampleを有効にして、対象の通信を変更しますか？','Enable Local example and change matching traffic?'),'OK',t('キャンセル','Cancel'),lang,'manifest-local-enabled',false,'manifest-local'),'Local example'));
++ await write('manifest-local-enabled',packagePage(hero(pill(t('無効にする','Disable'),'manifest-local',lang,'destructive'),'Local example')+state(t('1.0.0 · 有効','1.0.0 · Enabled'),'','ok')+versions(undefined,'1.0.0','1.0.0'),'Local example'));
++ await write('manifest-update',packagePage(hero(pill(t('2.0.0を追加','Add 2.0.0'),'manifest-enable',lang))+state(t('更新あり','Update available'),t('追加後も1.0.0が有効です。','1.0.0 stays enabled after adding.'),'warn')+versions('2.0.0','1.0.0','1.0.0')+details,'Search limit',true));
++ await write('manifest-enable',packagePage(hero(pill(t('2.0.0を有効にする','Enable 2.0.0'),'manifest-replace-confirm',lang))+state(t('2.0.0 · 追加済み・無効','2.0.0 · Added · Disabled'))+versions('2.0.0','2.0.0','1.0.0')+details));
++ await write('manifest-replace-confirm',packagePage(versions('2.0.0','2.0.0','1.0.0')+confirmation(t('Search limitの2.0.0を有効にして、1.0.0を置き換えますか？','Enable Search limit 2.0.0 and replace 1.0.0?'),'OK',t('キャンセル','Cancel'),lang,'manifest-updated',false,'manifest-enable')));
++ await write('manifest-updated',packagePage(hero(pill(t('無効にする','Disable'),'manifest-disabled-update',lang,'destructive'))+state(t('2.0.0 · 有効','2.0.0 · Enabled'),'','ok')+versions('2.0.0','2.0.0','2.0.0')+details));
++ await write('manifest-disabled-update',packagePage(hero(pill(t('2.0.0を有効にする','Enable 2.0.0'),'manifest-disabled-confirm',lang))+state(t('2.0.0 · 追加済み・無効','2.0.0 · Added · Disabled'))+versions('2.0.0','2.0.0')+details));
++ await write('manifest-disabled-confirm',packagePage(confirmation(t('Search limitの2.0.0を有効にして、対象の通信を変更しますか？','Enable Search limit 2.0.0 and change matching traffic?'),'OK',t('キャンセル','Cancel'),lang,'manifest-updated',false,'manifest-disabled-update')));
++ await write('scripts',shell('Scripts',fileList,'Scripts','Packages','packages',true));
++ await write('script',manifestPage('request.js',section(sourceFile,codeBlock(sourceCode)),{lang,tab:'Scripts',fullscreen:true}));
++ await write('script-local',manifestPage('request.js',section('Local example / scripts/request.js',codeBlock(sourceCode)),{lang,tab:'Scripts',fullscreen:true}));
++ await write('script-response',manifestPage('response.js',section('scripts/response.js',codeBlock('Interceptor.attach({\n  response: {\n    onLeave(res, cfg) {\n      console.log(res.body);\n    }\n  }\n});')),{lang,tab:'Scripts',fullscreen:true}));
++ await write('manifest-json',manifestPage('Manifest JSON',section('',codeBlock(JSON.stringify(manifest,null,2)).replace('<pre class="code"','<pre data-manifest-json class="code"')),{lang,tab:'Packages',fullscreen:true,donePage:'manifest'}));
++ await write('test',shell(t('テスト','Test'),section(t('対象','Target'),row('Hook','request.onEnter'))+section(t('サンプルイベント','Sample Event'),codeBlock(JSON.stringify({request:{method:'POST',host:'example.com',path:'/synthetic',body:{limit:20}}},null,2)))+section(t('サンプル設定','Sample Configuration'),codeBlock('{\n  "settings": {},\n  "endpoints": {}\n}'))+primaryButton(t('テストを実行','Run Test'),'test',lang)+section(t('結果','Result'),statusRow('neutral',t('未実行','Not run')),t('サンプルで実行します。実通信の変更や外部送信は行いません。','Uses sample data without changing live traffic or sending data externally.')),'Packages','Search limit','manifest'));
++ await write('empty',shell('Sources',section('',statusRow('neutral',t('リポジトリがありません','No repositories')),t('リポジトリを追加してManifestを探せます。','Add a repository to browse its Manifests.'))+primaryButton(t('リポジトリを追加','Add Repository'),'repository-add',lang),'Sources','Sources','repositories',true));
++ await write('error',shell('Example Repository',repoHero+section('',statusRow('error',t('一覧を取得できませんでした','Could not load the catalog')),t('接続を確認して、もう一度お試しください。','Check your connection and try again.'))+primaryButton(t('再試行','Try Again'),'repository',lang)+catalog()+repoDetails));
++ await write('components',shell(t('共通コンポーネント','Components'),section(t('一覧','Lists'),`<div class="catalog">${iconRow('Search limit',t('検索件数を変更します。','Changes the search limit.'),t('1.0.0 · 未追加','1.0.0 · Not added'),'manifest-import',lang,'search')}</div>`)+searchField(lang)+section(t('更新確認','Update Check'),checkStates.map(s=>checkRow(s,lang)).join(''))+hero(pill(t('追加','Add'),'manifest-added',lang))+`<div class="hero-action"><button class="pill disabled" disabled>${t('追加','Add')}</button><button class="pill disabled" disabled aria-busy="true">${t('追加中…','Adding…')}</button></div>`+versions('2.0.0','2.0.0','1.0.0')+confirmation(t('Search limitを有効にしますか？','Enable Search limit?'),'OK',t('キャンセル','Cancel'),lang,'manifest',true)+section(t('ファイル','Files'),scriptRow('request.js',sourceFile,lang)+codeBlock(sourceCode))));
+ }
+-await build('ja');
+-await build('en');
+-console.log('Built manifest browser mocks (16 screens, ja/en).');
+-
++await build('ja');await build('en');console.log(`Built ${generated.length/2} Manifest browser screens in JA/EN.`);

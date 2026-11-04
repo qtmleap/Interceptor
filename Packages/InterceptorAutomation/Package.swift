@@ -5,10 +5,12 @@ import PackageDescription
 let package = Package(
     name: "InterceptorAutomation",
     platforms: [.iOS(.v17), .macOS(.v14)],
-    products: [.executable(name: "interceptor-repository", targets: ["RepositoryPublisher"]), .library(name: "AutomationCore", targets: ["AutomationCore"]), .library(name: "AutomationRuntime", targets: ["AutomationRuntime"]), .library(name: "AutomationRepository", targets: ["AutomationRepository"])],
+    products: [.executable(name: "interceptor-repository", targets: ["RepositoryPublisher"]), .library(name: "AutomationCore", targets: ["AutomationCore"]), .library(name: "AutomationRuntime", targets: ["AutomationRuntime"]), .library(name: "AutomationRepository", targets: ["AutomationRepository"]), .library(name: "AutomationStorage", targets: ["AutomationStorage"])],
     targets: [
         .executableTarget(name: "RepositoryPublisher", dependencies: ["AutomationCore"]),
         .target(name: "AutomationCore"),
+        .target(name: "AutomationStorage", linkerSettings: [.linkedLibrary("sqlite3")]),
+        .testTarget(name: "AutomationStorageTests", dependencies: ["AutomationStorage"]),
         .target(
             name: "CQuickJS",
             exclude: ["Vendor/LICENSE", "Vendor/VERSION"],

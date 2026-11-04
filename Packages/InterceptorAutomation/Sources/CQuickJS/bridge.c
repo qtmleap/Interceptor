@@ -748,6 +748,156 @@ done:
     return ok ? 1 : v_fail(v);
 }
 
+
+
+// V2 has its own strict stage validator. All traversal uses native own data descriptors.
+static int optional_props(V *v, JSValueConst object, const char *const *keys, int n,
+                          unsigned required, JSValue *fields, unsigned *mask) {
+    for (int i = 0; i < n; i++) fields[i] = JS_UNDEFINED;
+    *mask = 0;
+    if (JS_GetClassID(object) != v->st->cls_object) return 0;
+    JSPropertyEnum *tab = NULL; uint32_t count = 0;
+    if (JS_GetOwnPropertyNames(v->ctx, &tab, &count, object, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0) return 0;
+    int ok = count <= (uint32_t)n;
+    for (uint32_t j = 0; ok && j < count; j++) {
+        JSValue key = JS_AtomToValue(v->ctx, tab[j].atom);
+        int slot = -1;
+        for (int k = 0; k < n; k++) if (string_equals(v, key, keys[k])) slot = k;
+        JS_FreeValue(v->ctx, key);
+        if (slot < 0 || !desc_data(v, object, tab[j].atom, &fields[slot])) { ok = 0; break; }
+        *mask |= 1u << slot;
+    }
+    JS_FreePropertyEnum(v->ctx, tab, count);
+    return ok && (*mask & required) == required;
+}
+
+static int bounded_component(V *v, JSValueConst value, size_t bytes, int depth) {
+    Buf saved = v->out;
+    int saved_depth = v->max_depth;
+    v->out = (Buf){ malloc(bytes + 1), 0, bytes, 0 };
+    v->max_depth = depth;
+    if (!v->out.p) { v->st->oom = 1; v->out = saved; v->max_depth = saved_depth; return 0; }
+    int ok = emit_value(v, value, 1);
+    free(v->out.p);
+    v->out = saved;
+    v->max_depth = saved_depth;
+    return ok;
+}
+
+static int b64_digit(unsigned char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    return c == '+' ? 62 : c == '/' ? 63 : -1;
+}
+
+static int raw_body_valid(V *v, JSValueConst base64, JSValueConst content_type) {
+    if (!JS_IsString(base64) || !JS_IsString(content_type)) return 0;
+    size_t n, tn;
+    const char *b = JS_ToCStringLen2(v->ctx, &n, base64, 0);
+    const char *t = JS_ToCStringLen2(v->ctx, &tn, content_type, 0);
+    int ok = b && t && n <= 43692 && n % 4 == 0 && tn > 2 && tn <= 256;
+    size_t pad = n && b && b[n-1] == '=' ? 1 : 0;
+    if (n > 1 && b && b[n-2] == '=') pad++;
+    if (ok) ok = n / 4 * 3 - pad <= 32768;
+    for (size_t i = 0; ok && i < n - pad; i++) ok = b64_digit((unsigned char)b[i]) >= 0;
+    if (ok && pad == 1) ok = (b64_digit((unsigned char)b[n-2]) & 3) == 0;
+    if (ok && pad == 2) ok = (b64_digit((unsigned char)b[n-3]) & 15) == 0;
+    int slash = 0;
+    for (size_t i = 0; ok && i < tn; i++) {
+        if (t[i] == '/') slash = 1;
+        ok = (unsigned char)t[i] >= 32 && (unsigned char)t[i] <= 126;
+    }
+    ok = ok && slash;
+    if (b) JS_FreeCString(v->ctx, b);
+    if (t) JS_FreeCString(v->ctx, t);
+    return ok;
+}
+
+static int workflow_query(V *v, JSValueConst query) {
+    int32_t n;
+    if (!array_prepare(v, query, &n) || n > 32) return 0;
+    static const char *const keys[] = {"name", "value"};
+    for (int i = 0; i < n; i++) {
+        JSValue pair, fields[2];
+        if (!array_get(v, query, i, &pair)) return 0;
+        int ok = exact_props(v, pair, keys, 2, fields);
+        JS_FreeValue(v->ctx, pair);
+        if (!ok) return 0;
+        ok = JS_IsString(fields[0]) && (JS_IsString(fields[1]) || JS_IsNull(fields[1]));
+        JS_FreeValue(v->ctx, fields[0]); JS_FreeValue(v->ctx, fields[1]);
+        if (!ok) return 0;
+    }
+    return bounded_component(v, query, 8192, 32);
+}
+
+static int workflow_body(V *v, JSValueConst body) {
+    static const char *const keys[] = {"mode", "value", "base64", "contentType"};
+    JSValue fields[4]; unsigned mask;
+    int ok = optional_props(v, body, keys, 4, 1, fields, &mask);
+    if (ok && string_equals(v, fields[0], "json")) ok = mask == 3 && bounded_component(v, fields[1], 32768, 32);
+    else if (ok && string_equals(v, fields[0], "raw")) ok = mask == 13 && raw_body_valid(v, fields[2], fields[3]);
+    else ok = 0;
+    for (int i = 0; i < 4; i++) JS_FreeValue(v->ctx, fields[i]);
+    return ok;
+}
+
+static int workflow_endpoint(V *v, JSValueConst config, JSValueConst endpoint) {
+    JSAtom atom = JS_NewAtom(v->ctx, "endpoints");
+    JSValue endpoints = JS_UNDEFINED;
+    int ok = atom != JS_ATOM_NULL && desc_data(v, config, atom, &endpoints);
+    if (atom != JS_ATOM_NULL) JS_FreeAtom(v->ctx, atom);
+    JSPropertyEnum *tab = NULL; uint32_t count = 0;
+    if (ok) ok = JS_GetClassID(endpoints) == v->st->cls_object && JS_GetOwnPropertyNames(v->ctx, &tab, &count, endpoints, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) >= 0;
+    JSValue approved = JS_UNDEFINED;
+    if (ok) ok = count == 1 && desc_data(v, endpoints, tab[0].atom, &approved) && JS_IsString(approved) && JS_IsString(endpoint);
+    if (ok) {
+        size_t n, m;
+        const char *a = JS_ToCStringLen2(v->ctx, &n, approved, 0), *b = JS_ToCStringLen2(v->ctx, &m, endpoint, 0);
+        ok = a && b && n == m && memcmp(a,b,n) == 0;
+        if (a) JS_FreeCString(v->ctx, a);
+        if (b) JS_FreeCString(v->ctx, b);
+    }
+    if (tab) JS_FreePropertyEnum(v->ctx, tab, count);
+    JS_FreeValue(v->ctx, approved); JS_FreeValue(v->ctx, endpoints);
+    return ok;
+}
+
+static int workflow_shape(V *v, JSValueConst root, int stage, JSValueConst config) {
+    static const char *const root_keys[] = {"actions"};
+    JSValue actions;
+    if (!exact_props(v, root, root_keys, 1, &actions)) return v_fail(v);
+    int32_t n;
+    int ok = array_prepare(v, actions, &n) && n <= 1;
+    if (ok && n == 1) {
+        JSValue action;
+        ok = array_get(v, actions, 0, &action);
+        if (ok) {
+            if (stage == 3) {
+                static const char *const keys[] = {"type", "endpointId", "json"};
+                JSValue f[3];
+                ok = exact_props(v, action, keys, 3, f);
+                if (ok) {
+                    ok = string_equals(v, f[0], "webhook") && workflow_endpoint(v, config, f[1]);
+                    for (int j = 0; j < 3; j++) JS_FreeValue(v->ctx, f[j]);
+                }
+            } else {
+                static const char *const keys[] = {"type", "method", "path", "query", "body", "continuation"};
+                JSValue fields[6]; unsigned mask;
+                ok = optional_props(v, action, keys, 6, 7, fields, &mask);
+                if (ok) ok = string_equals(v, fields[0], "sameOrigin") && JS_IsString(fields[1]) && JS_IsString(fields[2]);
+                if (ok && (mask & 8)) ok = workflow_query(v, fields[3]);
+                if (ok && (mask & 16)) ok = !string_equals(v, fields[1], "GET") && !string_equals(v, fields[1], "HEAD") && workflow_body(v, fields[4]);
+                if (ok && (mask & 32)) ok = JS_GetClassID(fields[5]) == v->st->cls_object && bounded_component(v, fields[5], 8192, 16);
+                for (int j = 0; j < 6; j++) JS_FreeValue(v->ctx, fields[j]);
+            }
+            JS_FreeValue(v->ctx, action);
+        }
+    }
+    JS_FreeValue(v->ctx, actions);
+    return ok ? 1 : v_fail(v);
+}
+
 // MARK: failure classification (no JS-visible conversion of the exception)
 
 static int classify_exception(JSContext *ctx, RunState *st, int fallback) {
@@ -792,7 +942,7 @@ void qjs_result_free(QJSResult *result) {
 
 // MARK: entry point
 
-QJSResult qjs_run(QJSCancelToken *token, const QJSLimits *limits,
+static QJSResult run_internal(int workflow_stage, QJSCancelToken *token, const QJSLimits *limits,
                   const uint8_t *source, size_t source_len,
                   const char *hook,
                   const uint8_t *event_json, size_t event_len,
@@ -809,7 +959,7 @@ QJSResult qjs_run(QJSCancelToken *token, const QJSLimits *limits,
     st.token = token;
     st.deadline_ns = now_ns() + (uint64_t)(limits ? limits->deadline_ms : 0) * 1000000ull;
 
-    if (!limits || !hook || (strcmp(hook, "onRequest") && strcmp(hook, "onResponse")) ||
+    if (!limits || !hook || (workflow_stage == 3 ? strcmp(hook, "onHTTPResult") : (strcmp(hook, "onRequest") && strcmp(hook, "onResponse"))) ||
         limits->deadline_ms == 0 || limits->heap_bytes == 0 || limits->stack_bytes == 0 ||
         limits->max_result_bytes == 0 || limits->max_result_depth == 0) {
         return res;
@@ -903,7 +1053,7 @@ QJSResult qjs_run(QJSCancelToken *token, const QJSLimits *limits,
         v.out.cap = limits->max_result_bytes;
         v.out.p = malloc(v.out.cap + 1);
         if (!v.out.p) { status = QJS_MEMORY_OR_STACK; goto cleanup; }
-        int ok = emit_result(&v, ret);
+        int ok = workflow_stage ? (workflow_shape(&v, ret, workflow_stage, cfgv) && (workflow_stage == 3 ? emit_result(&v, ret) : emit_value(&v, ret, 1))) : emit_result(&v, ret);
         if (ok) v.out.p[v.out.len] = 0;
         // Defense in depth: re-scan the serialized bytes natively, then the final budget check.
         if (ok && !json_check(v.out.p, v.out.len, (int)limits->max_result_depth)) ok = 0;
@@ -936,4 +1086,20 @@ cleanup:
     free(cfg);
     res.status = status;
     return res;
+}
+
+QJSResult qjs_run(QJSCancelToken *token, const QJSLimits *limits,
+                  const uint8_t *source, size_t source_len, const char *hook,
+                  const uint8_t *event_json, size_t event_len,
+                  const uint8_t *config_json, size_t config_len) {
+    return run_internal(0, token, limits, source, source_len, hook, event_json, event_len, config_json, config_len);
+}
+
+QJSResult qjs_run_workflow(QJSCancelToken *token, const QJSLimits *limits, int32_t stage,
+                  const uint8_t *source, size_t source_len,
+                  const uint8_t *event_json, size_t event_len,
+                  const uint8_t *config_json, size_t config_len) {
+    if (stage < 1 || stage > 3) { QJSResult invalid = {QJS_INVALID_INPUT, NULL, 0}; return invalid; }
+    const char *hook = stage == 1 ? "onRequest" : stage == 2 ? "onResponse" : "onHTTPResult";
+    return run_internal(stage, token, limits, source, source_len, hook, event_json, event_len, config_json, config_len);
 }

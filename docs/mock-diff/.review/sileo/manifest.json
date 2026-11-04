@@ -1,0 +1,8 @@
+{
+  "files": {
+    "SPEC.md": "08aa134869e9ff1b6afd727bc023261538f16142dc866e625381d8914d4b9e93",
+    "src/manifest-components.ts": "0ce6341d6ddb50f9fa69ad5aef1750581c0550730461b797d25af3d2c8de6155",
+    "src/manifest-screens.ts": "cdd512171a2575e1bfa2ecd9742610aec0cad73444019b17d5d10da8a43b11f5"
+  },
+  "delta": "ActualVieweriframe sandbox allow-scripts allow-forms NOallow-same-origin; sessionStorage throws. ReplacedallstoragewithdemoURLquery prop onalllinks, removedhistoryrewrite, no sandboxweakening. StateonlypernavigationURL,noglobalstore, staleBackjusthistoricalfixture nooverwrite. Allnativestatusdataunchanged."
+}

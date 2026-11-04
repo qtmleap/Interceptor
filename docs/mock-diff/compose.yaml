@@ -1,0 +1,25 @@
+name: interceptor-live-scripts-mocks-20261018
+services:
+  mock-diff:
+    image: ghcr.io/qtmleap/mock-diff-viewer@sha256:fa7dfb78263088a51036d892b6f99ec32fce1bc3f3181fc7ec47d818cfdd6c42
+    pull_policy: if_not_present
+    ports:
+      - "100.119.207.36:12356:3000"
+    volumes:
+      - .:/workspace
+      - /Users/devonly/.local/share/interceptor-mock-diff/apple-fonts:/usr/local/share/fonts/interceptor-apple:ro
+      - mock_diff_data:/data
+    init: true
+    restart: unless-stopped
+    mem_limit: 4g
+    cpus: 2.0
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3000/api/screens').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+volumes:
+  mock_diff_data:
+    external: true
+    name: interceptor-mock-diff-webp-20261022

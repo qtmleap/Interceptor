@@ -1,0 +1,15 @@
+{
+  "time": "2026-10-20T14:36:49.168160+00:00",
+  "workspace": "/Users/devonly/Developer/interceptor-live-scripts-20261018/Interceptor/docs/mock-diff",
+  "baseCopies": "/Users/devonly/Developer/interceptor-http-hooks-20261019/build/http-hooks/live-completion/remaining-verification/sileo-reference-refinement/before",
+  "files": {
+    "SPEC.md": "80aaa85fe21862685b0f24fa8641a67d2c03088a7d2374e060b9f82259cfd678",
+    "src/manifest-components.ts": "cc22bde76db2ecee660c488fece58431ad4e6b15c6099fae036057d2e61bdce0",
+    "src/manifest-screens.ts": "f3e9283d163c33635e3b6fb021d23c493703c626fca27958435e99a2eabc9abf",
+    "src/manifest-fixtures.ts": "65ae5e0833106ee5bc46a9afb236d5e86f7f90f9f6715cf2d671eecce821a799",
+    "src/sileo-reference-style.ts": "c3de9e4e95d88f2e9811f8facdd36e08283df340d76a07a7202cc11008a3b367"
+  },
+  "scope": "Mock-only Sileo screenshot refinement, target host first view, source/package/script/delete flows; native app and adoption unchanged",
+  "fingerprint": "197de86e8ae98cafeb0275bfaba3ba63af402c4f597bf619ab27da4807da18ed",
+  "delta": "User wording clarification: purpose before separately labeled version/status; Enabled footer. Fix review1: JSON Done/Test back retarget including absent state; seed fixtures only direct links without demo, explicit Add preserves same revision active state; empty Packages vs no match; disable native link drag, keyboard Delete via same confirm; Manage remains keyboard path."
+}

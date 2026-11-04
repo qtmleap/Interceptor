@@ -59,6 +59,13 @@ QJSResult qjs_run(QJSCancelToken *token, const QJSLimits *limits,
                   const uint8_t *event_json, size_t event_len,
                   const uint8_t *config_json, size_t config_len);
 
+/// Strict v2 stage path: 1=request planning, 2=response planning, 3=HTTP result.
+/// The v1 hook/validator remains separate and unchanged.
+QJSResult qjs_run_workflow(QJSCancelToken *token, const QJSLimits *limits, int32_t stage,
+                  const uint8_t *source, size_t source_len,
+                  const uint8_t *event_json, size_t event_len,
+                  const uint8_t *config_json, size_t config_len);
+
 void qjs_result_free(QJSResult *result);
 
 #ifdef __cplusplus

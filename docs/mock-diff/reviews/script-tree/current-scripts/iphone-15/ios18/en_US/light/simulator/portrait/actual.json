@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "imageSha256": "d6c1fa758271bdbbfdecaf3f8190bc0d444e33dbe1cbc2cf6ae66876e415995e",
+  "capturedAt": "2026-10-23T20:11:13.196329+00:00",
+  "commit": "7125f8f99f8f435760e8e6839ce8ffddeacbf937",
+  "dirty": true,
+  "contentSha256": "a1928e9ffc5c069f0b8b3fcedfbbcb863e54015bd198e4f7571a0dc2bf19da60",
+  "contentDescription": "Frozen native Scripts tree source manifest, captured by simctl at observed XCTest action; verify visible state with OCR before comparison.",
+  "operatingSystem": {
+    "name": "iOS",
+    "version": "18.5",
+    "build": "22F77"
+  },
+  "device": {
+    "id": "iphone-15",
+    "model": "iPhone 15"
+  },
+  "scale": 3,
+  "orientation": "portrait",
+  "locale": "en_US",
+  "theme": "light",
+  "origin": "simulator",
+  "runId": "script-tree-direct-source",
+  "compression": {
+    "sourceFormat": "PNG",
+    "sourceSha256": "a24e695eb40bff4ba411bd4def2b23f95721db8ebcc509e8a8ab0e1f113cbef7",
+    "sourceBytes": 133262,
+    "dimensions": [
+      1179,
+      2556
+    ],
+    "sourceBitDepth": 8,
+    "scale": 3,
+    "iccSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tool": "cwebp lossless exact metadata all + Pillow12.3.0",
+    "status": "lossless-verified",
+    "verifiedIdenticalRGBA": true,
+    "path": "/Users/devonly/Developer/interceptor-outbound-methods/ScriptTree/.codex/script-tree/native-direct-source/18-5/fullscreen/scripts-root.webp",
+    "webpSha256": "d6c1fa758271bdbbfdecaf3f8190bc0d444e33dbe1cbc2cf6ae66876e415995e",
+    "webpBytes": 26720
+  },
+  "checkpointTrigger": "scripts-root",
+  "triggerOccurrencesWhenCaptured": 1
+}

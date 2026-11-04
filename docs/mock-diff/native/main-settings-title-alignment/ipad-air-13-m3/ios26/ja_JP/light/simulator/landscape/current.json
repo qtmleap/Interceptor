@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "imageSha256": "d1b7033ad375171813747883773a3d17c314d6068763cf510e4c0169228b4e3b",
+  "capturedAt": "2026-10-22T04:04:43.675875+00:00",
+  "commit": "efeb620c8bd141fd902851a82298540d56d56acc",
+  "dirty": true,
+  "contentSha256": "ab3a753558d42f4c24a014bb460bba7937b531ad6433e451222f8d8b22acc8b2",
+  "contentDescription": "Source18 immutable clean efeb620c archive plus explicit ContentView and TabNavigationAlignment overlay; production fingerprint; retained Simulator build-for-testing host normally launched without XCTest",
+  "operatingSystem": {
+    "name": "iOS",
+    "version": "26.5",
+    "build": "23F77"
+  },
+  "device": {
+    "id": "ipad-air-13-m3",
+    "model": "iPad Air 13-inch (M3)"
+  },
+  "scale": 2,
+  "orientation": "landscape",
+  "locale": "ja_JP",
+  "theme": "light",
+  "origin": "simulator",
+  "dependenciesSha256": "f50711a5594d49050c9755542c4c9e58b9a88216f0e3fb7829a4b58ad286eba2",
+  "runId": "76c5376d-b395-41b3-ab00-f33f57564990"
+}

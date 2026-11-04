@@ -1,0 +1,161 @@
+{
+  "defaults": {
+    "versions": {
+      "current": {
+        "type": "image",
+        "expectedRevision": {
+          "commit": "5d510fda0bd72d43cf7e537baa969e8691164601",
+          "contentSha256": "da35b584e1f3f5771b84aab8ec8b376376754c3419b2084d3c361f5c20922dcb"
+        },
+        "path": "../native/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/current.webp",
+        "provenance": "../native/{screen}/{device}/{os}/{locale}/{theme}/{origin}/{orientation}/current.json"
+      }
+    }
+  },
+  "screens": [
+    {
+      "id": "plugin-catalog-package-detail",
+      "name": "Package",
+      "category": "Screens/Plugins/Native catalog",
+      "devices": [
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "landscape"
+          ],
+          "locales": [
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "dark"
+          ],
+          "origins": [
+            "simulator"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "plugin-catalog-package-version",
+      "name": "Version",
+      "category": "Screens/Plugins/Native catalog",
+      "devices": [
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "landscape"
+          ],
+          "locales": [
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "dark"
+          ],
+          "origins": [
+            "simulator"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "plugin-catalog-manifest-json",
+      "name": "Manifest JSON",
+      "category": "Screens/Plugins/Native catalog",
+      "devices": [
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "landscape"
+          ],
+          "locales": [
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "dark"
+          ],
+          "origins": [
+            "simulator"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "plugin-catalog-packages-relaunch",
+      "name": "Packages after relaunch",
+      "category": "Screens/Plugins/Native catalog",
+      "devices": [
+        {
+          "id": "ipad-air-13-m3",
+          "name": "iPad Air 13-inch (M3)",
+          "viewport": {
+            "width": 1024,
+            "height": 1366,
+            "deviceScaleFactor": 2
+          },
+          "orientations": [
+            "landscape"
+          ],
+          "locales": [
+            "ja_JP"
+          ],
+          "colorSchemes": [
+            "dark"
+          ],
+          "origins": [
+            "simulator"
+          ],
+          "operatingSystems": [
+            {
+              "id": "ios26",
+              "name": "iOS",
+              "version": "26.5",
+              "build": "23F77"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
