@@ -415,6 +415,7 @@ final class AutomationUITests: XCTestCase {
         let detail = scrollContainer(app, "plugins.package.detail")
 
         openModify(app)
+        try await captureModifyMenuIfRequested(repositoryURL: repositoryURL, app: app)
         cancelModify(app)
         assertEnabled(false, app: app)
 
@@ -763,6 +764,33 @@ private extension AutomationUITests {
         return identified
     }
 
+    /// The opt-in fixture handler captures and verifies exact lossless WebP before this UI proceeds.
+    @MainActor
+    func captureModifyMenuIfRequested(repositoryURL: URL, app: XCUIApplication) async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["INTERCEPTOR_MODIFY_MENU_CAPTURE"] == "1" else { return }
+        let token = try XCTUnwrap(environment["INTERCEPTOR_REPOSITORY_FIXTURE_TOKEN"])
+        var request = URLRequest(url: repositoryURL.deletingLastPathComponent().appendingPathComponent("__modify_menu_capture"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue(token, forHTTPHeaderField: "X-Interceptor-Capture-Nonce")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "locale": "en_US", "scale": Int(UIScreen.main.scale.rounded()),
+            "pointWidth": Int(app.frame.width.rounded()), "pointHeight": Int(app.frame.height.rounded()),
+            "idiom": UIDevice.current.userInterfaceIdiom == .pad ? "ipad" : "iphone",
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForResource = 20
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let (data, response) = try await session.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode
+        XCTAssertEqual(status, 200)
+        let captured = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(captured["verified"] as? Bool, true)
+    }
+
     @MainActor
     func cancelModify(_ app: XCUIApplication) {
         let reinstall = modifyButton(.reinstall, app: app)
@@ -1057,6 +1085,163 @@ private extension AutomationUITests {
 }
 
 // MARK: - Package Search tab
+
+extension AutomationUITests {
+    /// Opt-in Simulator capture only. Installs once, preserves the suite across both process languages,
+    /// and leaves all further install/approval actions to the separate functional tests.
+    @MainActor
+    func testCaptureMatrix() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        try XCTSkipUnless(environment["INTERCEPTOR_CAPTURE_MATRIX"] == "1", "capture matrix not requested")
+        guard let repositoryURL = await requiredRepositoryURL() else { return }
+        let allowed: Set<String> = ["home", "settings", "sources", "packages", "detail", "version", "modify", "scripts", "search"]
+        let screens = Set((environment["INTERCEPTOR_CAPTURE_MATRIX_SCREENS"] ?? allowed.sorted().joined(separator: ","))
+            .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+        XCTAssertFalse(screens.isEmpty)
+        XCTAssertTrue(screens.isSubset(of: allowed), "unknown capture screen")
+        let device = XCUIDevice.shared
+        let originalAppearance = device.appearance
+        let originalOrientation = device.orientation
+        defer { device.appearance = originalAppearance; device.orientation = originalOrientation }
+        let pad = UIDevice.current.userInterfaceIdiom == .pad
+        let orientations: [(UIDeviceOrientation, String)] = pad ? [(.portrait, "portrait"), (.landscapeLeft, "landscape")] : [(.portrait, "portrait")]
+        // The existing fixture bootstrap expects the regular-width sidebar Close to be visible.
+        device.orientation = pad ? .landscapeLeft : .portrait
+        let suite = "Interceptor.UITests.Matrix.\(UUID().uuidString)"
+        var app = launch(japanese: false, suite: suite)
+        defer { app.terminate() }
+        installMulti(repositoryURL, app: app, japanese: false)
+        // Leave the Source -> Categories -> Catalog push stack before seeking the root Close button.
+        selectTab("packages", app: app)
+        var browserOpen = true
+        for japanese in [false, true] {
+            if japanese {
+                app.terminate()
+                app = launch(japanese: true, suite: suite)
+                browserOpen = false
+                let agree = app.buttons.matching(identifier: "同意する").firstMatch
+                if !settingsTab(app, japanese: true).exists, agree.waitForExistence(timeout: 3) { agree.tap() }
+            }
+            let locale = japanese ? "ja_JP" : "en_US"
+            for (appearance, name) in [(XCUIDevice.Appearance.light, "light"), (.dark, "dark")] {
+                device.appearance = appearance
+                for (orientation, orientationName) in orientations {
+                    if browserOpen {
+                        if scrollContainer(app, "plugins.package.detail").exists {
+                            goBack(app, from: "Multi-file hooks")
+                        }
+                        var close = app.buttons.matching(identifier: "plugins.close").allElementsBoundByIndex.first(where: \.isHittable)
+                        if close == nil, let sidebar = app.buttons.matching(identifier: "ToggleSidebar").allElementsBoundByIndex.first(where: \.isHittable) {
+                            sidebar.tap()
+                            close = app.buttons.matching(identifier: "plugins.close").allElementsBoundByIndex.first(where: \.isHittable)
+                        }
+                        try XCTUnwrap(close, "browser close button").tap()
+                        XCTAssertTrue(scrollContainer(app, "plugins.package.detail").waitForNonExistence(timeout: 5))
+                        browserOpen = false
+                    }
+                    device.orientation = orientation
+                    let capture: (String) async throws -> Void = { screen in
+                        if screens.contains(screen) {
+                            try await self.captureMatrixCheckpoint(screen, locale: locale, appearance: name,
+                                                                   orientation: orientationName, repositoryURL: repositoryURL, app: app)
+                        }
+                    }
+                    let selectCaptureTab: (String) throws -> Void = { tab in
+                        self.selectTab(tab, app: app)
+                        guard pad, orientationName == "portrait", app.frame.width < app.frame.height else { return }
+                        let sidebar = app.staticTexts["plugins.tab." + tab]
+                        let content = self.scrollContainer(app, "plugins." + tab)
+                        guard sidebar.exists, sidebar.isHittable, sidebar.frame.intersects(content.frame) else { return }
+                        // iPadOS 18 can leave the selected sidebar floating above the detail column.
+                        let dismiss = app.otherElements.matching(identifier: "PopoverDismissRegion").firstMatch
+                        XCTAssertTrue(dismiss.waitForExistence(timeout: 5), "portrait sidebar dismiss region exists")
+                        XCTAssertTrue(dismiss.isHittable, "portrait sidebar dismiss region is hittable")
+                        dismiss.tap()
+                        let hidden = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                            !sidebar.exists || !sidebar.isHittable
+                        }, object: nil)
+                        XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed, "portrait sidebar dismissed before capture")
+                    }
+                    if screens.contains("home") {
+                        let label = japanese ? "ホーム" : "Home"
+                        let tabs = app.tabBars.buttons.matching(NSPredicate(format: "label == %@", label))
+                        let home = tabs.firstMatch.exists ? tabs.firstMatch : app.buttons.matching(NSPredicate(format: "identifier == 'paperplane.fill' AND label == %@", label)).firstMatch
+                        XCTAssertTrue(home.waitForExistence(timeout: 5))
+                        home.tap()
+                        try await capture("home")
+                    }
+                    let settings = settingsTab(app, japanese: japanese)
+                    XCTAssertTrue(settings.waitForExistence(timeout: 5))
+                    settings.tap()
+                    try await capture("settings")
+                    if screens.isDisjoint(with: ["sources", "packages", "detail", "version", "modify", "scripts", "search"]) { continue }
+                    reach(app.buttons.matching(identifier: "settings.plugins").firstMatch, in: app.collectionViews.firstMatch).tap()
+                    browserOpen = true
+                    try selectCaptureTab("sources")
+                    try await capture("sources")
+                    try selectCaptureTab("packages")
+                    if scrollContainer(app, "plugins.package.detail").exists {
+                        goBack(app, from: "Multi-file hooks")
+                    }
+                    try await capture("packages")
+                    if !screens.isDisjoint(with: ["detail", "version", "modify"]) {
+                        openInstalled(Self.multiID, app: app)
+                        assertEnabled(false, app: app)
+                        app.buttons["plugins.package.tab.details"].tap()
+                        try await capture("detail")
+                        if screens.contains("version") {
+                            app.buttons["plugins.package.tab.version"].tap()
+                            XCTAssertTrue(app.staticTexts["plugins.package.version"].waitForExistence(timeout: 5))
+                            try await capture("version")
+                            app.buttons["plugins.package.tab.details"].tap()
+                        }
+                        if screens.contains("modify") {
+                            openModify(app)
+                            try await capture("modify")
+                            cancelModify(app)
+                        }
+                    }
+                    if screens.contains("scripts") { try selectCaptureTab("scripts"); try await capture("scripts") }
+                    if screens.contains("search") { try selectCaptureTab("search"); try await capture("search") }
+                }
+            }
+        }
+    }
+
+    /// The host acknowledges only after native capture -> exact WebP -> pixel/profile verification -> manifest.
+    @MainActor
+    private func captureMatrixCheckpoint(_ screen: String, locale: String, appearance: String, orientation: String,
+                                         repositoryURL: URL, app: XCUIApplication) async throws {
+        var previous = CGRect.null
+        var unchangedSince = Date()
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let frame = app.frame
+            guard frame.width > 0, frame.height > 0, (frame.width > frame.height) == (orientation == "landscape") else { return false }
+            if frame != previous { previous = frame; unchangedSince = Date(); return false }
+            return app.state == .runningForeground && Date().timeIntervalSince(unchangedSince) >= 0.5
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 8), .completed)
+        let token = try XCTUnwrap(ProcessInfo.processInfo.environment["INTERCEPTOR_REPOSITORY_FIXTURE_TOKEN"])
+        var request = URLRequest(url: repositoryURL.deletingLastPathComponent().appendingPathComponent("__matrix_capture"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue(token, forHTTPHeaderField: "X-Interceptor-Capture-Nonce")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "screen": screen, "locale": locale, "appearance": appearance, "orientation": orientation,
+            "scale": Int(UIScreen.main.scale.rounded()), "pointWidth": Int(app.frame.width.rounded()),
+            "pointHeight": Int(app.frame.height.rounded()), "idiom": UIDevice.current.userInterfaceIdiom == .pad ? "ipad" : "iphone",
+        ])
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForResource = 60
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let (data, response) = try await session.data(for: request)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        let result = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(result["verified"] as? Bool, true)
+    }
+}
 
 extension AutomationUITests {
     /// Fixture identities: `summaryID` lives in the primary source ("Local repository fixture", author
