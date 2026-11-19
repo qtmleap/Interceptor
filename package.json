@@ -1,0 +1,17 @@
+{
+    "name": "interceptor-plugin-docs",
+    "private": true,
+    "type": "module",
+    "packageManager": "bun@1.4.2",
+    "scripts": {
+        "docs:test": "bun test tests/docs-repository.test.ts",
+        "docs:dev": "bun --bun vitepress dev docs/site --host 127.0.0.1",
+        "docs:build": "bun --bun vitepress build docs/site",
+        "docs:preview": "bun --bun vite preview docs/site --outDir .vitepress/dist --host 127.0.0.1 --strictPort",
+        "docs:diagrams": "bun scripts/render-doc-diagrams.ts"
+    },
+    "devDependencies": {
+        "vitepress": "1.6.4",
+        "vite": "5.4.21"
+    }
+}

@@ -177,3 +177,7 @@ GoogleService-Info.plist
 .env
 .env.*
 !.env.example
+# VitePress documentation (Bun)
+node_modules/
+docs/site/.vitepress/cache/
+docs/site/.vitepress/dist/

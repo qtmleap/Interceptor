@@ -1,0 +1,27 @@
+{
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "f08c828f-52b6-41bc-b465-fddffae57141",
+    "name": "Sample request preview",
+    "version": "1.0.1",
+    "subscriptions": [
+      {
+        "phase": "request.completed",
+        "match": {
+          "hosts": ["example.com"],
+          "methods": ["GET"],
+          "path": { "kind": "exact", "value": "/synthetic" }
+        }
+      }
+    ],
+    "read": {
+      "metadata": ["method", "host"],
+      "headers": [],
+      "queryKeys": [],
+      "body": { "mode": "none" }
+    },
+    "endpointBindings": ["preview"],
+    "settings": {}
+  },
+  "source": "function onRequest(event, config) {\n  return {\n    actions: [{\n      type: \"webhook\",\n      endpointId: config.endpoints.preview,\n      json: {\n        eventId: event.id,\n        method: event.request.method,\n        host: event.request.host\n      }\n    }]\n  };\n}\n"
+}
